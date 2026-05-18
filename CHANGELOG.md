@@ -1,3 +1,8 @@
+# 0.1.1
+
+- Updated the changelog to use English content for pub.dev language checks.
+- Added dartdoc comments for the public libraries, image processing APIs, and crop editor APIs.
+
 # 0.1.0
 
 - Initial release of `flutter_image_clip`.
