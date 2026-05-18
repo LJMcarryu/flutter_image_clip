@@ -3,6 +3,64 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 
+/// Base exception type thrown by `flutter_image_clip`.
+class ImageClipException implements Exception {
+  /// Creates an image clip exception with a readable [message].
+  const ImageClipException(this.message, {this.cause});
+
+  /// Human-readable error message.
+  final String message;
+
+  /// Optional lower-level error that caused this exception.
+  final Object? cause;
+
+  @override
+  String toString() {
+    if (cause == null) {
+      return '$runtimeType: $message';
+    }
+    return '$runtimeType: $message ($cause)';
+  }
+}
+
+/// Thrown when encoded image bytes cannot be decoded.
+class ImageClipDecodeException extends ImageClipException {
+  /// Creates a decode exception.
+  const ImageClipDecodeException(super.message, {super.cause});
+}
+
+/// Thrown when an image processing operation fails.
+class ImageClipProcessingException extends ImageClipException {
+  /// Creates a processing exception.
+  const ImageClipProcessingException(super.message, {super.cause});
+}
+
+/// Thrown when a crop region is invalid.
+class ImageClipInvalidCropRegionException extends ImageClipException {
+  /// Creates an invalid crop region exception.
+  const ImageClipInvalidCropRegionException(super.message);
+}
+
+/// Thrown when an image exceeds configured pixel limits.
+class ImageClipImageTooLargeException extends ImageClipException {
+  /// Creates an image size limit exception.
+  const ImageClipImageTooLargeException(
+    super.message, {
+    required this.width,
+    required this.height,
+    required this.maxPixels,
+  });
+
+  /// Image width in pixels.
+  final int width;
+
+  /// Image height in pixels.
+  final int height;
+
+  /// Configured pixel limit that was exceeded.
+  final int maxPixels;
+}
+
 /// Encoded output formats supported by [ImageProcessor].
 enum ImageClipOutputFormat {
   /// Portable Network Graphics output with lossless compression.
@@ -10,6 +68,55 @@ enum ImageClipOutputFormat {
 
   /// JPEG output with configurable lossy compression quality.
   jpeg,
+}
+
+/// Runtime guardrails for decoding and writing image pixels.
+class ImageClipProcessingSettings {
+  /// Creates processing settings.
+  const ImageClipProcessingSettings({
+    this.maxInputPixels = 48000000,
+    this.maxOutputPixels = 16000000,
+    this.autoDownscale = true,
+  });
+
+  /// Creates settings without input or output pixel limits.
+  const ImageClipProcessingSettings.unrestricted()
+    : maxInputPixels = null,
+      maxOutputPixels = null,
+      autoDownscale = false;
+
+  /// Maximum decoded input pixels before processing starts.
+  ///
+  /// Set to null to allow any input size.
+  final int? maxInputPixels;
+
+  /// Maximum output pixels after processing.
+  ///
+  /// When [autoDownscale] is true, larger outputs are resized down. When false,
+  /// larger outputs throw [ImageClipImageTooLargeException].
+  final int? maxOutputPixels;
+
+  /// Whether output images larger than [maxOutputPixels] should be resized.
+  final bool autoDownscale;
+
+  /// Converts these settings to the map used by the background processor.
+  Map<String, Object?> toMap() => <String, Object?>{
+    'maxInputPixels': maxInputPixels,
+    'maxOutputPixels': maxOutputPixels,
+    'autoDownscale': autoDownscale,
+  };
+
+  /// Creates settings from the map used by the background processor.
+  static ImageClipProcessingSettings fromMap(Map<Object?, Object?>? map) {
+    if (map == null) {
+      return const ImageClipProcessingSettings();
+    }
+    return ImageClipProcessingSettings(
+      maxInputPixels: _nullableIntOf(map['maxInputPixels']),
+      maxOutputPixels: _nullableIntOf(map['maxOutputPixels']),
+      autoDownscale: _boolOf(map['autoDownscale'], fallback: true),
+    );
+  }
 }
 
 /// Encoding options used when an image operation writes output bytes.
@@ -239,6 +346,14 @@ class ColorAdjustment {
 
 /// Performs image decoding and transformations on a background isolate.
 class ImageProcessor {
+  /// Creates an image processor.
+  const ImageProcessor({
+    this.processingSettings = const ImageClipProcessingSettings(),
+  });
+
+  /// Runtime guardrails used for decode and output processing.
+  final ImageClipProcessingSettings processingSettings;
+
   /// Creates a generated sample image for demos and tests.
   Future<EditedImage> createSample() =>
       _run(<String, Object?>{'kind': 'sample', 'label': 'Sample image'});
@@ -358,9 +473,13 @@ class ImageProcessor {
   }
 
   Future<EditedImage> _run(Map<String, Object?> request) async {
+    final payload = <String, Object?>{
+      ...request,
+      'processing': processingSettings.toMap(),
+    };
     final result = await compute(
       _runImageJob,
-      request,
+      payload,
       debugLabel: 'image-job',
     );
     return EditedImage.fromMap(result);
@@ -377,6 +496,11 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
         ? null
         : Map<Object?, Object?>.from(request['output']! as Map),
   );
+  final processingSettings = ImageClipProcessingSettings.fromMap(
+    request['processing'] == null
+        ? null
+        : Map<Object?, Object?>.from(request['processing']! as Map),
+  );
 
   late img.Image image;
   late String operation;
@@ -387,11 +511,11 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
       operation = 'Create sample';
       break;
     case 'decode':
-      image = _decode(request['bytes']! as Uint8List);
+      image = _decode(request['bytes']! as Uint8List, processingSettings);
       operation = 'Decode';
       break;
     case 'crop':
-      image = _decodeSource(request);
+      image = _decodeSource(request, processingSettings);
       image = _cropCenter(
         image,
         widthRatio: _doubleOf(request['widthRatio'], fallback: 0.75),
@@ -401,7 +525,7 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
       operation = 'Crop';
       break;
     case 'cropRegion':
-      image = _decodeSource(request);
+      image = _decodeSource(request, processingSettings);
       image = _cropRegion(
         image,
         x: _intOf(request['x'], fallback: 0),
@@ -413,7 +537,7 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
       operation = 'Crop region';
       break;
     case 'rotate':
-      image = _decodeSource(request);
+      image = _decodeSource(request, processingSettings);
       image = img.copyRotate(
         image,
         angle: _intOf(request['angle'], fallback: 90),
@@ -422,17 +546,17 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
       operation = 'Rotate';
       break;
     case 'flipHorizontal':
-      image = _decodeSource(request);
+      image = _decodeSource(request, processingSettings);
       image = img.flipHorizontal(image);
       operation = 'Flip horizontal';
       break;
     case 'flipVertical':
-      image = _decodeSource(request);
+      image = _decodeSource(request, processingSettings);
       image = img.flipVertical(image);
       operation = 'Flip vertical';
       break;
     case 'resize':
-      image = _decodeSource(request);
+      image = _decodeSource(request, processingSettings);
       image = _resizeLongSide(
         image,
         _intOf(request['maxSide'], fallback: 1080),
@@ -440,7 +564,7 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
       operation = 'Resize';
       break;
     case 'adjust':
-      image = _decodeSource(request);
+      image = _decodeSource(request, processingSettings);
       image = img.adjustColor(
         image,
         brightness: _doubleOf(request['brightness'], fallback: 1),
@@ -451,13 +575,16 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
       break;
     case 'exportImage':
     case 'exportPng':
-      image = _decodeSource(request);
+      image = _decodeSource(request, processingSettings);
       operation = 'Export ${outputSettings.format.name.toUpperCase()}';
       break;
     default:
-      throw UnsupportedError('Unsupported image processing task: $kind');
+      throw ImageClipProcessingException(
+        'Unsupported image processing task: $kind',
+      );
   }
 
+  image = _prepareOutputImage(image, processingSettings);
   final encoded = _encodeImage(image, outputSettings);
   stopwatch.stop();
 
@@ -472,22 +599,92 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
   };
 }
 
-img.Image _decodeSource(Map<String, Object?> request) {
+img.Image _decodeSource(
+  Map<String, Object?> request,
+  ImageClipProcessingSettings settings,
+) {
   final source = _sourceMap(request);
-  return _decode(source['bytes']! as Uint8List);
+  return _decode(source['bytes']! as Uint8List, settings);
 }
 
 Map<Object?, Object?> _sourceMap(Map<String, Object?> request) {
   return Map<Object?, Object?>.from(request['source']! as Map);
 }
 
-img.Image _decode(Uint8List bytes) {
-  final decoded = img.decodeImage(bytes);
-  if (decoded == null) {
-    throw const FormatException('Unsupported image format');
+img.Image _decode(Uint8List bytes, ImageClipProcessingSettings settings) {
+  img.Image? decoded;
+  try {
+    decoded = img.decodeImage(bytes);
+  } catch (error) {
+    throw ImageClipDecodeException(
+      'Unable to decode image bytes',
+      cause: error,
+    );
   }
-  return decoded.convert(numChannels: 4);
+  if (decoded == null) {
+    throw const ImageClipDecodeException('Unsupported image format');
+  }
+  final oriented = img.bakeOrientation(decoded);
+  _checkInputPixelLimit(oriented, settings);
+  return _prepareOutputImage(oriented, settings).convert(numChannels: 4);
 }
+
+void _checkInputPixelLimit(
+  img.Image image,
+  ImageClipProcessingSettings settings,
+) {
+  final maxPixels = settings.maxInputPixels;
+  if (maxPixels == null) {
+    return;
+  }
+  final pixels = _pixelCount(image);
+  if (pixels > maxPixels) {
+    throw ImageClipImageTooLargeException(
+      'Input image has $pixels pixels, which exceeds the configured limit of '
+      '$maxPixels pixels',
+      width: image.width,
+      height: image.height,
+      maxPixels: maxPixels,
+    );
+  }
+}
+
+img.Image _prepareOutputImage(
+  img.Image image,
+  ImageClipProcessingSettings settings,
+) {
+  final maxPixels = settings.maxOutputPixels;
+  if (maxPixels == null) {
+    return image;
+  }
+
+  final pixels = _pixelCount(image);
+  if (pixels <= maxPixels) {
+    return image;
+  }
+
+  if (!settings.autoDownscale) {
+    throw ImageClipImageTooLargeException(
+      'Output image has $pixels pixels, which exceeds the configured limit of '
+      '$maxPixels pixels',
+      width: image.width,
+      height: image.height,
+      maxPixels: maxPixels,
+    );
+  }
+
+  final scale = math.sqrt(maxPixels / pixels);
+  final targetWidth = math.max(1, (image.width * scale).floor());
+  final targetHeight = math.max(1, (image.height * scale).floor());
+  return img.copyResize(
+    image,
+    width: targetWidth,
+    height: targetHeight,
+    interpolation: img.Interpolation.linear,
+  );
+}
+
+int _pixelCount(img.Image image) => image.width * image.height;
 
 Uint8List _encodeImage(img.Image image, ImageClipOutputSettings settings) {
   return switch (settings.format) {
@@ -547,6 +744,11 @@ img.Image _cropRegion(
   required int height,
   required double cornerRadius,
 }) {
+  if (width <= 0 || height <= 0) {
+    throw ImageClipInvalidCropRegionException(
+      'Crop region width and height must be greater than zero',
+    );
+  }
   final safeX = x.clamp(0, source.width - 1).toInt();
   final safeY = y.clamp(0, source.height - 1).toInt();
   final safeWidth = width.clamp(1, source.width - safeX).toInt();
@@ -713,6 +915,20 @@ double _doubleOf(Object? value, {required double fallback}) {
 int _intOf(Object? value, {required int fallback}) {
   if (value is num) {
     return value.round();
+  }
+  return fallback;
+}
+
+int? _nullableIntOf(Object? value) {
+  if (value is num) {
+    return value.round();
+  }
+  return null;
+}
+
+bool _boolOf(Object? value, {required bool fallback}) {
+  if (value is bool) {
+    return value;
   }
   return fallback;
 }

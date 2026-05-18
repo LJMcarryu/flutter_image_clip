@@ -1,5 +1,6 @@
 import 'package:flutter_image_clip/flutter_image_clip.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -48,5 +49,61 @@ void main() {
     expect(jpeg.format, ImageClipOutputFormat.jpeg);
     expect(jpeg.mimeType, 'image/jpeg');
     expect(jpeg.bytes.sublist(0, 2), <int>[0xFF, 0xD8]);
+  });
+
+  test('bakes EXIF orientation when decoding image bytes', () async {
+    final processor = ImageProcessor();
+    final source = img.Image(width: 2, height: 3)
+      ..exif.imageIfd.orientation = 6;
+
+    final decoded = await processor.decodeBytes(
+      img.encodeJpg(source),
+      label: 'rotated.jpg',
+    );
+
+    expect(decoded.width, 3);
+    expect(decoded.height, 2);
+  });
+
+  test(
+    'downscales decoded images to the configured output pixel limit',
+    () async {
+      const settings = ImageClipProcessingSettings(maxOutputPixels: 25);
+      final processor = ImageProcessor(processingSettings: settings);
+      final source = img.Image(width: 10, height: 10);
+
+      final decoded = await processor.decodeBytes(
+        img.encodePng(source),
+        label: 'large.png',
+      );
+
+      expect(decoded.width * decoded.height, lessThanOrEqualTo(25));
+      expect(decoded.width, 5);
+      expect(decoded.height, 5);
+    },
+  );
+
+  test('throws a typed exception when input image exceeds pixel limit', () {
+    const settings = ImageClipProcessingSettings(maxInputPixels: 50);
+    final processor = ImageProcessor(processingSettings: settings);
+    final source = img.Image(width: 10, height: 10);
+
+    expect(
+      processor.decodeBytes(img.encodePng(source), label: 'too-large.png'),
+      throwsA(isA<ImageClipImageTooLargeException>()),
+    );
+  });
+
+  test('throws a typed exception for invalid crop regions', () async {
+    final processor = ImageProcessor();
+    final sample = await processor.createSample();
+
+    expect(
+      processor.cropRegion(
+        sample,
+        const CropRegion(x: 0, y: 0, width: 0, height: 100, cornerRadius: 0),
+      ),
+      throwsA(isA<ImageClipInvalidCropRegionException>()),
+    );
   });
 }

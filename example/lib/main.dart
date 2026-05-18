@@ -18,7 +18,21 @@ class ImageClipExampleApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF006D77)),
         scaffoldBackgroundColor: const Color(0xFFF5F7F8),
       ),
-      home: const ImageClipEditor(),
+      home: Builder(
+        builder: (context) {
+          return ImageClipEditor(
+            theme: ImageClipEditorTheme.fromColorScheme(
+              Theme.of(context).colorScheme,
+            ),
+            aspectRatios: const <ImageClipAspectRatio>[
+              // ImageClipAspectRatio.square,
+              ImageClipAspectRatio.portrait,
+              ImageClipAspectRatio.landscape,
+              // ImageClipAspectRatio.widescreen,
+            ],
+          );
+        },
+      ),
     );
   }
 }

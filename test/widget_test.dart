@@ -160,6 +160,33 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('applies custom editor theme tokens', (tester) async {
+    const background = Color(0xFF1E293B);
+    const primaryText = Color(0xFFF8FAFC);
+
+    await pumpClippingApp(
+      tester,
+      editor: const ImageClipEditor(
+        theme: ImageClipEditorTheme(
+          backgroundColor: background,
+          primaryTextColor: primaryText,
+          cropBorderColor: Color(0xFFF59E0B),
+          cropGridColor: Color(0x99F59E0B),
+        ),
+      ),
+    );
+
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
+    final cancel = tester.widget<TextButton>(find.byType(TextButton).first);
+
+    expect(scaffold.backgroundColor, background);
+    expect(
+      cancel.style?.foregroundColor?.resolve(<WidgetState>{}),
+      primaryText,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('save can return JPEG output', (tester) async {
     ImageClipResult? result;
 

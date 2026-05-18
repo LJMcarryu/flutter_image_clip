@@ -18,7 +18,10 @@ Future<ImageClipResult?> showImageClipEditor(
   List<ImageClipAspectRatio> aspectRatios = ImageClipAspectRatio.defaults,
   ImageClipScaleMode initialScaleMode = ImageClipScaleMode.fill,
   ImageClipOutputSettings outputSettings = const ImageClipOutputSettings.png(),
+  ImageClipProcessingSettings processingSettings =
+      const ImageClipProcessingSettings(),
   ImageClipEditorLabels labels = const ImageClipEditorLabels(),
+  ImageClipEditorTheme theme = const ImageClipEditorTheme.dark(),
   bool loadSampleOnStart = true,
   bool useRootNavigator = false,
   RouteSettings? routeSettings,
@@ -36,7 +39,9 @@ Future<ImageClipResult?> showImageClipEditor(
           aspectRatios: aspectRatios,
           initialScaleMode: initialScaleMode,
           outputSettings: outputSettings,
+          processingSettings: processingSettings,
           labels: labels,
+          theme: theme,
           loadSampleOnStart: loadSampleOnStart,
           closeOnCancel: true,
           closeOnSave: true,
@@ -259,6 +264,155 @@ class ImageClipEditorLabels {
   String errorMessage(Object error) => '$processingFailedPrefix: $error';
 }
 
+/// Visual tokens used by [ImageClipEditor] and [ImageClipResultPage].
+class ImageClipEditorTheme {
+  /// Creates an editor theme.
+  const ImageClipEditorTheme({
+    this.backgroundColor = const Color(0xFF101113),
+    this.previewBackgroundColor = const Color(0xFF101113),
+    this.surfaceColor = const Color(0xFF18191C),
+    this.imageBackgroundColor = const Color(0xFF17181B),
+    this.tileColor = const Color(0xFF222326),
+    this.borderColor = const Color(0xFF2A2B2E),
+    this.strongBorderColor = const Color(0xFF333439),
+    this.primaryTextColor = const Color(0xFFF7F7F7),
+    this.secondaryTextColor = const Color(0xFF9D9EA3),
+    this.disabledTextColor = const Color(0xFF5A5B5E),
+    this.inactiveTextColor = const Color(0xFF6D6E72),
+    this.progressColor = const Color(0xFFF7F7F7),
+    this.cropShadeColor = const Color(0x99000000),
+    this.cropBorderColor = const Color(0xCCFFFFFF),
+    this.cropGridColor = const Color(0x99FFFFFF),
+    this.borderRadius = 8,
+    this.cropBorderWidth = 1.2,
+    this.aspectRatioBorderWidth = 1.6,
+  });
+
+  /// Creates the default dark editor theme.
+  const ImageClipEditorTheme.dark() : this();
+
+  /// Creates a theme from a Flutter [ColorScheme].
+  factory ImageClipEditorTheme.fromColorScheme(ColorScheme colorScheme) {
+    final dark = colorScheme.brightness == Brightness.dark;
+    return ImageClipEditorTheme(
+      backgroundColor: colorScheme.surface,
+      previewBackgroundColor: colorScheme.surface,
+      surfaceColor: colorScheme.surfaceContainerLow,
+      imageBackgroundColor: colorScheme.surfaceContainerLowest,
+      tileColor: colorScheme.surfaceContainerHigh,
+      borderColor: colorScheme.outlineVariant,
+      strongBorderColor: colorScheme.outline,
+      primaryTextColor: colorScheme.onSurface,
+      secondaryTextColor: colorScheme.onSurfaceVariant,
+      disabledTextColor: colorScheme.onSurface.withValues(alpha: 0.38),
+      inactiveTextColor: colorScheme.onSurfaceVariant.withValues(alpha: 0.72),
+      progressColor: colorScheme.primary,
+      cropShadeColor: dark ? const Color(0x99000000) : const Color(0x66FFFFFF),
+      cropBorderColor: colorScheme.primary,
+      cropGridColor: colorScheme.primary.withValues(alpha: 0.62),
+    );
+  }
+
+  /// Background color for the editor scaffold.
+  final Color backgroundColor;
+
+  /// Background color for the preview area.
+  final Color previewBackgroundColor;
+
+  /// Surface color for result sections.
+  final Color surfaceColor;
+
+  /// Background color behind rendered images.
+  final Color imageBackgroundColor;
+
+  /// Surface color for metric tiles.
+  final Color tileColor;
+
+  /// Subtle border color.
+  final Color borderColor;
+
+  /// Stronger border color for nested controls.
+  final Color strongBorderColor;
+
+  /// Main text and enabled control color.
+  final Color primaryTextColor;
+
+  /// Secondary label text color.
+  final Color secondaryTextColor;
+
+  /// Disabled control color.
+  final Color disabledTextColor;
+
+  /// Unselected control color.
+  final Color inactiveTextColor;
+
+  /// Progress indicator color.
+  final Color progressColor;
+
+  /// Overlay color outside the crop frame.
+  final Color cropShadeColor;
+
+  /// Crop frame border color.
+  final Color cropBorderColor;
+
+  /// Crop grid line color.
+  final Color cropGridColor;
+
+  /// Default corner radius for framed surfaces.
+  final double borderRadius;
+
+  /// Stroke width for the crop frame.
+  final double cropBorderWidth;
+
+  /// Stroke width for aspect ratio preview glyphs.
+  final double aspectRatioBorderWidth;
+
+  /// Creates a copy with selected values replaced.
+  ImageClipEditorTheme copyWith({
+    Color? backgroundColor,
+    Color? previewBackgroundColor,
+    Color? surfaceColor,
+    Color? imageBackgroundColor,
+    Color? tileColor,
+    Color? borderColor,
+    Color? strongBorderColor,
+    Color? primaryTextColor,
+    Color? secondaryTextColor,
+    Color? disabledTextColor,
+    Color? inactiveTextColor,
+    Color? progressColor,
+    Color? cropShadeColor,
+    Color? cropBorderColor,
+    Color? cropGridColor,
+    double? borderRadius,
+    double? cropBorderWidth,
+    double? aspectRatioBorderWidth,
+  }) {
+    return ImageClipEditorTheme(
+      backgroundColor: backgroundColor ?? this.backgroundColor,
+      previewBackgroundColor:
+          previewBackgroundColor ?? this.previewBackgroundColor,
+      surfaceColor: surfaceColor ?? this.surfaceColor,
+      imageBackgroundColor: imageBackgroundColor ?? this.imageBackgroundColor,
+      tileColor: tileColor ?? this.tileColor,
+      borderColor: borderColor ?? this.borderColor,
+      strongBorderColor: strongBorderColor ?? this.strongBorderColor,
+      primaryTextColor: primaryTextColor ?? this.primaryTextColor,
+      secondaryTextColor: secondaryTextColor ?? this.secondaryTextColor,
+      disabledTextColor: disabledTextColor ?? this.disabledTextColor,
+      inactiveTextColor: inactiveTextColor ?? this.inactiveTextColor,
+      progressColor: progressColor ?? this.progressColor,
+      cropShadeColor: cropShadeColor ?? this.cropShadeColor,
+      cropBorderColor: cropBorderColor ?? this.cropBorderColor,
+      cropGridColor: cropGridColor ?? this.cropGridColor,
+      borderRadius: borderRadius ?? this.borderRadius,
+      cropBorderWidth: cropBorderWidth ?? this.cropBorderWidth,
+      aspectRatioBorderWidth:
+          aspectRatioBorderWidth ?? this.aspectRatioBorderWidth,
+    );
+  }
+}
+
 /// Result returned after a crop is saved.
 class ImageClipResult {
   /// Creates a crop result with source, output, and crop metadata.
@@ -303,7 +457,9 @@ class ImageClipEditor extends StatefulWidget {
     this.aspectRatios = ImageClipAspectRatio.defaults,
     this.initialScaleMode = ImageClipScaleMode.fill,
     this.outputSettings = const ImageClipOutputSettings.png(),
+    this.processingSettings = const ImageClipProcessingSettings(),
     this.labels = const ImageClipEditorLabels(),
+    this.theme = const ImageClipEditorTheme.dark(),
     this.loadSampleOnStart = true,
     this.closeOnCancel = false,
     this.closeOnSave = false,
@@ -340,8 +496,14 @@ class ImageClipEditor extends StatefulWidget {
   /// Output encoding settings used for the saved crop result.
   final ImageClipOutputSettings outputSettings;
 
+  /// Runtime guardrails used when this widget creates its own processor.
+  final ImageClipProcessingSettings processingSettings;
+
   /// User-facing copy used by the editor.
   final ImageClipEditorLabels labels;
+
+  /// Visual tokens used by the editor.
+  final ImageClipEditorTheme theme;
 
   /// Whether to generate a sample image when [initialImageBytes] is null.
   final bool loadSampleOnStart;
@@ -402,7 +564,9 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   @override
   void initState() {
     super.initState();
-    _processor = widget.processor ?? ImageProcessor();
+    _processor =
+        widget.processor ??
+        ImageProcessor(processingSettings: widget.processingSettings);
     _status = widget.labels.initialStatus;
     _cropAspectRatio = _initialAspectRatio;
     _cropScaleMode = widget.initialScaleMode;
@@ -421,7 +585,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF101113),
+      backgroundColor: widget.theme.backgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -429,10 +593,16 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
               isBusy: _isBusy,
               canSave: _image != null,
               labels: widget.labels,
+              theme: widget.theme,
               onCancel: _cancelCrop,
               onSave: _applyCrop,
             ),
-            if (_isBusy) const LinearProgressIndicator(minHeight: 2),
+            if (_isBusy)
+              LinearProgressIndicator(
+                minHeight: 2,
+                color: widget.theme.progressColor,
+                backgroundColor: widget.theme.borderColor,
+              ),
             Expanded(
               child: _PreviewPanel(
                 key: _previewKey,
@@ -441,6 +611,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
                 status: _status,
                 cropAspectRatio: _cropAspectRatioValue,
                 scaleMode: _cropScaleMode,
+                theme: widget.theme,
               ),
             ),
             _CropBottomBar(
@@ -448,6 +619,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
               aspectRatios: _aspectRatioChoices,
               scaleMode: _cropScaleMode,
               labels: widget.labels,
+              theme: widget.theme,
               canRun: _image != null && !_isBusy,
               onScaleModeToggle: _toggleScaleMode,
               onRotate: _rotateRight,
@@ -618,8 +790,11 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       if (widget.showResultPage) {
         await Navigator.of(context).push(
           MaterialPageRoute<void>(
-            builder: (context) =>
-                ImageClipResultPage(result: result, labels: widget.labels),
+            builder: (context) => ImageClipResultPage(
+              result: result,
+              labels: widget.labels,
+              theme: widget.theme,
+            ),
           ),
         );
       }
@@ -700,6 +875,7 @@ class ImageClipResultPage extends StatelessWidget {
     super.key,
     required this.result,
     this.labels = const ImageClipEditorLabels(),
+    this.theme = const ImageClipEditorTheme.dark(),
   });
 
   /// Crop result to preview.
@@ -708,17 +884,21 @@ class ImageClipResultPage extends StatelessWidget {
   /// User-facing copy used by this result page.
   final ImageClipEditorLabels labels;
 
+  /// Visual tokens used by this result page.
+  final ImageClipEditorTheme theme;
+
   @override
   Widget build(BuildContext context) {
     final region = result.region;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF101113),
+      backgroundColor: theme.backgroundColor,
       body: SafeArea(
         child: Column(
           children: [
             _ResultTopBar(
               labels: labels,
+              theme: theme,
               onBack: () => Navigator.of(context).pop(),
             ),
             Expanded(
@@ -727,34 +907,51 @@ class ImageClipResultPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _CroppedImagePreview(image: result.cropped),
+                    _CroppedImagePreview(image: result.cropped, theme: theme),
                     const SizedBox(height: 18),
                     _MetricSection(
                       title: labels.cropDetailsTitle,
+                      theme: theme,
                       children: [
                         _MetricTile(
                           label: labels.rotationDegreesLabel,
                           value: '${result.rotationDegrees}°',
+                          theme: theme,
                         ),
                         _MetricTile(
                           label: labels.sourceSizeLabel,
                           value:
                               '${result.source.width} x ${result.source.height}',
+                          theme: theme,
                         ),
-                        _MetricTile(label: 'x', value: '${region.x} px'),
-                        _MetricTile(label: 'y', value: '${region.y} px'),
+                        _MetricTile(
+                          label: 'x',
+                          value: '${region.x} px',
+                          theme: theme,
+                        ),
+                        _MetricTile(
+                          label: 'y',
+                          value: '${region.y} px',
+                          theme: theme,
+                        ),
                         _MetricTile(
                           label: 'width',
                           value: '${region.width} px',
+                          theme: theme,
                         ),
                         _MetricTile(
                           label: 'height',
                           value: '${region.height} px',
+                          theme: theme,
                         ),
                       ],
                     ),
                     const SizedBox(height: 14),
-                    _ResultDataPreview(result: result, labels: labels),
+                    _ResultDataPreview(
+                      result: result,
+                      labels: labels,
+                      theme: theme,
+                    ),
                   ],
                 ),
               ),
@@ -767,32 +964,37 @@ class ImageClipResultPage extends StatelessWidget {
 }
 
 class _ResultTopBar extends StatelessWidget {
-  const _ResultTopBar({required this.labels, required this.onBack});
+  const _ResultTopBar({
+    required this.labels,
+    required this.theme,
+    required this.onBack,
+  });
 
   final ImageClipEditorLabels labels;
+  final ImageClipEditorTheme theme;
   final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       height: 76,
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFF2A2B2E))),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: theme.borderColor)),
       ),
       child: Row(
         children: [
           const SizedBox(width: 8),
           IconButton(
             onPressed: onBack,
-            color: const Color(0xFFF7F7F7),
+            color: theme.primaryTextColor,
             icon: const Icon(Icons.arrow_back),
             tooltip: labels.backTooltip,
           ),
           const SizedBox(width: 4),
           Text(
             labels.resultTitle,
-            style: const TextStyle(
-              color: Color(0xFFF7F7F7),
+            style: TextStyle(
+              color: theme.primaryTextColor,
               fontSize: 22,
               fontWeight: FontWeight.w500,
             ),
@@ -804,9 +1006,10 @@ class _ResultTopBar extends StatelessWidget {
 }
 
 class _CroppedImagePreview extends StatelessWidget {
-  const _CroppedImagePreview({required this.image});
+  const _CroppedImagePreview({required this.image, required this.theme});
 
   final EditedImage image;
+  final ImageClipEditorTheme theme;
 
   @override
   Widget build(BuildContext context) {
@@ -814,9 +1017,9 @@ class _CroppedImagePreview extends StatelessWidget {
       height: 360,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: const Color(0xFF17181B),
-        border: Border.all(color: const Color(0xFF2A2B2E)),
-        borderRadius: BorderRadius.circular(8),
+        color: theme.imageBackgroundColor,
+        border: Border.all(color: theme.borderColor),
+        borderRadius: BorderRadius.circular(theme.borderRadius),
       ),
       child: Image.memory(
         image.bytes,
@@ -829,27 +1032,32 @@ class _CroppedImagePreview extends StatelessWidget {
 }
 
 class _MetricSection extends StatelessWidget {
-  const _MetricSection({required this.title, required this.children});
+  const _MetricSection({
+    required this.title,
+    required this.children,
+    required this.theme,
+  });
 
   final String title;
   final List<_MetricTile> children;
+  final ImageClipEditorTheme theme;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF18191C),
-        border: Border.all(color: const Color(0xFF2A2B2E)),
-        borderRadius: BorderRadius.circular(8),
+        color: theme.surfaceColor,
+        border: Border.all(color: theme.borderColor),
+        borderRadius: BorderRadius.circular(theme.borderRadius),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: Color(0xFFF2F2F2),
+            style: TextStyle(
+              color: theme.primaryTextColor,
               fontSize: 18,
               fontWeight: FontWeight.w500,
             ),
@@ -877,10 +1085,15 @@ class _MetricSection extends StatelessWidget {
 }
 
 class _MetricTile extends StatelessWidget {
-  const _MetricTile({required this.label, required this.value});
+  const _MetricTile({
+    required this.label,
+    required this.value,
+    required this.theme,
+  });
 
   final String label;
   final String value;
+  final ImageClipEditorTheme theme;
 
   @override
   Widget build(BuildContext context) {
@@ -888,9 +1101,9 @@ class _MetricTile extends StatelessWidget {
       height: 72,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF222326),
-        border: Border.all(color: const Color(0xFF333439)),
-        borderRadius: BorderRadius.circular(8),
+        color: theme.tileColor,
+        border: Border.all(color: theme.strongBorderColor),
+        borderRadius: BorderRadius.circular(theme.borderRadius),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -900,14 +1113,14 @@ class _MetricTile extends StatelessWidget {
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFF9D9EA3), fontSize: 13),
+            style: TextStyle(color: theme.secondaryTextColor, fontSize: 13),
           ),
           const SizedBox(height: 5),
           SelectableText(
             value,
             maxLines: 1,
-            style: const TextStyle(
-              color: Color(0xFFF4F4F4),
+            style: TextStyle(
+              color: theme.primaryTextColor,
               fontSize: 17,
               fontWeight: FontWeight.w500,
             ),
@@ -919,10 +1132,15 @@ class _MetricTile extends StatelessWidget {
 }
 
 class _ResultDataPreview extends StatelessWidget {
-  const _ResultDataPreview({required this.result, required this.labels});
+  const _ResultDataPreview({
+    required this.result,
+    required this.labels,
+    required this.theme,
+  });
 
   final ImageClipResult result;
   final ImageClipEditorLabels labels;
+  final ImageClipEditorTheme theme;
 
   @override
   Widget build(BuildContext context) {
@@ -940,17 +1158,17 @@ class _ResultDataPreview extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF18191C),
-        border: Border.all(color: const Color(0xFF2A2B2E)),
-        borderRadius: BorderRadius.circular(8),
+        color: theme.surfaceColor,
+        border: Border.all(color: theme.borderColor),
+        borderRadius: BorderRadius.circular(theme.borderRadius),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             labels.resultDataTitle,
-            style: const TextStyle(
-              color: Color(0xFFF2F2F2),
+            style: TextStyle(
+              color: theme.primaryTextColor,
               fontSize: 18,
               fontWeight: FontWeight.w500,
             ),
@@ -958,11 +1176,11 @@ class _ResultDataPreview extends StatelessWidget {
           const SizedBox(height: 12),
           SelectableText(
             data,
-            style: const TextStyle(
-              color: Color(0xFFE7E7E7),
+            style: TextStyle(
+              color: theme.primaryTextColor,
               fontSize: 14,
               height: 1.45,
-              fontFeatures: [FontFeature.tabularFigures()],
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ],
@@ -979,6 +1197,7 @@ class _PreviewPanel extends StatefulWidget {
     required this.status,
     required this.cropAspectRatio,
     required this.scaleMode,
+    required this.theme,
   });
 
   final EditedImage? image;
@@ -986,6 +1205,7 @@ class _PreviewPanel extends StatefulWidget {
   final String status;
   final double cropAspectRatio;
   final ImageClipScaleMode scaleMode;
+  final ImageClipEditorTheme theme;
 
   @override
   State<_PreviewPanel> createState() => _PreviewPanelState();
@@ -1057,7 +1277,7 @@ class _PreviewPanelState extends State<_PreviewPanel> {
   Widget build(BuildContext context) {
     final image = widget.image;
     if (image == null) {
-      return _EmptyPreview(status: widget.status);
+      return _EmptyPreview(status: widget.status, theme: widget.theme);
     }
 
     return LayoutBuilder(
@@ -1115,15 +1335,15 @@ class _PreviewPanelState extends State<_PreviewPanel> {
                       filterQuality: FilterQuality.high,
                     ),
                   ),
-                  _CropShade(rect: layout.cropRect),
+                  _CropShade(rect: layout.cropRect, theme: widget.theme),
                   Positioned.fromRect(
                     rect: layout.cropRect,
                     child: IgnorePointer(
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           border: Border.all(
-                            color: const Color(0xCCFFFFFF),
-                            width: 1.2,
+                            color: widget.theme.cropBorderColor,
+                            width: widget.theme.cropBorderWidth,
                           ),
                         ),
                       ),
@@ -1366,24 +1586,28 @@ class _CropPreviewLayout {
 }
 
 class _CropShade extends StatelessWidget {
-  const _CropShade({required this.rect});
+  const _CropShade({required this.rect, required this.theme});
 
   final Rect rect;
+  final ImageClipEditorTheme theme;
 
   @override
   Widget build(BuildContext context) {
-    return IgnorePointer(child: CustomPaint(painter: _CropShadePainter(rect)));
+    return IgnorePointer(
+      child: CustomPaint(painter: _CropShadePainter(rect, theme)),
+    );
   }
 }
 
 class _CropShadePainter extends CustomPainter {
-  const _CropShadePainter(this.rect);
+  const _CropShadePainter(this.rect, this.theme);
 
   final Rect rect;
+  final ImageClipEditorTheme theme;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final shade = Paint()..color = const Color(0x99000000);
+    final shade = Paint()..color = theme.cropShadeColor;
     final path = Path()
       ..fillType = PathFillType.evenOdd
       ..addRect(Offset.zero & size)
@@ -1391,7 +1615,7 @@ class _CropShadePainter extends CustomPainter {
     canvas.drawPath(path, shade);
 
     final grid = Paint()
-      ..color = const Color(0x99FFFFFF)
+      ..color = theme.cropGridColor
       ..strokeWidth = 1;
     for (var i = 1; i < 3; i++) {
       final dx = rect.left + rect.width * i / 3;
@@ -1403,14 +1627,15 @@ class _CropShadePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CropShadePainter oldDelegate) {
-    return oldDelegate.rect != rect;
+    return oldDelegate.rect != rect || oldDelegate.theme != theme;
   }
 }
 
 class _EmptyPreview extends StatelessWidget {
-  const _EmptyPreview({required this.status});
+  const _EmptyPreview({required this.status, required this.theme});
 
   final String status;
+  final ImageClipEditorTheme theme;
 
   @override
   Widget build(BuildContext context) {
@@ -1419,7 +1644,7 @@ class _EmptyPreview extends StatelessWidget {
         status,
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: const Color(0xFFE7E7E7),
+          color: theme.primaryTextColor,
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -1432,6 +1657,7 @@ class _CropTopBar extends StatelessWidget {
     required this.isBusy,
     required this.canSave,
     required this.labels,
+    required this.theme,
     required this.onCancel,
     required this.onSave,
   });
@@ -1439,18 +1665,19 @@ class _CropTopBar extends StatelessWidget {
   final bool isBusy;
   final bool canSave;
   final ImageClipEditorLabels labels;
+  final ImageClipEditorTheme theme;
   final VoidCallback onCancel;
   final VoidCallback onSave;
 
   @override
   Widget build(BuildContext context) {
-    final enabledColor = const Color(0xFFF7F7F7);
-    final disabledColor = enabledColor.withValues(alpha: 0.38);
+    final enabledColor = theme.primaryTextColor;
+    final disabledColor = theme.disabledTextColor;
 
     return Container(
       height: 76,
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFF2A2B2E))),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: theme.borderColor)),
       ),
       child: Row(
         children: [
@@ -1503,6 +1730,7 @@ class _CropBottomBar extends StatelessWidget {
     required this.aspectRatios,
     required this.scaleMode,
     required this.labels,
+    required this.theme,
     required this.canRun,
     required this.onScaleModeToggle,
     required this.onRotate,
@@ -1513,6 +1741,7 @@ class _CropBottomBar extends StatelessWidget {
   final List<ImageClipAspectRatio> aspectRatios;
   final ImageClipScaleMode scaleMode;
   final ImageClipEditorLabels labels;
+  final ImageClipEditorTheme theme;
   final bool canRun;
   final VoidCallback onScaleModeToggle;
   final VoidCallback onRotate;
@@ -1529,9 +1758,9 @@ class _CropBottomBar extends StatelessWidget {
 
         return Container(
           height: barHeight,
-          decoration: const BoxDecoration(
-            color: Color(0xFF101113),
-            border: Border(top: BorderSide(color: Color(0xFF2A2B2E))),
+          decoration: BoxDecoration(
+            color: theme.backgroundColor,
+            border: Border(top: BorderSide(color: theme.borderColor)),
           ),
           child: Center(
             child: FittedBox(
@@ -1553,6 +1782,7 @@ class _CropBottomBar extends StatelessWidget {
                           label: scaleMode == ImageClipScaleMode.fill
                               ? labels.fitButton
                               : labels.fillButton,
+                          theme: theme,
                           enabled: canRun,
                           compact: compact,
                           onPressed: onScaleModeToggle,
@@ -1561,6 +1791,7 @@ class _CropBottomBar extends StatelessWidget {
                         _CropToolButton(
                           icon: Icons.rotate_90_degrees_cw_outlined,
                           label: labels.rotateButton,
+                          theme: theme,
                           enabled: canRun,
                           compact: compact,
                           onPressed: onRotate,
@@ -1589,6 +1820,7 @@ class _CropBottomBar extends StatelessWidget {
                                 aspectRatio: aspectRatios[index],
                                 selected:
                                     selectedAspectRatio == aspectRatios[index],
+                                theme: theme,
                                 enabled: canRun,
                                 compact: compact,
                                 onSelected: onAspectRatioChanged,
@@ -1612,6 +1844,7 @@ class _CropToolButton extends StatelessWidget {
   const _CropToolButton({
     required this.icon,
     required this.label,
+    required this.theme,
     required this.enabled,
     required this.compact,
     required this.onPressed,
@@ -1619,13 +1852,14 @@ class _CropToolButton extends StatelessWidget {
 
   final IconData icon;
   final String label;
+  final ImageClipEditorTheme theme;
   final bool enabled;
   final bool compact;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final color = enabled ? const Color(0xFFF4F4F4) : const Color(0xFF5A5B5E);
+    final color = enabled ? theme.primaryTextColor : theme.disabledTextColor;
 
     return InkResponse(
       onTap: enabled ? onPressed : null,
@@ -1656,6 +1890,7 @@ class _AspectRatioChoice extends StatelessWidget {
   const _AspectRatioChoice({
     required this.aspectRatio,
     required this.selected,
+    required this.theme,
     required this.enabled,
     required this.compact,
     required this.onSelected,
@@ -1663,6 +1898,7 @@ class _AspectRatioChoice extends StatelessWidget {
 
   final ImageClipAspectRatio aspectRatio;
   final bool selected;
+  final ImageClipEditorTheme theme;
   final bool enabled;
   final bool compact;
   final ValueChanged<ImageClipAspectRatio> onSelected;
@@ -1670,10 +1906,10 @@ class _AspectRatioChoice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = !enabled
-        ? const Color(0xFF4F5053)
+        ? theme.disabledTextColor
         : selected
-        ? const Color(0xFFF1F1F1)
-        : const Color(0xFF6D6E72);
+        ? theme.primaryTextColor
+        : theme.inactiveTextColor;
 
     return InkResponse(
       onTap: enabled ? () => onSelected(aspectRatio) : null,
@@ -1686,6 +1922,7 @@ class _AspectRatioChoice extends StatelessWidget {
             _AspectRatioGlyph(
               aspectRatio: aspectRatio,
               color: color,
+              theme: theme,
               compact: compact,
             ),
             SizedBox(height: compact ? 8 : 12),
@@ -1709,11 +1946,13 @@ class _AspectRatioGlyph extends StatelessWidget {
   const _AspectRatioGlyph({
     required this.aspectRatio,
     required this.color,
+    required this.theme,
     required this.compact,
   });
 
   final ImageClipAspectRatio aspectRatio;
   final Color color;
+  final ImageClipEditorTheme theme;
   final bool compact;
 
   @override
@@ -1735,7 +1974,10 @@ class _AspectRatioGlyph extends StatelessWidget {
       child: Center(
         child: DecoratedBox(
           decoration: BoxDecoration(
-            border: Border.all(color: color, width: 1.6),
+            border: Border.all(
+              color: color,
+              width: theme.aspectRatioBorderWidth,
+            ),
           ),
           child: SizedBox(width: size.width, height: size.height),
         ),

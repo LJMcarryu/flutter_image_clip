@@ -19,7 +19,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.2.0
+  flutter_image_clip: ^0.3.0
 ```
 
 然后执行：
@@ -53,6 +53,14 @@ final result = await showImageClipEditor(
     ImageClipAspectRatio.widescreen,
   ],
   outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 88),
+  processingSettings: const ImageClipProcessingSettings(
+    maxInputPixels: 48000000,
+    maxOutputPixels: 16000000,
+    autoDownscale: true,
+  ),
+  theme: ImageClipEditorTheme.fromColorScheme(
+    Theme.of(context).colorScheme,
+  ),
 );
 
 if (result != null) {
@@ -116,6 +124,31 @@ ImageClipEditor(
 )
 ```
 
+## 自定义主题
+
+```dart
+ImageClipEditor(
+  theme: const ImageClipEditorTheme(
+    backgroundColor: Color(0xFF111827),
+    surfaceColor: Color(0xFF1F2937),
+    primaryTextColor: Color(0xFFF9FAFB),
+    secondaryTextColor: Color(0xFFCBD5E1),
+    cropBorderColor: Color(0xFFF59E0B),
+    cropGridColor: Color(0x99F59E0B),
+  ),
+)
+```
+
+也可以从业务 App 的 `ColorScheme` 生成：
+
+```dart
+ImageClipEditor(
+  theme: ImageClipEditorTheme.fromColorScheme(
+    Theme.of(context).colorScheme,
+  ),
+)
+```
+
 ## 使用图像处理 API
 
 ```dart
@@ -135,6 +168,38 @@ final png = await processor.exportPng(adjusted);
 final jpeg = await processor.exportJpeg(adjusted, quality: 88);
 ```
 
+`decodeBytes` 和后续裁剪/旋转处理会自动烘焙 EXIF orientation，手机拍摄的旋转照片会按视觉方向进入裁剪流程。
+
+## 大图保护与异常处理
+
+```dart
+final processor = ImageProcessor(
+  processingSettings: const ImageClipProcessingSettings(
+    maxInputPixels: 48000000,
+    maxOutputPixels: 16000000,
+    autoDownscale: true,
+  ),
+);
+
+try {
+  final image = await processor.decodeBytes(bytes, label: 'camera.jpg');
+  final cropped = await processor.cropRegion(
+    image,
+    const CropRegion(x: 0, y: 0, width: 1200, height: 1200, cornerRadius: 0),
+  );
+} on ImageClipImageTooLargeException catch (error) {
+  debugPrint('Image is too large: ${error.width} x ${error.height}');
+} on ImageClipDecodeException catch (error) {
+  debugPrint(error.message);
+}
+```
+
+默认配置会拒绝超过 4800 万像素的输入，并把超过 1600 万像素的输出自动 downscale。需要完全关闭限制时可使用：
+
+```dart
+const ImageClipProcessingSettings.unrestricted()
+```
+
 ## 本地开发
 
 ```sh
@@ -142,6 +207,7 @@ flutter pub get
 dart format lib test example
 flutter analyze
 flutter test
+dart doc --output doc/api
 flutter pub publish --dry-run
 flutter run -t example/lib/main.dart
 ```

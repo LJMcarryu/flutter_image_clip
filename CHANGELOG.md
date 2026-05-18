@@ -1,3 +1,12 @@
+# 0.3.0
+
+- Added `ImageClipEditorTheme` for configurable editor and result page colors, borders, crop overlays, and framed surface radius.
+- Added EXIF orientation baking during image decoding so rotated camera photos crop with the expected dimensions.
+- Added `ImageClipProcessingSettings` for input pixel limits, output pixel limits, and automatic downscaling.
+- Added typed exceptions for decode failures, processing failures, invalid crop regions, and oversized images.
+- Improved configurable crop ratio presets so custom ratio frames inherit editor theme tokens.
+- Added GitHub Actions CI for formatting, analysis, tests, API docs, and pub dry-run validation.
+
 # 0.2.0
 
 - Added `ImageClipEditorLabels` for configurable editor, status, and result page copy.
