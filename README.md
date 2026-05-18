@@ -7,8 +7,10 @@
 - `showImageClipEditor`：一行代码打开完整裁剪界面。
 - `ImageClipEditor`：可嵌入业务页面的裁剪 Widget。
 - 手势支持：拖动、双指缩放、鼠标滚轮缩放、双击复位。
-- 裁剪模式：Portrait / Landscape、Fit / Fill、90 度旋转。
-- 图像处理：解码、中心裁剪、区域裁剪、旋转、翻转、缩放、调色、PNG 导出。
+- 裁剪模式：可配置命名比例预设、Fit / Fill、90 度旋转。
+- 文案配置：通过 `ImageClipEditorLabels` 覆盖按钮、状态、结果页文案，默认使用英文。
+- 输出格式：裁剪结果可输出 PNG 或 JPEG，并可配置 JPEG quality。
+- 图像处理：解码、中心裁剪、区域裁剪、旋转、翻转、缩放、调色、PNG/JPEG 导出。
 - 处理任务通过 Flutter `compute` 执行，降低 UI isolate 压力。
 
 ## 安装
@@ -17,7 +19,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.1.0
+  flutter_image_clip: ^0.2.0
 ```
 
 然后执行：
@@ -43,6 +45,14 @@ final result = await showImageClipEditor(
   context,
   imageBytes: bytes,
   imageLabel: 'avatar.jpg',
+  initialAspectRatio: ImageClipAspectRatio.square,
+  aspectRatios: const [
+    ImageClipAspectRatio.square,
+    ImageClipAspectRatio.portrait,
+    ImageClipAspectRatio.landscape,
+    ImageClipAspectRatio.widescreen,
+  ],
+  outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 88),
 );
 
 if (result != null) {
@@ -75,10 +85,34 @@ if (result != null) {
 ImageClipEditor(
   initialImageBytes: bytes,
   initialImageLabel: 'cover.jpg',
+  initialAspectRatio: const ImageClipAspectRatio(
+    label: 'Banner',
+    width: 16,
+    height: 9,
+  ),
+  aspectRatios: const [
+    ImageClipAspectRatio.square,
+    ImageClipAspectRatio.widescreen,
+    ImageClipAspectRatio(label: 'Banner', width: 3, height: 1),
+  ],
+  outputSettings: const ImageClipOutputSettings.png(),
   showResultPage: false,
   onResult: (result) {
     final croppedBytes = result.cropped.bytes;
   },
+)
+```
+
+## 自定义编辑器文案
+
+```dart
+ImageClipEditor(
+  labels: const ImageClipEditorLabels(
+    cancelButton: 'Close',
+    saveButton: 'Use photo',
+    rotateButton: 'Rotate',
+    cropCompleteStatus: 'Photo cropped',
+  ),
 )
 ```
 
@@ -98,6 +132,7 @@ final adjusted = await processor.adjustColor(
   const ColorAdjustment(brightness: 1.05, contrast: 1.1, saturation: 0.95),
 );
 final png = await processor.exportPng(adjusted);
+final jpeg = await processor.exportJpeg(adjusted, quality: 88);
 ```
 
 ## 本地开发

@@ -10,11 +10,15 @@ import '../image_processing/image_processor.dart';
 Future<ImageClipResult?> showImageClipEditor(
   BuildContext context, {
   Uint8List? imageBytes,
-  String imageLabel = '待裁剪图片',
+  String imageLabel = '',
   ImageProcessor? processor,
   ImageClipCropOrientation initialOrientation =
       ImageClipCropOrientation.portrait,
+  ImageClipAspectRatio? initialAspectRatio,
+  List<ImageClipAspectRatio> aspectRatios = ImageClipAspectRatio.defaults,
   ImageClipScaleMode initialScaleMode = ImageClipScaleMode.fill,
+  ImageClipOutputSettings outputSettings = const ImageClipOutputSettings.png(),
+  ImageClipEditorLabels labels = const ImageClipEditorLabels(),
   bool loadSampleOnStart = true,
   bool useRootNavigator = false,
   RouteSettings? routeSettings,
@@ -28,7 +32,11 @@ Future<ImageClipResult?> showImageClipEditor(
           initialImageBytes: imageBytes,
           initialImageLabel: imageLabel,
           initialOrientation: initialOrientation,
+          initialAspectRatio: initialAspectRatio,
+          aspectRatios: aspectRatios,
           initialScaleMode: initialScaleMode,
+          outputSettings: outputSettings,
+          labels: labels,
           loadSampleOnStart: loadSampleOnStart,
           closeOnCancel: true,
           closeOnSave: true,
@@ -39,13 +47,88 @@ Future<ImageClipResult?> showImageClipEditor(
   );
 }
 
-/// Aspect-ratio presets used by [ImageClipEditor].
+/// Legacy portrait/landscape selector used when no aspect ratio is supplied.
 enum ImageClipCropOrientation {
   /// Uses a portrait 3:4 crop box.
   portrait,
 
   /// Uses a landscape 4:3 crop box.
   landscape,
+}
+
+/// A named crop box aspect ratio shown by [ImageClipEditor].
+class ImageClipAspectRatio {
+  /// Creates a crop aspect ratio preset.
+  const ImageClipAspectRatio({
+    required this.label,
+    required this.width,
+    required this.height,
+  }) : assert(width > 0),
+       assert(height > 0);
+
+  /// Square 1:1 crop preset.
+  static const square = ImageClipAspectRatio(
+    label: 'Square',
+    width: 1,
+    height: 1,
+  );
+
+  /// Portrait 3:4 crop preset.
+  static const portrait = ImageClipAspectRatio(
+    label: 'Portrait',
+    width: 3,
+    height: 4,
+  );
+
+  /// Landscape 4:3 crop preset.
+  static const landscape = ImageClipAspectRatio(
+    label: 'Landscape',
+    width: 4,
+    height: 3,
+  );
+
+  /// Widescreen 16:9 crop preset.
+  static const widescreen = ImageClipAspectRatio(
+    label: '16:9',
+    width: 16,
+    height: 9,
+  );
+
+  /// Default presets shown by the editor.
+  static const defaults = <ImageClipAspectRatio>[portrait, landscape];
+
+  /// Creates a preset equivalent to the legacy [ImageClipCropOrientation].
+  static ImageClipAspectRatio fromOrientation(
+    ImageClipCropOrientation orientation,
+  ) {
+    return switch (orientation) {
+      ImageClipCropOrientation.portrait => portrait,
+      ImageClipCropOrientation.landscape => landscape,
+    };
+  }
+
+  /// User-facing preset label.
+  final String label;
+
+  /// Relative crop width.
+  final double width;
+
+  /// Relative crop height.
+  final double height;
+
+  /// Width divided by height.
+  double get value => width / height;
+
+  @override
+  bool operator ==(Object other) {
+    return other is ImageClipAspectRatio &&
+        other.label == label &&
+        other.width == width &&
+        other.height == height;
+  }
+
+  @override
+  int get hashCode => Object.hash(label, width, height);
 }
 
 /// How the source image is initially placed behind the crop box.
@@ -55,6 +138,125 @@ enum ImageClipScaleMode {
 
   /// Scales the source image until the crop box is fully covered.
   fill,
+}
+
+/// User-facing copy used by [ImageClipEditor] and [ImageClipResultPage].
+class ImageClipEditorLabels {
+  /// Creates editor labels and status messages.
+  const ImageClipEditorLabels({
+    this.defaultImageLabel = defaultImageLabelValue,
+    this.cancelButton = 'Cancel',
+    this.saveButton = 'Save',
+    this.fitButton = 'Fit',
+    this.fillButton = 'Fill',
+    this.rotateButton = 'Rotate',
+    this.resultTitle = 'Crop result',
+    this.cropDetailsTitle = 'Crop details',
+    this.rotationDegreesLabel = 'Rotation',
+    this.sourceSizeLabel = 'Source size',
+    this.resultDataTitle = 'Result data',
+    this.backTooltip = 'Back',
+    this.initialStatus = 'Choose an image to start cropping',
+    this.loadingImageStatus = 'Loading image',
+    this.imageLoadedStatus = 'Image loaded',
+    this.waitingForImageStatus = 'Waiting for image',
+    this.generatingSampleStatus = 'Generating sample image',
+    this.sampleGeneratedStatus = 'Sample image ready',
+    this.imageRequiredMessage = 'Add an image before cropping',
+    this.rotatingStatus = 'Rotating image',
+    this.rotationCompleteStatus = 'Rotation complete',
+    this.croppingStatus = 'Cropping image',
+    this.cropCompleteStatus = 'Crop complete',
+    this.cropResetMessage = 'Crop frame reset',
+    this.processingFailedPrefix = 'Processing failed',
+  });
+
+  /// Default image label used when no label is supplied.
+  static const defaultImageLabelValue = 'Image to crop';
+
+  /// Default label attached to incoming image bytes.
+  final String defaultImageLabel;
+
+  /// Cancel button label.
+  final String cancelButton;
+
+  /// Save button label.
+  final String saveButton;
+
+  /// Button label for fit mode.
+  final String fitButton;
+
+  /// Button label for fill mode.
+  final String fillButton;
+
+  /// Rotate button label.
+  final String rotateButton;
+
+  /// Result page title.
+  final String resultTitle;
+
+  /// Result metadata section title.
+  final String cropDetailsTitle;
+
+  /// Rotation metric label.
+  final String rotationDegreesLabel;
+
+  /// Source image size metric label.
+  final String sourceSizeLabel;
+
+  /// Result data section title.
+  final String resultDataTitle;
+
+  /// Back button tooltip.
+  final String backTooltip;
+
+  /// Initial empty preview status.
+  final String initialStatus;
+
+  /// Status shown while image bytes are decoded.
+  final String loadingImageStatus;
+
+  /// Status shown after image bytes are decoded.
+  final String imageLoadedStatus;
+
+  /// Status shown when no image is available.
+  final String waitingForImageStatus;
+
+  /// Status shown while the sample image is generated.
+  final String generatingSampleStatus;
+
+  /// Status shown after the sample image is generated.
+  final String sampleGeneratedStatus;
+
+  /// Message shown when the user tries to crop without an image.
+  final String imageRequiredMessage;
+
+  /// Status shown while the image is rotating.
+  final String rotatingStatus;
+
+  /// Status shown after rotation completes.
+  final String rotationCompleteStatus;
+
+  /// Status shown while the final crop is running.
+  final String croppingStatus;
+
+  /// Status shown after the final crop completes.
+  final String cropCompleteStatus;
+
+  /// Message shown after the crop frame is reset.
+  final String cropResetMessage;
+
+  /// Prefix used for processing errors.
+  final String processingFailedPrefix;
+
+  /// Formats a completed processing status with image metadata.
+  String completedStatus(String label, EditedImage result) {
+    return '$label: ${result.dimensionsLabel}, ${result.bytesLabel}, '
+        '${result.elapsedMs} ms';
+  }
+
+  /// Formats a processing error message.
+  String errorMessage(Object error) => '$processingFailedPrefix: $error';
 }
 
 /// Result returned after a crop is saved.
@@ -70,7 +272,7 @@ class ImageClipResult {
   /// Source image that was displayed in the editor.
   final EditedImage source;
 
-  /// Cropped PNG image produced by the editor.
+  /// Cropped image produced by the editor.
   final EditedImage cropped;
 
   /// Pixel crop rectangle applied to [source].
@@ -95,9 +297,13 @@ class ImageClipEditor extends StatefulWidget {
     super.key,
     this.processor,
     this.initialImageBytes,
-    this.initialImageLabel = '待裁剪图片',
+    this.initialImageLabel = '',
     this.initialOrientation = ImageClipCropOrientation.portrait,
+    this.initialAspectRatio,
+    this.aspectRatios = ImageClipAspectRatio.defaults,
     this.initialScaleMode = ImageClipScaleMode.fill,
+    this.outputSettings = const ImageClipOutputSettings.png(),
+    this.labels = const ImageClipEditorLabels(),
     this.loadSampleOnStart = true,
     this.closeOnCancel = false,
     this.closeOnSave = false,
@@ -113,13 +319,29 @@ class ImageClipEditor extends StatefulWidget {
   final Uint8List? initialImageBytes;
 
   /// Label attached to [initialImageBytes] in image processing results.
+  ///
+  /// When empty, [ImageClipEditorLabels.defaultImageLabel] is used.
   final String initialImageLabel;
 
-  /// Initial crop-box orientation.
+  /// Legacy initial crop-box orientation.
+  ///
+  /// Ignored when [initialAspectRatio] is provided.
   final ImageClipCropOrientation initialOrientation;
+
+  /// Initial crop-box aspect ratio that overrides [initialOrientation].
+  final ImageClipAspectRatio? initialAspectRatio;
+
+  /// Aspect ratio presets shown in the bottom toolbar.
+  final List<ImageClipAspectRatio> aspectRatios;
 
   /// Initial image scaling mode.
   final ImageClipScaleMode initialScaleMode;
+
+  /// Output encoding settings used for the saved crop result.
+  final ImageClipOutputSettings outputSettings;
+
+  /// User-facing copy used by the editor.
+  final ImageClipEditorLabels labels;
 
   /// Whether to generate a sample image when [initialImageBytes] is null.
   final bool loadSampleOnStart;
@@ -149,21 +371,40 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
 
   EditedImage? _image;
   bool _isBusy = false;
-  String _status = '选择图片开始剪辑';
-  late ImageClipCropOrientation _cropOrientation;
+  late String _status;
+  late ImageClipAspectRatio _cropAspectRatio;
   late ImageClipScaleMode _cropScaleMode;
   int _rotationDegrees = 0;
 
-  double get _cropAspectRatio => switch (_cropOrientation) {
-    ImageClipCropOrientation.portrait => 3 / 4,
-    ImageClipCropOrientation.landscape => 4 / 3,
-  };
+  double get _cropAspectRatioValue => _cropAspectRatio.value;
+
+  ImageClipAspectRatio get _initialAspectRatio {
+    return widget.initialAspectRatio ??
+        ImageClipAspectRatio.fromOrientation(widget.initialOrientation);
+  }
+
+  String get _initialImageLabel {
+    return widget.initialImageLabel.isEmpty
+        ? widget.labels.defaultImageLabel
+        : widget.initialImageLabel;
+  }
+
+  List<ImageClipAspectRatio> get _aspectRatioChoices {
+    final presets = widget.aspectRatios.isEmpty
+        ? ImageClipAspectRatio.defaults
+        : widget.aspectRatios;
+    if (presets.contains(_cropAspectRatio)) {
+      return presets;
+    }
+    return <ImageClipAspectRatio>[_cropAspectRatio, ...presets];
+  }
 
   @override
   void initState() {
     super.initState();
     _processor = widget.processor ?? ImageProcessor();
-    _cropOrientation = widget.initialOrientation;
+    _status = widget.labels.initialStatus;
+    _cropAspectRatio = _initialAspectRatio;
     _cropScaleMode = widget.initialScaleMode;
     unawaited(_loadInitialImage());
   }
@@ -187,6 +428,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
             _CropTopBar(
               isBusy: _isBusy,
               canSave: _image != null,
+              labels: widget.labels,
               onCancel: _cancelCrop,
               onSave: _applyCrop,
             ),
@@ -197,17 +439,19 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
                 image: _image,
                 isBusy: _isBusy,
                 status: _status,
-                cropAspectRatio: _cropAspectRatio,
+                cropAspectRatio: _cropAspectRatioValue,
                 scaleMode: _cropScaleMode,
               ),
             ),
             _CropBottomBar(
-              selectedOrientation: _cropOrientation,
+              selectedAspectRatio: _cropAspectRatio,
+              aspectRatios: _aspectRatioChoices,
               scaleMode: _cropScaleMode,
+              labels: widget.labels,
               canRun: _image != null && !_isBusy,
               onScaleModeToggle: _toggleScaleMode,
               onRotate: _rotateRight,
-              onOrientationChanged: _setCropOrientation,
+              onAspectRatioChanged: _setCropAspectRatio,
             ),
           ],
         ),
@@ -219,9 +463,9 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     final bytes = widget.initialImageBytes;
     if (bytes != null) {
       return _runImageTask(
-        () => _processor.decodeBytes(bytes, label: widget.initialImageLabel),
-        busyLabel: '正在载入图片',
-        doneLabel: '图片已载入',
+        () => _processor.decodeBytes(bytes, label: _initialImageLabel),
+        busyLabel: widget.labels.loadingImageStatus,
+        doneLabel: widget.labels.imageLoadedStatus,
         onDone: (_) {
           _rotationDegrees = 0;
         },
@@ -234,7 +478,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
 
     setState(() {
       _image = null;
-      _status = '等待传入图片';
+      _status = widget.labels.waitingForImageStatus;
       _rotationDegrees = 0;
     });
     return Future<void>.value();
@@ -243,8 +487,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   Future<void> _loadSample() {
     return _runImageTask(
       () => _processor.createSample(),
-      busyLabel: '正在生成示例图',
-      doneLabel: '示例图已生成',
+      busyLabel: widget.labels.generatingSampleStatus,
+      doneLabel: widget.labels.sampleGeneratedStatus,
       onDone: (_) {
         _rotationDegrees = 0;
       },
@@ -257,7 +501,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       if (widget.loadSampleOnStart) {
         return _loadSample();
       }
-      _showMessage('请先传入图片');
+      _showMessage(widget.labels.imageRequiredMessage);
       return;
     }
     final region = _previewKey.currentState?.currentCropRegion(cornerRadius: 0);
@@ -280,13 +524,13 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       if (widget.loadSampleOnStart) {
         return _loadSample();
       }
-      _showMessage('请先传入图片');
+      _showMessage(widget.labels.imageRequiredMessage);
       return Future<void>.value();
     }
     return _runImageTask(
       () => _processor.rotateRight(source),
-      busyLabel: '正在旋转',
-      doneLabel: '旋转完成',
+      busyLabel: widget.labels.rotatingStatus,
+      doneLabel: widget.labels.rotationCompleteStatus,
       onDone: (_) {
         _rotationDegrees = (_rotationDegrees + 90) % 360;
       },
@@ -317,8 +561,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
         _image = result;
         _isBusy = false;
         onDone?.call(result);
-        _status =
-            '$doneLabel：${result.dimensionsLabel}，${result.bytesLabel}，${result.elapsedMs} ms';
+        _status = widget.labels.completedStatus(doneLabel, result);
       });
     } catch (error) {
       if (!mounted) {
@@ -326,9 +569,9 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       }
       setState(() {
         _isBusy = false;
-        _status = '处理失败：$error';
+        _status = widget.labels.errorMessage(error);
       });
-      _showMessage('处理失败：$error');
+      _showMessage(widget.labels.errorMessage(error));
     }
   }
 
@@ -342,11 +585,15 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
 
     setState(() {
       _isBusy = true;
-      _status = '正在裁剪';
+      _status = widget.labels.croppingStatus;
     });
 
     try {
-      final cropped = await _processor.cropRegion(source, region);
+      final cropped = await _processor.cropRegion(
+        source,
+        region,
+        outputSettings: widget.outputSettings,
+      );
       if (!mounted) {
         return;
       }
@@ -358,8 +605,10 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       );
       setState(() {
         _isBusy = false;
-        _status =
-            '裁剪完成：${cropped.dimensionsLabel}，${cropped.bytesLabel}，${cropped.elapsedMs} ms';
+        _status = widget.labels.completedStatus(
+          widget.labels.cropCompleteStatus,
+          cropped,
+        );
       });
       widget.onResult?.call(result);
       if (widget.closeOnSave) {
@@ -369,7 +618,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       if (widget.showResultPage) {
         await Navigator.of(context).push(
           MaterialPageRoute<void>(
-            builder: (context) => ImageClipResultPage(result: result),
+            builder: (context) =>
+                ImageClipResultPage(result: result, labels: widget.labels),
           ),
         );
       }
@@ -379,9 +629,9 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       }
       setState(() {
         _isBusy = false;
-        _status = '处理失败：$error';
+        _status = widget.labels.errorMessage(error);
       });
-      _showMessage('处理失败：$error');
+      _showMessage(widget.labels.errorMessage(error));
     }
   }
 
@@ -417,7 +667,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       return;
     }
     setState(() {
-      _cropOrientation = widget.initialOrientation;
+      _cropAspectRatio = _initialAspectRatio;
       _cropScaleMode = widget.initialScaleMode;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -425,15 +675,15 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
         _resetCropView();
       }
     });
-    _showMessage('已复位裁剪框');
+    _showMessage(widget.labels.cropResetMessage);
   }
 
-  void _setCropOrientation(ImageClipCropOrientation orientation) {
-    if (_cropOrientation == orientation || _isBusy) {
+  void _setCropAspectRatio(ImageClipAspectRatio aspectRatio) {
+    if (_cropAspectRatio == aspectRatio || _isBusy) {
       return;
     }
     setState(() {
-      _cropOrientation = orientation;
+      _cropAspectRatio = aspectRatio;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -446,10 +696,17 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
 /// Displays the cropped image and crop metadata after saving.
 class ImageClipResultPage extends StatelessWidget {
   /// Creates a result page for a saved crop [result].
-  const ImageClipResultPage({super.key, required this.result});
+  const ImageClipResultPage({
+    super.key,
+    required this.result,
+    this.labels = const ImageClipEditorLabels(),
+  });
 
   /// Crop result to preview.
   final ImageClipResult result;
+
+  /// User-facing copy used by this result page.
+  final ImageClipEditorLabels labels;
 
   @override
   Widget build(BuildContext context) {
@@ -460,7 +717,10 @@ class ImageClipResultPage extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            _ResultTopBar(onBack: () => Navigator.of(context).pop()),
+            _ResultTopBar(
+              labels: labels,
+              onBack: () => Navigator.of(context).pop(),
+            ),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
@@ -470,14 +730,14 @@ class ImageClipResultPage extends StatelessWidget {
                     _CroppedImagePreview(image: result.cropped),
                     const SizedBox(height: 18),
                     _MetricSection(
-                      title: '截图信息',
+                      title: labels.cropDetailsTitle,
                       children: [
                         _MetricTile(
-                          label: '旋转角度',
+                          label: labels.rotationDegreesLabel,
                           value: '${result.rotationDegrees}°',
                         ),
                         _MetricTile(
-                          label: '原图尺寸',
+                          label: labels.sourceSizeLabel,
                           value:
                               '${result.source.width} x ${result.source.height}',
                         ),
@@ -494,7 +754,7 @@ class ImageClipResultPage extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    _ResultDataPreview(result: result),
+                    _ResultDataPreview(result: result, labels: labels),
                   ],
                 ),
               ),
@@ -507,8 +767,9 @@ class ImageClipResultPage extends StatelessWidget {
 }
 
 class _ResultTopBar extends StatelessWidget {
-  const _ResultTopBar({required this.onBack});
+  const _ResultTopBar({required this.labels, required this.onBack});
 
+  final ImageClipEditorLabels labels;
   final VoidCallback onBack;
 
   @override
@@ -525,12 +786,12 @@ class _ResultTopBar extends StatelessWidget {
             onPressed: onBack,
             color: const Color(0xFFF7F7F7),
             icon: const Icon(Icons.arrow_back),
-            tooltip: '返回',
+            tooltip: labels.backTooltip,
           ),
           const SizedBox(width: 4),
-          const Text(
-            '裁剪结果',
-            style: TextStyle(
+          Text(
+            labels.resultTitle,
+            style: const TextStyle(
               color: Color(0xFFF7F7F7),
               fontSize: 22,
               fontWeight: FontWeight.w500,
@@ -658,9 +919,10 @@ class _MetricTile extends StatelessWidget {
 }
 
 class _ResultDataPreview extends StatelessWidget {
-  const _ResultDataPreview({required this.result});
+  const _ResultDataPreview({required this.result, required this.labels});
 
   final ImageClipResult result;
+  final ImageClipEditorLabels labels;
 
   @override
   Widget build(BuildContext context) {
@@ -672,7 +934,8 @@ class _ResultDataPreview extends StatelessWidget {
         'region.width: ${region.width}\n'
         'region.height: ${region.height}\n'
         'cropped.width: ${result.cropped.width}\n'
-        'cropped.height: ${result.cropped.height}';
+        'cropped.height: ${result.cropped.height}\n'
+        'cropped.mimeType: ${result.cropped.mimeType}';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -684,9 +947,9 @@ class _ResultDataPreview extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '返回数据',
-            style: TextStyle(
+          Text(
+            labels.resultDataTitle,
+            style: const TextStyle(
               color: Color(0xFFF2F2F2),
               fontSize: 18,
               fontWeight: FontWeight.w500,
@@ -1168,12 +1431,14 @@ class _CropTopBar extends StatelessWidget {
   const _CropTopBar({
     required this.isBusy,
     required this.canSave,
+    required this.labels,
     required this.onCancel,
     required this.onSave,
   });
 
   final bool isBusy;
   final bool canSave;
+  final ImageClipEditorLabels labels;
   final VoidCallback onCancel;
   final VoidCallback onSave;
 
@@ -1191,13 +1456,13 @@ class _CropTopBar extends StatelessWidget {
         children: [
           const SizedBox(width: 18),
           _TextActionButton(
-            label: 'Cancel',
+            label: labels.cancelButton,
             color: enabledColor,
             onPressed: isBusy ? null : onCancel,
           ),
           const Spacer(),
           _TextActionButton(
-            label: 'Save',
+            label: labels.saveButton,
             color: canSave && !isBusy ? enabledColor : disabledColor,
             onPressed: canSave && !isBusy ? onSave : null,
           ),
@@ -1234,20 +1499,24 @@ class _TextActionButton extends StatelessWidget {
 
 class _CropBottomBar extends StatelessWidget {
   const _CropBottomBar({
-    required this.selectedOrientation,
+    required this.selectedAspectRatio,
+    required this.aspectRatios,
     required this.scaleMode,
+    required this.labels,
     required this.canRun,
     required this.onScaleModeToggle,
     required this.onRotate,
-    required this.onOrientationChanged,
+    required this.onAspectRatioChanged,
   });
 
-  final ImageClipCropOrientation selectedOrientation;
+  final ImageClipAspectRatio selectedAspectRatio;
+  final List<ImageClipAspectRatio> aspectRatios;
   final ImageClipScaleMode scaleMode;
+  final ImageClipEditorLabels labels;
   final bool canRun;
   final VoidCallback onScaleModeToggle;
   final VoidCallback onRotate;
-  final ValueChanged<ImageClipCropOrientation> onOrientationChanged;
+  final ValueChanged<ImageClipAspectRatio> onAspectRatioChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1256,7 +1525,7 @@ class _CropBottomBar extends StatelessWidget {
         final compact = constraints.maxWidth < 500;
         final barHeight = compact ? 202.0 : 236.0;
         final toolGap = compact ? 46.0 : 72.0;
-        final modeGap = compact ? 32.0 : 54.0;
+        final modeGap = compact ? 24.0 : 40.0;
 
         return Container(
           height: barHeight,
@@ -1282,8 +1551,8 @@ class _CropBottomBar extends StatelessWidget {
                               ? Icons.fit_screen_outlined
                               : Icons.fullscreen_outlined,
                           label: scaleMode == ImageClipScaleMode.fill
-                              ? 'Fit'
-                              : 'Fill',
+                              ? labels.fitButton
+                              : labels.fillButton,
                           enabled: canRun,
                           compact: compact,
                           onPressed: onScaleModeToggle,
@@ -1291,7 +1560,7 @@ class _CropBottomBar extends StatelessWidget {
                         SizedBox(width: toolGap),
                         _CropToolButton(
                           icon: Icons.rotate_90_degrees_cw_outlined,
-                          label: 'Rotate',
+                          label: labels.rotateButton,
                           enabled: canRun,
                           compact: compact,
                           onPressed: onRotate,
@@ -1299,31 +1568,34 @@ class _CropBottomBar extends StatelessWidget {
                       ],
                     ),
                     SizedBox(height: compact ? 18 : 28),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _OrientationChoice(
-                          label: 'Portrait',
-                          orientation: ImageClipCropOrientation.portrait,
-                          selected:
-                              selectedOrientation ==
-                              ImageClipCropOrientation.portrait,
-                          enabled: canRun,
-                          compact: compact,
-                          onSelected: onOrientationChanged,
-                        ),
-                        SizedBox(width: modeGap),
-                        _OrientationChoice(
-                          label: 'Landscape',
-                          orientation: ImageClipCropOrientation.landscape,
-                          selected:
-                              selectedOrientation ==
-                              ImageClipCropOrientation.landscape,
-                          enabled: canRun,
-                          compact: compact,
-                          onSelected: onOrientationChanged,
-                        ),
-                      ],
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          for (
+                            var index = 0;
+                            index < aspectRatios.length;
+                            index++
+                          )
+                            Padding(
+                              padding: EdgeInsets.only(
+                                left: index == 0 ? 0 : modeGap / 2,
+                                right: index == aspectRatios.length - 1
+                                    ? 0
+                                    : modeGap / 2,
+                              ),
+                              child: _AspectRatioChoice(
+                                aspectRatio: aspectRatios[index],
+                                selected:
+                                    selectedAspectRatio == aspectRatios[index],
+                                enabled: canRun,
+                                compact: compact,
+                                onSelected: onAspectRatioChanged,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -1380,22 +1652,20 @@ class _CropToolButton extends StatelessWidget {
   }
 }
 
-class _OrientationChoice extends StatelessWidget {
-  const _OrientationChoice({
-    required this.label,
-    required this.orientation,
+class _AspectRatioChoice extends StatelessWidget {
+  const _AspectRatioChoice({
+    required this.aspectRatio,
     required this.selected,
     required this.enabled,
     required this.compact,
     required this.onSelected,
   });
 
-  final String label;
-  final ImageClipCropOrientation orientation;
+  final ImageClipAspectRatio aspectRatio;
   final bool selected;
   final bool enabled;
   final bool compact;
-  final ValueChanged<ImageClipCropOrientation> onSelected;
+  final ValueChanged<ImageClipAspectRatio> onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -1406,21 +1676,21 @@ class _OrientationChoice extends StatelessWidget {
         : const Color(0xFF6D6E72);
 
     return InkResponse(
-      onTap: enabled ? () => onSelected(orientation) : null,
+      onTap: enabled ? () => onSelected(aspectRatio) : null,
       radius: 48,
       child: SizedBox(
         width: compact ? 104 : 116,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _OrientationGlyph(
-              orientation: orientation,
+            _AspectRatioGlyph(
+              aspectRatio: aspectRatio,
               color: color,
               compact: compact,
             ),
             SizedBox(height: compact ? 8 : 12),
             Text(
-              label,
+              aspectRatio.label,
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: color,
@@ -1435,25 +1705,29 @@ class _OrientationChoice extends StatelessWidget {
   }
 }
 
-class _OrientationGlyph extends StatelessWidget {
-  const _OrientationGlyph({
-    required this.orientation,
+class _AspectRatioGlyph extends StatelessWidget {
+  const _AspectRatioGlyph({
+    required this.aspectRatio,
     required this.color,
     required this.compact,
   });
 
-  final ImageClipCropOrientation orientation;
+  final ImageClipAspectRatio aspectRatio;
   final Color color;
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final size = switch ((orientation, compact)) {
-      (ImageClipCropOrientation.portrait, true) => const Size(30, 42),
-      (ImageClipCropOrientation.portrait, false) => const Size(34, 48),
-      (ImageClipCropOrientation.landscape, true) => const Size(50, 32),
-      (ImageClipCropOrientation.landscape, false) => const Size(58, 36),
-    };
+    final maxWidth = compact ? 54.0 : 62.0;
+    final maxHeight = compact ? 42.0 : 48.0;
+    final ratio = aspectRatio.value;
+    var glyphWidth = maxWidth;
+    var glyphHeight = glyphWidth / ratio;
+    if (glyphHeight > maxHeight) {
+      glyphHeight = maxHeight;
+      glyphWidth = glyphHeight * ratio;
+    }
+    final size = Size(glyphWidth, glyphHeight);
 
     return SizedBox(
       width: 64,

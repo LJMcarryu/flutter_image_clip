@@ -23,7 +23,7 @@ void main() {
       sample,
       const CropRegion(x: 120, y: 80, width: 300, height: 220, cornerRadius: 8),
     );
-    expect(gestureCropped.operation, '手势裁剪');
+    expect(gestureCropped.operation, 'Crop region');
     expect(gestureCropped.width, 300);
     expect(gestureCropped.height, 220);
 
@@ -35,11 +35,18 @@ void main() {
       rotated,
       const ColorAdjustment(brightness: 1.08, contrast: 1.1, saturation: 0.9),
     );
-    expect(adjusted.operation, '调色');
+    expect(adjusted.operation, 'Adjust color');
     expect(adjusted.bytes, isNotEmpty);
 
     final exported = await processor.exportPng(adjusted);
-    expect(exported.operation, '导出 PNG');
+    expect(exported.operation, 'Export PNG');
+    expect(exported.format, ImageClipOutputFormat.png);
     expect(exported.bytes, isNotEmpty);
+
+    final jpeg = await processor.exportJpeg(adjusted, quality: 82);
+    expect(jpeg.operation, 'Export JPEG');
+    expect(jpeg.format, ImageClipOutputFormat.jpeg);
+    expect(jpeg.mimeType, 'image/jpeg');
+    expect(jpeg.bytes.sublist(0, 2), <int>[0xFF, 0xD8]);
   });
 }

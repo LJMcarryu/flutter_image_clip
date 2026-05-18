@@ -3,6 +3,75 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 
+/// Encoded output formats supported by [ImageProcessor].
+enum ImageClipOutputFormat {
+  /// Portable Network Graphics output with lossless compression.
+  png,
+
+  /// JPEG output with configurable lossy compression quality.
+  jpeg,
+}
+
+/// Encoding options used when an image operation writes output bytes.
+class ImageClipOutputSettings {
+  /// Creates output encoding settings.
+  const ImageClipOutputSettings({
+    this.format = ImageClipOutputFormat.png,
+    this.jpegQuality = 90,
+    this.pngLevel = 6,
+  });
+
+  /// Creates lossless PNG output settings.
+  const ImageClipOutputSettings.png({this.pngLevel = 6})
+    : format = ImageClipOutputFormat.png,
+      jpegQuality = 90;
+
+  /// Creates JPEG output settings.
+  const ImageClipOutputSettings.jpeg({this.jpegQuality = 90})
+    : format = ImageClipOutputFormat.jpeg,
+      pngLevel = 6;
+
+  /// Encoded output format.
+  final ImageClipOutputFormat format;
+
+  /// JPEG quality from 1 to 100.
+  final int jpegQuality;
+
+  /// PNG compression level from 0 to 9.
+  final int pngLevel;
+
+  /// MIME type for [format].
+  String get mimeType => switch (format) {
+    ImageClipOutputFormat.png => 'image/png',
+    ImageClipOutputFormat.jpeg => 'image/jpeg',
+  };
+
+  /// File extension for [format], without a leading dot.
+  String get fileExtension => switch (format) {
+    ImageClipOutputFormat.png => 'png',
+    ImageClipOutputFormat.jpeg => 'jpg',
+  };
+
+  /// Converts these settings to the map used by the background processor.
+  Map<String, Object?> toMap() => <String, Object?>{
+    'format': format.name,
+    'jpegQuality': jpegQuality,
+    'pngLevel': pngLevel,
+  };
+
+  /// Creates settings from the map used by the background processor.
+  static ImageClipOutputSettings fromMap(Map<Object?, Object?>? map) {
+    if (map == null) {
+      return const ImageClipOutputSettings();
+    }
+    return ImageClipOutputSettings(
+      format: _formatFromName(map['format'] as String?),
+      jpegQuality: _intOf(map['jpegQuality'], fallback: 90),
+      pngLevel: _intOf(map['pngLevel'], fallback: 6),
+    );
+  }
+}
+
 /// Describes an image generated or transformed by [ImageProcessor].
 class EditedImage {
   /// Creates an immutable image processing result.
@@ -13,9 +82,10 @@ class EditedImage {
     required this.label,
     required this.operation,
     required this.elapsedMs,
+    this.format = ImageClipOutputFormat.png,
   });
 
-  /// Encoded PNG bytes for the image.
+  /// Encoded bytes for the image.
   final Uint8List bytes;
 
   /// Width of the image in physical pixels.
@@ -33,6 +103,21 @@ class EditedImage {
   /// Processing time in milliseconds.
   final int elapsedMs;
 
+  /// Encoded output format for [bytes].
+  final ImageClipOutputFormat format;
+
+  /// MIME type for [format].
+  String get mimeType => switch (format) {
+    ImageClipOutputFormat.png => 'image/png',
+    ImageClipOutputFormat.jpeg => 'image/jpeg',
+  };
+
+  /// File extension for [format], without a leading dot.
+  String get fileExtension => switch (format) {
+    ImageClipOutputFormat.png => 'png',
+    ImageClipOutputFormat.jpeg => 'jpg',
+  };
+
   /// Image dimensions formatted as `widthxheight`.
   String get dimensionsLabel => '${width}x$height';
 
@@ -47,6 +132,7 @@ class EditedImage {
     'label': label,
     'operation': operation,
     'elapsedMs': elapsedMs,
+    'format': format.name,
   };
 
   /// Creates an [EditedImage] from the isolate-safe map returned by [toMap].
@@ -58,6 +144,7 @@ class EditedImage {
       label: map['label']! as String,
       operation: map['operation']! as String,
       elapsedMs: map['elapsedMs']! as int,
+      format: _formatFromName(map['format'] as String?),
     );
   }
 }
@@ -154,7 +241,7 @@ class ColorAdjustment {
 class ImageProcessor {
   /// Creates a generated sample image for demos and tests.
   Future<EditedImage> createSample() =>
-      _run(<String, Object?>{'kind': 'sample', 'label': '内置示例图'});
+      _run(<String, Object?>{'kind': 'sample', 'label': 'Sample image'});
 
   /// Decodes encoded image [bytes] into a normalized PNG [EditedImage].
   Future<EditedImage> decodeBytes(Uint8List bytes, {required String label}) {
@@ -166,20 +253,32 @@ class ImageProcessor {
   }
 
   /// Crops the center of [source] using relative [settings].
-  Future<EditedImage> cropCenter(EditedImage source, CropSettings settings) {
+  Future<EditedImage> cropCenter(
+    EditedImage source,
+    CropSettings settings, {
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
+  }) {
     return _run(<String, Object?>{
       'kind': 'crop',
       'source': source.toMap(),
       ...settings.toMap(),
+      'output': outputSettings.toMap(),
     });
   }
 
   /// Crops [source] to an explicit pixel [region].
-  Future<EditedImage> cropRegion(EditedImage source, CropRegion region) {
+  Future<EditedImage> cropRegion(
+    EditedImage source,
+    CropRegion region, {
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
+  }) {
     return _run(<String, Object?>{
       'kind': 'cropRegion',
       'source': source.toMap(),
       ...region.toMap(),
+      'output': outputSettings.toMap(),
     });
   }
 
@@ -232,12 +331,30 @@ class ImageProcessor {
     });
   }
 
+  /// Re-encodes [source] using [outputSettings].
+  Future<EditedImage> exportImage(
+    EditedImage source, {
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
+  }) {
+    return _run(<String, Object?>{
+      'kind': 'exportImage',
+      'source': source.toMap(),
+      'output': outputSettings.toMap(),
+    });
+  }
+
   /// Re-encodes [source] as a PNG [EditedImage].
   Future<EditedImage> exportPng(EditedImage source) {
-    return _run(<String, Object?>{
-      'kind': 'exportPng',
-      'source': source.toMap(),
-    });
+    return exportImage(source);
+  }
+
+  /// Re-encodes [source] as a JPEG [EditedImage].
+  Future<EditedImage> exportJpeg(EditedImage source, {int quality = 90}) {
+    return exportImage(
+      source,
+      outputSettings: ImageClipOutputSettings.jpeg(jpegQuality: quality),
+    );
   }
 
   Future<EditedImage> _run(Map<String, Object?> request) async {
@@ -255,6 +372,11 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
   final kind = request['kind']! as String;
   final label =
       (request['label'] as String?) ?? _sourceMap(request)['label']! as String;
+  final outputSettings = ImageClipOutputSettings.fromMap(
+    request['output'] == null
+        ? null
+        : Map<Object?, Object?>.from(request['output']! as Map),
+  );
 
   late img.Image image;
   late String operation;
@@ -262,11 +384,11 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
   switch (kind) {
     case 'sample':
       image = _createSampleImage();
-      operation = '生成示例';
+      operation = 'Create sample';
       break;
     case 'decode':
       image = _decode(request['bytes']! as Uint8List);
-      operation = '解码';
+      operation = 'Decode';
       break;
     case 'crop':
       image = _decodeSource(request);
@@ -276,7 +398,7 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
         heightRatio: _doubleOf(request['heightRatio'], fallback: 0.75),
         cornerRadius: _doubleOf(request['cornerRadius'], fallback: 0),
       );
-      operation = '裁剪';
+      operation = 'Crop';
       break;
     case 'cropRegion':
       image = _decodeSource(request);
@@ -288,7 +410,7 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
         height: _intOf(request['height'], fallback: image.height),
         cornerRadius: _doubleOf(request['cornerRadius'], fallback: 0),
       );
-      operation = '手势裁剪';
+      operation = 'Crop region';
       break;
     case 'rotate':
       image = _decodeSource(request);
@@ -297,17 +419,17 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
         angle: _intOf(request['angle'], fallback: 90),
         interpolation: img.Interpolation.linear,
       );
-      operation = '旋转';
+      operation = 'Rotate';
       break;
     case 'flipHorizontal':
       image = _decodeSource(request);
       image = img.flipHorizontal(image);
-      operation = '水平翻转';
+      operation = 'Flip horizontal';
       break;
     case 'flipVertical':
       image = _decodeSource(request);
       image = img.flipVertical(image);
-      operation = '垂直翻转';
+      operation = 'Flip vertical';
       break;
     case 'resize':
       image = _decodeSource(request);
@@ -315,7 +437,7 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
         image,
         _intOf(request['maxSide'], fallback: 1080),
       );
-      operation = '缩放';
+      operation = 'Resize';
       break;
     case 'adjust':
       image = _decodeSource(request);
@@ -325,17 +447,18 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
         contrast: _doubleOf(request['contrast'], fallback: 1),
         saturation: _doubleOf(request['saturation'], fallback: 1),
       );
-      operation = '调色';
+      operation = 'Adjust color';
       break;
+    case 'exportImage':
     case 'exportPng':
       image = _decodeSource(request);
-      operation = '导出 PNG';
+      operation = 'Export ${outputSettings.format.name.toUpperCase()}';
       break;
     default:
-      throw UnsupportedError('未知图片处理任务：$kind');
+      throw UnsupportedError('Unsupported image processing task: $kind');
   }
 
-  final encoded = Uint8List.fromList(img.encodePng(image, level: 6));
+  final encoded = _encodeImage(image, outputSettings);
   stopwatch.stop();
 
   return <String, Object?>{
@@ -345,6 +468,7 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
     'label': label,
     'operation': operation,
     'elapsedMs': stopwatch.elapsedMilliseconds,
+    'format': outputSettings.format.name,
   };
 }
 
@@ -360,9 +484,29 @@ Map<Object?, Object?> _sourceMap(Map<String, Object?> request) {
 img.Image _decode(Uint8List bytes) {
   final decoded = img.decodeImage(bytes);
   if (decoded == null) {
-    throw const FormatException('无法识别图片格式');
+    throw const FormatException('Unsupported image format');
   }
   return decoded.convert(numChannels: 4);
+}
+
+Uint8List _encodeImage(img.Image image, ImageClipOutputSettings settings) {
+  return switch (settings.format) {
+    ImageClipOutputFormat.png => Uint8List.fromList(
+      img.encodePng(image, level: settings.pngLevel.clamp(0, 9).toInt()),
+    ),
+    ImageClipOutputFormat.jpeg => Uint8List.fromList(
+      img.encodeJpg(image, quality: settings.jpegQuality.clamp(1, 100).toInt()),
+    ),
+  };
+}
+
+ImageClipOutputFormat _formatFromName(String? name) {
+  for (final format in ImageClipOutputFormat.values) {
+    if (format.name == name) {
+      return format;
+    }
+  }
+  return ImageClipOutputFormat.png;
 }
 
 img.Image _cropCenter(

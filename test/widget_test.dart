@@ -27,6 +27,7 @@ void main() {
   Future<void> pumpClippingApp(
     WidgetTester tester, {
     Size size = const Size(440, 956),
+    Widget editor = const ImageClipEditor(),
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -36,10 +37,7 @@ void main() {
     });
 
     await tester.pumpWidget(
-      const MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: ImageClipEditor(),
-      ),
+      MaterialApp(debugShowCheckedModeBanner: false, home: editor),
     );
     await pumpUntilSampleLoads(tester);
   }
@@ -126,12 +124,63 @@ void main() {
     await pumpUntilIdle(tester);
     await tester.pumpAndSettle();
 
-    expect(find.text('裁剪结果'), findsOneWidget);
-    expect(find.text('截图信息'), findsOneWidget);
-    expect(find.text('旋转角度'), findsOneWidget);
+    expect(find.text('Crop result'), findsOneWidget);
+    expect(find.text('Crop details'), findsOneWidget);
+    expect(find.text('Rotation'), findsOneWidget);
     expect(find.text('90°'), findsOneWidget);
-    expect(find.text('返回数据'), findsOneWidget);
+    expect(find.text('Result data'), findsOneWidget);
     expect(find.textContaining('rotationDegrees: 90'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('supports custom labels and aspect ratio presets', (
+    tester,
+  ) async {
+    await pumpClippingApp(
+      tester,
+      editor: const ImageClipEditor(
+        labels: ImageClipEditorLabels(
+          cancelButton: 'Dismiss',
+          saveButton: 'Crop',
+          rotateButton: 'Turn',
+        ),
+        initialAspectRatio: ImageClipAspectRatio.square,
+        aspectRatios: <ImageClipAspectRatio>[
+          ImageClipAspectRatio.square,
+          ImageClipAspectRatio.widescreen,
+        ],
+      ),
+    );
+
+    expect(find.text('Dismiss'), findsOneWidget);
+    expect(find.text('Crop'), findsOneWidget);
+    expect(find.text('Turn'), findsOneWidget);
+    expect(find.text('Square'), findsOneWidget);
+    expect(find.text('16:9'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('save can return JPEG output', (tester) async {
+    ImageClipResult? result;
+
+    await pumpClippingApp(
+      tester,
+      editor: ImageClipEditor(
+        showResultPage: false,
+        outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 82),
+        onResult: (value) {
+          result = value;
+        },
+      ),
+    );
+
+    await tester.tap(find.text('Save'));
+    await pumpUntilIdle(tester);
+
+    expect(result, isNotNull);
+    expect(result!.cropped.format, ImageClipOutputFormat.jpeg);
+    expect(result!.cropped.mimeType, 'image/jpeg');
+    expect(result!.cropped.bytes.sublist(0, 2), <int>[0xFF, 0xD8]);
     expect(tester.takeException(), isNull);
   });
 

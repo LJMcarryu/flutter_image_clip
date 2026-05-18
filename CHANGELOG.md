@@ -1,3 +1,11 @@
+# 0.2.0
+
+- Added `ImageClipEditorLabels` for configurable editor, status, and result page copy.
+- Added `ImageClipAspectRatio` so the editor can show custom named crop ratio presets such as square or widescreen crops.
+- Added `ImageClipOutputSettings` and `ImageClipOutputFormat` for configurable PNG or JPEG crop output.
+- Added `ImageProcessor.exportImage` and `ImageProcessor.exportJpeg`.
+- Changed built-in editor and processor messages to English defaults.
+
 # 0.1.1
 
 - Updated the changelog to use English content for pub.dev language checks.
