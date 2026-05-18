@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../image_processing/image_processor.dart';
 
-/// 打开完整图片裁剪界面，保存后返回 [ImageClipResult]。
+/// Opens a full-screen image crop editor and returns an [ImageClipResult].
 Future<ImageClipResult?> showImageClipEditor(
   BuildContext context, {
   Uint8List? imageBytes,
@@ -39,11 +39,27 @@ Future<ImageClipResult?> showImageClipEditor(
   );
 }
 
-enum ImageClipCropOrientation { portrait, landscape }
+/// Aspect-ratio presets used by [ImageClipEditor].
+enum ImageClipCropOrientation {
+  /// Uses a portrait 3:4 crop box.
+  portrait,
 
-enum ImageClipScaleMode { fit, fill }
+  /// Uses a landscape 4:3 crop box.
+  landscape,
+}
 
+/// How the source image is initially placed behind the crop box.
+enum ImageClipScaleMode {
+  /// Shows the whole source image inside the preview area.
+  fit,
+
+  /// Scales the source image until the crop box is fully covered.
+  fill,
+}
+
+/// Result returned after a crop is saved.
 class ImageClipResult {
+  /// Creates a crop result with source, output, and crop metadata.
   const ImageClipResult({
     required this.source,
     required this.cropped,
@@ -51,11 +67,19 @@ class ImageClipResult {
     required this.rotationDegrees,
   });
 
+  /// Source image that was displayed in the editor.
   final EditedImage source;
+
+  /// Cropped PNG image produced by the editor.
   final EditedImage cropped;
+
+  /// Pixel crop rectangle applied to [source].
   final CropRegion region;
+
+  /// Clockwise rotation applied before the final crop, in degrees.
   final int rotationDegrees;
 
+  /// Converts the result metadata and images to isolate-safe maps.
   Map<String, Object?> toMap() => <String, Object?>{
     'source': source.toMap(),
     'cropped': cropped.toMap(),
@@ -64,7 +88,9 @@ class ImageClipResult {
   };
 }
 
+/// Embeddable Flutter widget for interactive image clipping.
 class ImageClipEditor extends StatefulWidget {
+  /// Creates an image crop editor widget.
   const ImageClipEditor({
     super.key,
     this.processor,
@@ -80,16 +106,37 @@ class ImageClipEditor extends StatefulWidget {
     this.onResult,
   });
 
+  /// Optional processor instance used for image operations.
   final ImageProcessor? processor;
+
+  /// Encoded image bytes loaded when the editor starts.
   final Uint8List? initialImageBytes;
+
+  /// Label attached to [initialImageBytes] in image processing results.
   final String initialImageLabel;
+
+  /// Initial crop-box orientation.
   final ImageClipCropOrientation initialOrientation;
+
+  /// Initial image scaling mode.
   final ImageClipScaleMode initialScaleMode;
+
+  /// Whether to generate a sample image when [initialImageBytes] is null.
   final bool loadSampleOnStart;
+
+  /// Whether canceling the editor should pop the current route.
   final bool closeOnCancel;
+
+  /// Whether saving a crop should pop the current route with the result.
   final bool closeOnSave;
+
+  /// Whether to navigate to [ImageClipResultPage] after saving.
   final bool showResultPage;
+
+  /// Called when the user cancels the crop operation.
   final VoidCallback? onCancel;
+
+  /// Called with the saved crop result.
   final ValueChanged<ImageClipResult>? onResult;
 
   @override
@@ -396,9 +443,12 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   }
 }
 
+/// Displays the cropped image and crop metadata after saving.
 class ImageClipResultPage extends StatelessWidget {
+  /// Creates a result page for a saved crop [result].
   const ImageClipResultPage({super.key, required this.result});
 
+  /// Crop result to preview.
   final ImageClipResult result;
 
   @override

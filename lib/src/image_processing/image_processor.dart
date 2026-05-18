@@ -3,7 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 
+/// Describes an image generated or transformed by [ImageProcessor].
 class EditedImage {
+  /// Creates an immutable image processing result.
   const EditedImage({
     required this.bytes,
     required this.width,
@@ -13,17 +15,31 @@ class EditedImage {
     required this.elapsedMs,
   });
 
+  /// Encoded PNG bytes for the image.
   final Uint8List bytes;
+
+  /// Width of the image in physical pixels.
   final int width;
+
+  /// Height of the image in physical pixels.
   final int height;
+
+  /// Human-readable image label preserved through processing operations.
   final String label;
+
+  /// Human-readable name of the operation that produced this image.
   final String operation;
+
+  /// Processing time in milliseconds.
   final int elapsedMs;
 
+  /// Image dimensions formatted as `widthxheight`.
   String get dimensionsLabel => '${width}x$height';
 
+  /// Encoded byte length formatted for display.
   String get bytesLabel => _formatBytes(bytes.length);
 
+  /// Converts this result to a map that can be sent across Flutter isolates.
   Map<String, Object?> toMap() => <String, Object?>{
     'bytes': bytes,
     'width': width,
@@ -33,6 +49,7 @@ class EditedImage {
     'elapsedMs': elapsedMs,
   };
 
+  /// Creates an [EditedImage] from the isolate-safe map returned by [toMap].
   static EditedImage fromMap(Map<String, Object?> map) {
     return EditedImage(
       bytes: map['bytes']! as Uint8List,
@@ -45,17 +62,25 @@ class EditedImage {
   }
 }
 
+/// Relative crop settings used by [ImageProcessor.cropCenter].
 class CropSettings {
+  /// Creates center-crop settings with width, height, and corner radius values.
   const CropSettings({
     required this.widthRatio,
     required this.heightRatio,
     required this.cornerRadius,
   });
 
+  /// Fraction of the source image width to keep, clamped between 0.1 and 1.0.
   final double widthRatio;
+
+  /// Fraction of the source image height to keep, clamped between 0.1 and 1.0.
   final double heightRatio;
+
+  /// Rounded corner radius in source-image pixels.
   final double cornerRadius;
 
+  /// Converts these settings to the map used by the background processor.
   Map<String, Object?> toMap() => <String, Object?>{
     'widthRatio': widthRatio,
     'heightRatio': heightRatio,
@@ -63,7 +88,9 @@ class CropSettings {
   };
 }
 
+/// Pixel crop rectangle used by [ImageProcessor.cropRegion].
 class CropRegion {
+  /// Creates a crop rectangle in source-image pixel coordinates.
   const CropRegion({
     required this.x,
     required this.y,
@@ -72,12 +99,22 @@ class CropRegion {
     required this.cornerRadius,
   });
 
+  /// Left edge of the crop rectangle in source-image pixels.
   final int x;
+
+  /// Top edge of the crop rectangle in source-image pixels.
   final int y;
+
+  /// Width of the crop rectangle in source-image pixels.
   final int width;
+
+  /// Height of the crop rectangle in source-image pixels.
   final int height;
+
+  /// Rounded corner radius in source-image pixels.
   final double cornerRadius;
 
+  /// Converts this region to the map used by the background processor.
   Map<String, Object?> toMap() => <String, Object?>{
     'x': x,
     'y': y,
@@ -87,17 +124,25 @@ class CropRegion {
   };
 }
 
+/// Multipliers used by [ImageProcessor.adjustColor].
 class ColorAdjustment {
+  /// Creates color adjustment multipliers.
   const ColorAdjustment({
     required this.brightness,
     required this.contrast,
     required this.saturation,
   });
 
+  /// Brightness multiplier passed to the image package.
   final double brightness;
+
+  /// Contrast multiplier passed to the image package.
   final double contrast;
+
+  /// Saturation multiplier passed to the image package.
   final double saturation;
 
+  /// Converts these multipliers to the map used by the background processor.
   Map<String, Object?> toMap() => <String, Object?>{
     'brightness': brightness,
     'contrast': contrast,
@@ -105,10 +150,13 @@ class ColorAdjustment {
   };
 }
 
+/// Performs image decoding and transformations on a background isolate.
 class ImageProcessor {
+  /// Creates a generated sample image for demos and tests.
   Future<EditedImage> createSample() =>
       _run(<String, Object?>{'kind': 'sample', 'label': '内置示例图'});
 
+  /// Decodes encoded image [bytes] into a normalized PNG [EditedImage].
   Future<EditedImage> decodeBytes(Uint8List bytes, {required String label}) {
     return _run(<String, Object?>{
       'kind': 'decode',
@@ -117,6 +165,7 @@ class ImageProcessor {
     });
   }
 
+  /// Crops the center of [source] using relative [settings].
   Future<EditedImage> cropCenter(EditedImage source, CropSettings settings) {
     return _run(<String, Object?>{
       'kind': 'crop',
@@ -125,6 +174,7 @@ class ImageProcessor {
     });
   }
 
+  /// Crops [source] to an explicit pixel [region].
   Future<EditedImage> cropRegion(EditedImage source, CropRegion region) {
     return _run(<String, Object?>{
       'kind': 'cropRegion',
@@ -133,6 +183,7 @@ class ImageProcessor {
     });
   }
 
+  /// Rotates [source] clockwise by [degrees].
   Future<EditedImage> rotate(EditedImage source, {int degrees = 90}) {
     return _run(<String, Object?>{
       'kind': 'rotate',
@@ -141,8 +192,10 @@ class ImageProcessor {
     });
   }
 
+  /// Rotates [source] clockwise by 90 degrees.
   Future<EditedImage> rotateRight(EditedImage source) => rotate(source);
 
+  /// Flips [source] around the vertical axis.
   Future<EditedImage> flipHorizontal(EditedImage source) {
     return _run(<String, Object?>{
       'kind': 'flipHorizontal',
@@ -150,6 +203,7 @@ class ImageProcessor {
     });
   }
 
+  /// Flips [source] around the horizontal axis.
   Future<EditedImage> flipVertical(EditedImage source) {
     return _run(<String, Object?>{
       'kind': 'flipVertical',
@@ -157,6 +211,7 @@ class ImageProcessor {
     });
   }
 
+  /// Resizes [source] so its longest side is [maxSide] pixels.
   Future<EditedImage> resizeLongSide(EditedImage source, int maxSide) {
     return _run(<String, Object?>{
       'kind': 'resize',
@@ -165,6 +220,7 @@ class ImageProcessor {
     });
   }
 
+  /// Applies brightness, contrast, and saturation multipliers to [source].
   Future<EditedImage> adjustColor(
     EditedImage source,
     ColorAdjustment adjustment,
@@ -176,6 +232,7 @@ class ImageProcessor {
     });
   }
 
+  /// Re-encodes [source] as a PNG [EditedImage].
   Future<EditedImage> exportPng(EditedImage source) {
     return _run(<String, Object?>{
       'kind': 'exportPng',
