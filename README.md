@@ -6,6 +6,7 @@
 
 - `showImageClipEditor`：一行代码打开完整裁剪界面。
 - `ImageClipEditor`：可嵌入业务页面的裁剪 Widget。
+- `ImageClipEditorController`：从父组件主动加载图片、重置视图、旋转和触发裁剪。
 - 手势支持：拖动、双指缩放、鼠标滚轮缩放、双击复位。
 - 裁剪模式：可配置命名比例预设、Fit / Fill、90 度旋转。
 - 文案配置：通过 `ImageClipEditorLabels` 覆盖按钮、状态、结果页文案，默认使用英文。
@@ -19,7 +20,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.3.0
+  flutter_image_clip: ^0.4.0
 ```
 
 然后执行：
@@ -110,6 +111,35 @@ ImageClipEditor(
   },
 )
 ```
+
+## 使用控制器
+
+`ImageClipEditorController` 适合头像上传、资料编辑器、表单页等需要由业务按钮驱动裁剪流程的场景。
+
+```dart
+final controller = ImageClipEditorController();
+
+ImageClipEditor(
+  controller: controller,
+  loadSampleOnStart: false,
+  showResultPage: false,
+  onResult: (result) {
+    final bytes = result.cropped.bytes;
+  },
+);
+
+await controller.loadImage(bytes, label: 'avatar.jpg');
+controller.resetView();
+await controller.rotateRight();
+
+final result = await controller.crop();
+if (result != null) {
+  final croppedBytes = result.cropped.bytes;
+}
+final region = controller.currentCropRegion();
+```
+
+当新的图片加载请求早于旧请求完成时，编辑器会忽略旧请求的回写结果，避免业务快速切换图片时显示过期裁剪状态。
 
 ## 自定义编辑器文案
 

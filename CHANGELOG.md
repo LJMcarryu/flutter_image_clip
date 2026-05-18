@@ -1,3 +1,11 @@
+# 0.4.0
+
+- 新增 `ImageClipEditorController`，支持父组件主动加载图片、清空图片、重置裁剪视图、旋转图片、读取当前裁剪区域并触发裁剪。
+- 优化编辑器异步任务生命周期：新的图片加载请求会使旧任务结果失效，避免快速切换图片时旧结果覆盖新状态。
+- 裁剪保存任务也加入过期结果保护，避免图片被替换后继续回写旧裁剪结果。
+- 补充控制器驱动流程和乱序异步加载的 Widget 测试。
+- 更新 README 的控制器集成示例。
+
 # 0.3.0
 
 - Added `ImageClipEditorTheme` for configurable editor and result page colors, borders, crop overlays, and framed surface radius.

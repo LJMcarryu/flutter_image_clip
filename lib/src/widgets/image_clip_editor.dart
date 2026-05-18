@@ -444,11 +444,95 @@ class ImageClipResult {
   };
 }
 
+/// Programmatic controller for an [ImageClipEditor].
+///
+/// Attach the controller to an editor through [ImageClipEditor.controller], then
+/// call these methods from parent widgets to load images, reset the viewport, or
+/// trigger crop operations without relying on toolbar taps.
+class ImageClipEditorController {
+  _ImageClipEditorState? _state;
+
+  /// Whether this controller is currently attached to an editor state.
+  bool get isAttached => _state != null;
+
+  /// Whether the attached editor is currently running an image task.
+  bool get isBusy => _state?._isBusy ?? false;
+
+  /// The image currently loaded in the attached editor.
+  EditedImage? get image => _state?._image;
+
+  /// The current visible crop region in source-image pixel coordinates.
+  CropRegion? currentCropRegion({double cornerRadius = 0}) {
+    return _requireState()._currentCropRegion(cornerRadius: cornerRadius);
+  }
+
+  /// Loads encoded image [bytes] into the attached editor.
+  ///
+  /// If another load or processing task is still running, its eventual result is
+  /// ignored and this image becomes the newest requested editor state.
+  Future<void> loadImage(Uint8List bytes, {String label = ''}) {
+    return _requireState()._loadControllerImage(bytes, label: label);
+  }
+
+  /// Generates and loads the built-in sample image.
+  Future<void> loadSample() {
+    return _requireState()._loadSample(replaceCurrent: true);
+  }
+
+  /// Clears the current image and resets the editor status.
+  void clearImage() {
+    _requireState()._clearImageFromController();
+  }
+
+  /// Resets the crop viewport to the editor's current scale mode.
+  void resetView() {
+    _requireState()._resetCropView();
+  }
+
+  /// Rotates the current image clockwise by 90 degrees.
+  Future<void> rotateRight() {
+    return _requireState()._rotateRight();
+  }
+
+  /// Runs the current crop operation and returns its result.
+  Future<ImageClipResult?> crop() {
+    return _requireState()._applyCrop();
+  }
+
+  void _attach(_ImageClipEditorState state) {
+    final attachedState = _state;
+    if (attachedState != null && !identical(attachedState, state)) {
+      throw FlutterError(
+        'This ImageClipEditorController is already attached to another '
+        'ImageClipEditor.',
+      );
+    }
+    _state = state;
+  }
+
+  void _detach(_ImageClipEditorState state) {
+    if (identical(_state, state)) {
+      _state = null;
+    }
+  }
+
+  _ImageClipEditorState _requireState() {
+    final state = _state;
+    if (state == null) {
+      throw StateError(
+        'ImageClipEditorController is not attached to an ImageClipEditor.',
+      );
+    }
+    return state;
+  }
+}
+
 /// Embeddable Flutter widget for interactive image clipping.
 class ImageClipEditor extends StatefulWidget {
   /// Creates an image crop editor widget.
   const ImageClipEditor({
     super.key,
+    this.controller,
     this.processor,
     this.initialImageBytes,
     this.initialImageLabel = '',
@@ -467,6 +551,9 @@ class ImageClipEditor extends StatefulWidget {
     this.onCancel,
     this.onResult,
   });
+
+  /// Optional controller used to drive this editor from parent widgets.
+  final ImageClipEditorController? controller;
 
   /// Optional processor instance used for image operations.
   final ImageProcessor? processor;
@@ -533,6 +620,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
 
   EditedImage? _image;
   bool _isBusy = false;
+  int _taskSerial = 0;
   late String _status;
   late ImageClipAspectRatio _cropAspectRatio;
   late ImageClipScaleMode _cropScaleMode;
@@ -570,16 +658,28 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     _status = widget.labels.initialStatus;
     _cropAspectRatio = _initialAspectRatio;
     _cropScaleMode = widget.initialScaleMode;
+    widget.controller?._attach(this);
     unawaited(_loadInitialImage());
   }
 
   @override
   void didUpdateWidget(covariant ImageClipEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller)) {
+      oldWidget.controller?._detach(this);
+      widget.controller?._attach(this);
+    }
     if (oldWidget.initialImageBytes != widget.initialImageBytes ||
         oldWidget.initialImageLabel != widget.initialImageLabel) {
       unawaited(_loadInitialImage());
     }
+  }
+
+  @override
+  void dispose() {
+    _taskSerial++;
+    widget.controller?._detach(this);
+    super.dispose();
   }
 
   @override
@@ -638,6 +738,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
         () => _processor.decodeBytes(bytes, label: _initialImageLabel),
         busyLabel: widget.labels.loadingImageStatus,
         doneLabel: widget.labels.imageLoadedStatus,
+        replaceCurrent: true,
         onDone: (_) {
           _rotationDegrees = 0;
         },
@@ -645,9 +746,10 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     }
 
     if (widget.loadSampleOnStart) {
-      return _loadSample();
+      return _loadSample(replaceCurrent: true);
     }
 
+    _taskSerial++;
     setState(() {
       _image = null;
       _status = widget.labels.waitingForImageStatus;
@@ -656,27 +758,60 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     return Future<void>.value();
   }
 
-  Future<void> _loadSample() {
+  Future<void> _loadControllerImage(Uint8List bytes, {required String label}) {
+    final effectiveLabel = label.isEmpty
+        ? widget.labels.defaultImageLabel
+        : label;
     return _runImageTask(
-      () => _processor.createSample(),
-      busyLabel: widget.labels.generatingSampleStatus,
-      doneLabel: widget.labels.sampleGeneratedStatus,
+      () => _processor.decodeBytes(bytes, label: effectiveLabel),
+      busyLabel: widget.labels.loadingImageStatus,
+      doneLabel: widget.labels.imageLoadedStatus,
+      replaceCurrent: true,
       onDone: (_) {
         _rotationDegrees = 0;
       },
     );
   }
 
-  Future<void> _applyCrop() async {
+  Future<void> _loadSample({bool replaceCurrent = false}) {
+    return _runImageTask(
+      () => _processor.createSample(),
+      busyLabel: widget.labels.generatingSampleStatus,
+      doneLabel: widget.labels.sampleGeneratedStatus,
+      replaceCurrent: replaceCurrent,
+      onDone: (_) {
+        _rotationDegrees = 0;
+      },
+    );
+  }
+
+  void _clearImageFromController() {
+    _taskSerial++;
+    setState(() {
+      _image = null;
+      _isBusy = false;
+      _rotationDegrees = 0;
+      _status = widget.labels.waitingForImageStatus;
+    });
+  }
+
+  CropRegion? _currentCropRegion({required double cornerRadius}) {
+    return _previewKey.currentState?.currentCropRegion(
+      cornerRadius: cornerRadius,
+    );
+  }
+
+  Future<ImageClipResult?> _applyCrop() async {
     final source = _image;
     if (source == null) {
       if (widget.loadSampleOnStart) {
-        return _loadSample();
+        await _loadSample();
+        return null;
       }
       _showMessage(widget.labels.imageRequiredMessage);
-      return;
+      return null;
     }
-    final region = _previewKey.currentState?.currentCropRegion(cornerRadius: 0);
+    final region = _currentCropRegion(cornerRadius: 0);
     final cropRegion =
         region ??
         CropRegion(
@@ -687,7 +822,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
           cornerRadius: 0,
         );
 
-    await _saveCropResult(source: source, region: cropRegion);
+    return _saveCropResult(source: source, region: cropRegion);
   }
 
   Future<void> _rotateRight() {
@@ -713,11 +848,13 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     Future<EditedImage> Function() task, {
     required String busyLabel,
     required String doneLabel,
+    bool replaceCurrent = false,
     void Function(EditedImage result)? onDone,
   }) async {
-    if (_isBusy) {
+    if (_isBusy && !replaceCurrent) {
       return;
     }
+    final taskId = ++_taskSerial;
 
     setState(() {
       _isBusy = true;
@@ -726,7 +863,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
 
     try {
       final result = await task();
-      if (!mounted) {
+      if (!mounted || taskId != _taskSerial) {
         return;
       }
       setState(() {
@@ -736,7 +873,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
         _status = widget.labels.completedStatus(doneLabel, result);
       });
     } catch (error) {
-      if (!mounted) {
+      if (!mounted || taskId != _taskSerial) {
         return;
       }
       setState(() {
@@ -747,13 +884,14 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     }
   }
 
-  Future<void> _saveCropResult({
+  Future<ImageClipResult?> _saveCropResult({
     required EditedImage source,
     required CropRegion region,
   }) async {
     if (_isBusy) {
-      return;
+      return null;
     }
+    final taskId = ++_taskSerial;
 
     setState(() {
       _isBusy = true;
@@ -766,8 +904,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
         region,
         outputSettings: widget.outputSettings,
       );
-      if (!mounted) {
-        return;
+      if (!mounted || taskId != _taskSerial) {
+        return null;
       }
       final result = ImageClipResult(
         source: source,
@@ -785,7 +923,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       widget.onResult?.call(result);
       if (widget.closeOnSave) {
         Navigator.of(context).pop(result);
-        return;
+        return result;
       }
       if (widget.showResultPage) {
         await Navigator.of(context).push(
@@ -798,15 +936,17 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
           ),
         );
       }
+      return result;
     } catch (error) {
-      if (!mounted) {
-        return;
+      if (!mounted || taskId != _taskSerial) {
+        return null;
       }
       setState(() {
         _isBusy = false;
         _status = widget.labels.errorMessage(error);
       });
       _showMessage(widget.labels.errorMessage(error));
+      return null;
     }
   }
 

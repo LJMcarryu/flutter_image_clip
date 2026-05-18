@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_image_clip/flutter_image_clip.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 
 void main() {
   Future<void> pumpUntilSampleLoads(WidgetTester tester) async {
@@ -266,4 +270,127 @@ void main() {
     expect(find.byType(Image), findsWidgets);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('controller can load, reset, rotate and crop an image', (
+    tester,
+  ) async {
+    final controller = ImageClipEditorController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: controller,
+          loadSampleOnStart: false,
+          showResultPage: false,
+        ),
+      ),
+    );
+
+    expect(controller.isAttached, isTrue);
+    expect(controller.image, isNull);
+
+    await tester.runAsync(() {
+      return controller.loadImage(_pngBytes(120, 80), label: 'controller.png');
+    });
+    await tester.pump();
+
+    expect(controller.image, isNotNull);
+    expect(controller.currentCropRegion(), isNotNull);
+    expect(find.byType(Image), findsWidgets);
+
+    controller.resetView();
+    await tester.runAsync(controller.rotateRight);
+    await tester.pump();
+
+    final result = await tester.runAsync(controller.crop);
+    await tester.pump();
+
+    expect(result, isNotNull);
+    expect(result!.source.label, 'controller.png');
+    expect(result.cropped.bytes, isNotEmpty);
+    expect(result.rotationDegrees, 90);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('newer image loads ignore stale async completions', (
+    tester,
+  ) async {
+    final controller = ImageClipEditorController();
+    final processor = _DelayedDecodeProcessor();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: controller,
+          processor: processor,
+          initialImageBytes: _pngBytes(32, 32),
+          initialImageLabel: 'first.png',
+          loadSampleOnStart: false,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: controller,
+          processor: processor,
+          initialImageBytes: _pngBytes(48, 48),
+          initialImageLabel: 'second.png',
+          loadSampleOnStart: false,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    processor.complete('second.png', width: 48, height: 48);
+    await tester.pump();
+
+    expect(controller.image?.label, 'second.png');
+
+    processor.complete('first.png', width: 32, height: 32);
+    await tester.pump();
+
+    expect(controller.image?.label, 'second.png');
+    expect(tester.takeException(), isNull);
+  });
+}
+
+Uint8List _pngBytes(int width, int height) {
+  return Uint8List.fromList(
+    img.encodePng(img.Image(width: width, height: height)),
+  );
+}
+
+EditedImage _editedImage(
+  String label, {
+  required int width,
+  required int height,
+}) {
+  return EditedImage(
+    bytes: _pngBytes(width, height),
+    width: width,
+    height: height,
+    label: label,
+    operation: 'Decode',
+    elapsedMs: 1,
+  );
+}
+
+class _DelayedDecodeProcessor extends ImageProcessor {
+  final _pending = <String, Completer<EditedImage>>{};
+
+  @override
+  Future<EditedImage> decodeBytes(Uint8List bytes, {required String label}) {
+    final completer = Completer<EditedImage>();
+    _pending[label] = completer;
+    return completer.future;
+  }
+
+  void complete(String label, {required int width, required int height}) {
+    _pending
+        .remove(label)!
+        .complete(_editedImage(label, width: width, height: height));
+  }
 }
