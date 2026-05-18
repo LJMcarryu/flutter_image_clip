@@ -1,3 +1,13 @@
+# 0.6.1
+
+- 新增 `ImageProcessor.probeBytes` 和 `ImageClipImageInfo`，可在完整解码前识别 PNG、JPEG、GIF、WebP 的格式与尺寸。
+- 解码前会优先通过图片 header 执行输入像素上限检查，减少异常超大图片带来的内存压力。
+- 后台 isolate 的图片字节请求和结果改用 `TransferableTypedData` 传输，降低大图处理时的跨 isolate 拷贝成本。
+- `ImageClipTask.fromFuture` 现在同样支持 `ImageClipTaskOptions.timeout`。
+- `ImageClipEditor` 新增 `onProgress` 回调，并将编辑器进度条接入后台任务进度。
+- example 更新为移动端接入示例，支持相册选图、样例图、任务取消、输入探测信息和导出结果预览。
+- benchmark 新增 `--json` 输出，便于后续接入性能回归比对。
+
 # 0.6.0
 
 - 将发布包平台声明收敛为仅支持 Android 和 iOS。

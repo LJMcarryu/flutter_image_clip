@@ -1,6 +1,9 @@
 part of 'image_processor.dart';
 
 img.Image _decode(Uint8List bytes, ImageClipProcessingSettings settings) {
+  final info = _probeEncodedImage(bytes);
+  _checkProbedInputPixelLimit(info, settings);
+
   img.Image? decoded;
   try {
     decoded = img.decodeImage(bytes);
@@ -16,6 +19,28 @@ img.Image _decode(Uint8List bytes, ImageClipProcessingSettings settings) {
   final oriented = img.bakeOrientation(decoded);
   _checkInputPixelLimit(oriented, settings);
   return oriented.convert(numChannels: 4);
+}
+
+void _checkProbedInputPixelLimit(
+  ImageClipImageInfo info,
+  ImageClipProcessingSettings settings,
+) {
+  final maxPixels = settings.maxInputPixels;
+  final pixels = info.pixelCount;
+  final width = info.width;
+  final height = info.height;
+  if (maxPixels == null || pixels == null || width == null || height == null) {
+    return;
+  }
+  if (pixels > maxPixels) {
+    throw ImageClipImageTooLargeException(
+      'Input image header reports $pixels pixels, which exceeds the '
+      'configured limit of $maxPixels pixels',
+      width: width,
+      height: height,
+      maxPixels: maxPixels,
+    );
+  }
 }
 
 void _checkInputPixelLimit(

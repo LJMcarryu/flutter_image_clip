@@ -11,6 +11,74 @@ enum ImageClipOutputFormat {
   jpeg,
 }
 
+/// Encoded image container formats recognized before full decoding.
+enum ImageClipEncodedFormat {
+  /// PNG input bytes.
+  png,
+
+  /// JPEG input bytes.
+  jpeg,
+
+  /// GIF input bytes.
+  gif,
+
+  /// WebP input bytes.
+  webp,
+
+  /// The input header is not recognized.
+  unknown,
+}
+
+/// Lightweight information parsed from encoded image bytes.
+///
+/// This is intended for early validation and diagnostics. A value can have a
+/// recognized [format] but no dimensions when the header is incomplete.
+class ImageClipImageInfo {
+  /// Creates encoded image information.
+  const ImageClipImageInfo({required this.format, this.width, this.height})
+    : assert((width == null) == (height == null));
+
+  /// Encoded container format recognized from the byte header.
+  final ImageClipEncodedFormat format;
+
+  /// Encoded image width in pixels, when available.
+  final int? width;
+
+  /// Encoded image height in pixels, when available.
+  final int? height;
+
+  /// Whether both [width] and [height] are available.
+  bool get hasDimensions => width != null && height != null;
+
+  /// Pixel count when dimensions are available.
+  int? get pixelCount {
+    final width = this.width;
+    final height = this.height;
+    if (width == null || height == null) {
+      return null;
+    }
+    return width * height;
+  }
+
+  /// Image dimensions formatted as `widthxheight`, or `unknown`.
+  String get dimensionsLabel {
+    final width = this.width;
+    final height = this.height;
+    if (width == null || height == null) {
+      return 'unknown';
+    }
+    return '${width}x$height';
+  }
+
+  @override
+  String toString() {
+    return 'ImageClipImageInfo('
+        'format: ${format.name}, '
+        'dimensions: $dimensionsLabel'
+        ')';
+  }
+}
+
 /// Runtime guardrails for decoding and writing image pixels.
 class ImageClipProcessingSettings {
   /// Creates processing settings.

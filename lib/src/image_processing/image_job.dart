@@ -63,7 +63,7 @@ Map<String, Object?> _runImageJob(
   stopwatch.stop();
 
   return <String, Object?>{
-    'bytes': encoded,
+    'bytes': _bytesToIsolateMessage(encoded),
     'width': image.width,
     'height': image.height,
     'label': label,
@@ -86,7 +86,9 @@ _PipelineJobResult _runPipeline(
   final source = pipeline['source'] == null
       ? null
       : Map<Object?, Object?>.from(pipeline['source']! as Map);
-  final bytes = pipeline['bytes'] as Uint8List?;
+  final bytes = pipeline['bytes'] == null
+      ? null
+      : _bytesFromIsolateMessage(pipeline['bytes']);
   final label =
       (pipeline['label'] as String?) ??
       (source == null ? 'Image' : source['label']! as String);
@@ -109,7 +111,7 @@ _PipelineJobResult _runPipeline(
   );
 
   var image = _decode(
-    source == null ? bytes! : source['bytes']! as Uint8List,
+    source == null ? bytes! : _bytesFromIsolateMessage(source['bytes']),
     processingSettings,
   );
   final stepMaps = (pipeline['steps'] as List<Object?>? ?? const <Object?>[])

@@ -1,11 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_image_clip/image_processing/image_processor.dart';
 import 'package:image/image.dart' as img;
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
   final processor = ImageProcessor();
   final smallPng = _pngBytes(640, 480);
   final largePng = _pngBytes(2400, 1600);
@@ -40,7 +41,11 @@ Future<void> main() async {
     ),
   ];
 
-  _printResults(results);
+  if (args.contains('--json')) {
+    _printJsonResults(results);
+    return;
+  }
+  _printTableResults(results);
 }
 
 Future<_BenchmarkResult> _measure(
@@ -87,7 +92,7 @@ Uint8List _pngBytes(int width, int height) {
   return Uint8List.fromList(img.encodePng(image, level: 6));
 }
 
-void _printResults(List<_BenchmarkResult> results) {
+void _printTableResults(List<_BenchmarkResult> results) {
   stdout.writeln('| case | avg ms | median ms | output | bytes |');
   stdout.writeln('| --- | ---: | ---: | --- | ---: |');
   for (final result in results) {
@@ -96,6 +101,16 @@ void _printResults(List<_BenchmarkResult> results) {
       '${result.medianMs} | ${result.outputSize} | ${result.outputBytes} |',
     );
   }
+}
+
+void _printJsonResults(List<_BenchmarkResult> results) {
+  stdout.writeln(
+    const JsonEncoder.withIndent('  ').convert(<String, Object?>{
+      'results': <Map<String, Object?>>[
+        for (final result in results) result.toJson(),
+      ],
+    }),
+  );
 }
 
 class _BenchmarkResult {
@@ -112,4 +127,12 @@ class _BenchmarkResult {
   final int medianMs;
   final int outputBytes;
   final String outputSize;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'case': name,
+    'averageMs': averageMs,
+    'medianMs': medianMs,
+    'outputBytes': outputBytes,
+    'outputSize': outputSize,
+  };
 }

@@ -111,6 +111,7 @@ class ImageClipTask<T> {
     Map<String, Object?> request, {
     ImageClipTaskOptions? options,
   }) : _options = options ?? const ImageClipTaskOptions() {
+    _startTimeoutTimer();
     _emitProgress(
       const ImageClipTaskProgress(
         stage: ImageClipTaskProgressStage.queued,
@@ -122,7 +123,9 @@ class ImageClipTask<T> {
     unawaited(_spawn(request));
   }
 
-  ImageClipTask._manual(this._options);
+  ImageClipTask._manual(this._options) {
+    _startTimeoutTimer();
+  }
 
   final ImageClipTaskOptions _options;
   final _resultCompleter = Completer<T>();
@@ -155,28 +158,31 @@ class ImageClipTask<T> {
     future.then(_complete, onError: _completeError);
   }
 
+  void _startTimeoutTimer() {
+    final timeout = _options.timeout;
+    if (timeout == null) {
+      return;
+    }
+    _timeoutTimer = Timer(timeout, () {
+      _cancelWith(
+        ImageClipTaskTimeoutException(
+          'Image processing task timed out after ${timeout.inMilliseconds} ms',
+          timeout: timeout,
+        ),
+      );
+    });
+  }
+
   Future<void> _spawn(Map<String, Object?> request) async {
     final receivePort = ReceivePort();
     _receivePort = receivePort;
 
-    final timeout = _options.timeout;
-    if (timeout != null) {
-      _timeoutTimer = Timer(timeout, () {
-        _cancelWith(
-          ImageClipTaskTimeoutException(
-            'Image processing task timed out after ${timeout.inMilliseconds} ms',
-            timeout: timeout,
-          ),
-        );
-      });
-    }
-
     try {
-      final isolate = await Isolate.spawn(
-        _imageClipTaskEntrypoint,
-        <String, Object?>{'request': request, 'sendPort': receivePort.sendPort},
-        debugName: 'image-job',
-      );
+      final isolate =
+          await Isolate.spawn(_imageClipTaskEntrypoint, <String, Object?>{
+            'request': _prepareRequestForIsolate(request),
+            'sendPort': receivePort.sendPort,
+          }, debugName: 'image-job');
       _isolate = isolate;
       if (_isCanceled) {
         isolate.kill(priority: Isolate.immediate);
@@ -203,9 +209,7 @@ class ImageClipTask<T> {
           break;
         case 'result':
           _complete(
-            EditedImage.fromMap(
-                  Map<String, Object?>.from(map['result']! as Map),
-                )
+            EditedImage.fromMap(_editedImageResultFromMessage(map['result']))
                 as T,
           );
           break;

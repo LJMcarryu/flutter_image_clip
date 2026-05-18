@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter_image_clip/flutter_image_clip.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
@@ -63,6 +66,36 @@ void main() {
 
     expect(decoded.width, 3);
     expect(decoded.height, 2);
+  });
+
+  test('probes encoded image headers without full decoding', () {
+    final processor = ImageProcessor();
+
+    final png = processor.probeBytes(_pngHeader(width: 320, height: 180));
+    expect(png.format, ImageClipEncodedFormat.png);
+    expect(png.width, 320);
+    expect(png.height, 180);
+    expect(png.pixelCount, 57600);
+
+    final jpeg = processor.probeBytes(_jpegHeader(width: 640, height: 480));
+    expect(jpeg.format, ImageClipEncodedFormat.jpeg);
+    expect(jpeg.dimensionsLabel, '640x480');
+
+    final gif = processor.probeBytes(_gifHeader(width: 48, height: 32));
+    expect(gif.format, ImageClipEncodedFormat.gif);
+    expect(gif.width, 48);
+    expect(gif.height, 32);
+
+    final webp = processor.probeBytes(
+      _webpVp8xHeader(width: 1024, height: 768),
+    );
+    expect(webp.format, ImageClipEncodedFormat.webp);
+    expect(webp.width, 1024);
+    expect(webp.height, 768);
+
+    final unknown = processor.probeBytes(Uint8List.fromList(<int>[1, 2, 3]));
+    expect(unknown.format, ImageClipEncodedFormat.unknown);
+    expect(unknown.hasDimensions, isFalse);
   });
 
   test('runs multiple image operations as a single pipeline', () async {
@@ -161,6 +194,20 @@ void main() {
     expect(task.isCanceled, isTrue);
   });
 
+  test('times out image processing tasks', () async {
+    final completer = Completer<EditedImage>();
+    final task = ImageClipTask<EditedImage>.fromFuture(
+      completer.future,
+      options: const ImageClipTaskOptions(timeout: Duration(milliseconds: 10)),
+    );
+
+    await expectLater(
+      task.result,
+      throwsA(isA<ImageClipTaskTimeoutException>()),
+    );
+    expect(task.isCanceled, isTrue);
+  });
+
   test(
     'downscales decoded images to the configured output pixel limit',
     () async {
@@ -190,6 +237,19 @@ void main() {
     );
   });
 
+  test('rejects oversized PNG input from its header before full decode', () {
+    const settings = ImageClipProcessingSettings(maxInputPixels: 1000);
+    final processor = ImageProcessor(processingSettings: settings);
+
+    expect(
+      processor.decodeBytes(
+        _pngHeader(width: 10000, height: 10000),
+        label: 'huge.png',
+      ),
+      throwsA(isA<ImageClipImageTooLargeException>()),
+    );
+  });
+
   test('throws a typed exception for invalid crop regions', () async {
     final processor = ImageProcessor();
     final sample = await processor.createSample();
@@ -202,4 +262,84 @@ void main() {
       throwsA(isA<ImageClipInvalidCropRegionException>()),
     );
   });
+}
+
+Uint8List _pngHeader({required int width, required int height}) {
+  final bytes = Uint8List(24);
+  bytes.setAll(0, <int>[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+  _writeUint32be(bytes, 8, 13);
+  bytes.setAll(12, 'IHDR'.codeUnits);
+  _writeUint32be(bytes, 16, width);
+  _writeUint32be(bytes, 20, height);
+  return bytes;
+}
+
+Uint8List _jpegHeader({required int width, required int height}) {
+  return Uint8List.fromList(<int>[
+    0xFF,
+    0xD8,
+    0xFF,
+    0xC0,
+    0x00,
+    0x11,
+    0x08,
+    (height >> 8) & 0xFF,
+    height & 0xFF,
+    (width >> 8) & 0xFF,
+    width & 0xFF,
+    0x03,
+    0x01,
+    0x11,
+    0x00,
+    0x02,
+    0x11,
+    0x00,
+    0x03,
+    0x11,
+    0x00,
+    0xFF,
+    0xD9,
+  ]);
+}
+
+Uint8List _gifHeader({required int width, required int height}) {
+  return Uint8List.fromList(<int>[
+    ...'GIF89a'.codeUnits,
+    width & 0xFF,
+    (width >> 8) & 0xFF,
+    height & 0xFF,
+    (height >> 8) & 0xFF,
+  ]);
+}
+
+Uint8List _webpVp8xHeader({required int width, required int height}) {
+  final bytes = Uint8List(30);
+  bytes.setAll(0, 'RIFF'.codeUnits);
+  _writeUint32le(bytes, 4, 22);
+  bytes.setAll(8, 'WEBP'.codeUnits);
+  bytes.setAll(12, 'VP8X'.codeUnits);
+  _writeUint32le(bytes, 16, 10);
+  _writeUint24le(bytes, 24, width - 1);
+  _writeUint24le(bytes, 27, height - 1);
+  return bytes;
+}
+
+void _writeUint32be(Uint8List bytes, int offset, int value) {
+  bytes[offset] = (value >> 24) & 0xFF;
+  bytes[offset + 1] = (value >> 16) & 0xFF;
+  bytes[offset + 2] = (value >> 8) & 0xFF;
+  bytes[offset + 3] = value & 0xFF;
+}
+
+void _writeUint32le(Uint8List bytes, int offset, int value) {
+  bytes[offset] = value & 0xFF;
+  bytes[offset + 1] = (value >> 8) & 0xFF;
+  bytes[offset + 2] = (value >> 16) & 0xFF;
+  bytes[offset + 3] = (value >> 24) & 0xFF;
+}
+
+void _writeUint24le(Uint8List bytes, int offset, int value) {
+  bytes[offset] = value & 0xFF;
+  bytes[offset + 1] = (value >> 8) & 0xFF;
+  bytes[offset + 2] = (value >> 16) & 0xFF;
 }

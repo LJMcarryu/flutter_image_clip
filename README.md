@@ -13,9 +13,10 @@
 - 文案配置：通过 `ImageClipEditorLabels` 覆盖按钮、状态、结果页文案，默认使用英文。
 - 输出格式：裁剪结果可输出 PNG 或 JPEG，并可配置 JPEG quality。
 - 图像处理：解码、中心裁剪、区域裁剪、旋转、翻转、缩放、调色、PNG/JPEG 导出。
+- 输入探测：可在完整解码前识别 PNG、JPEG、GIF、WebP 的格式和尺寸，用于移动端大图保护。
 - 批处理 pipeline：多步图像操作可合并为一次后台任务，减少重复编解码。
 - 可取消任务：通过 `ImageClipTask` 监听进度、取消任务或设置超时。
-- 处理任务通过后台 isolate 执行，降低 UI isolate 压力。
+- 处理任务通过后台 isolate 执行，并使用 `TransferableTypedData` 传输大字节数组，降低 UI isolate 压力。
 
 ## 安装
 
@@ -23,7 +24,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.6.0
+  flutter_image_clip: ^0.6.1
 ```
 
 然后执行：
@@ -65,6 +66,9 @@ final result = await showImageClipEditor(
   theme: ImageClipEditorTheme.fromColorScheme(
     Theme.of(context).colorScheme,
   ),
+  onProgress: (progress) {
+    debugPrint('${progress.stage.name}: ${progress.fraction}');
+  },
 );
 
 if (result != null) {
@@ -188,6 +192,9 @@ ImageClipEditor(
 ```dart
 final processor = ImageProcessor();
 
+final info = processor.probeBytes(bytes);
+debugPrint('${info.format.name} ${info.dimensionsLabel}');
+
 final image = await processor.decodeBytes(bytes, label: 'input.jpg');
 final cropped = await processor.cropRegion(
   image,
@@ -251,6 +258,7 @@ final result = await task.result;
 
 ```sh
 dart run benchmark/image_processor_benchmark.dart
+dart run benchmark/image_processor_benchmark.dart --json
 ```
 
 基准脚本会输出解码、旋转裁剪导出 JPEG、大图 downscale 的平均耗时、中位耗时、输出尺寸和字节数。

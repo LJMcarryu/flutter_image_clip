@@ -19,6 +19,7 @@ Future<ImageClipResult?> showImageClipEditor(
   bool loadSampleOnStart = true,
   bool useRootNavigator = false,
   RouteSettings? routeSettings,
+  ValueChanged<ImageClipTaskProgress>? onProgress,
 }) {
   return Navigator.of(context, rootNavigator: useRootNavigator).push(
     MaterialPageRoute<ImageClipResult>(
@@ -40,6 +41,7 @@ Future<ImageClipResult?> showImageClipEditor(
           closeOnCancel: true,
           closeOnSave: true,
           showResultPage: false,
+          onProgress: onProgress,
         );
       },
     ),
@@ -161,6 +163,7 @@ class ImageClipEditor extends StatefulWidget {
     this.closeOnSave = false,
     this.showResultPage = true,
     this.onCancel,
+    this.onProgress,
     this.onResult,
   });
 
@@ -219,6 +222,9 @@ class ImageClipEditor extends StatefulWidget {
   /// Called when the user cancels the crop operation.
   final VoidCallback? onCancel;
 
+  /// Called when the active image task emits progress.
+  final ValueChanged<ImageClipTaskProgress>? onProgress;
+
   /// Called with the saved crop result.
   final ValueChanged<ImageClipResult>? onResult;
 
@@ -234,6 +240,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   bool _isBusy = false;
   int _taskSerial = 0;
   ImageClipTask<EditedImage>? _activeTask;
+  StreamSubscription<ImageClipTaskProgress>? _activeProgressSubscription;
+  double? _progressValue;
   late String _status;
   late ImageClipAspectRatio _cropAspectRatio;
   late ImageClipScaleMode _cropScaleMode;
@@ -292,6 +300,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   void dispose() {
     _taskSerial++;
     _activeTask?.cancel();
+    unawaited(_activeProgressSubscription?.cancel());
     widget.controller?._detach(this);
     super.dispose();
   }
@@ -313,6 +322,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
             ),
             if (_isBusy)
               LinearProgressIndicator(
+                value: _progressValue,
                 minHeight: 2,
                 color: widget.theme.progressColor,
                 backgroundColor: widget.theme.borderColor,
@@ -403,9 +413,12 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     _taskSerial++;
     _activeTask?.cancel();
     _activeTask = null;
+    unawaited(_activeProgressSubscription?.cancel());
+    _activeProgressSubscription = null;
     setState(() {
       _image = null;
       _isBusy = false;
+      _progressValue = null;
       _rotationDegrees = 0;
       _status = widget.labels.waitingForImageStatus;
     });
@@ -425,9 +438,12 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     _taskSerial++;
     final canceled = activeTask.cancel();
     _activeTask = null;
+    unawaited(_activeProgressSubscription?.cancel());
+    _activeProgressSubscription = null;
     if (mounted) {
       setState(() {
         _isBusy = false;
+        _progressValue = null;
         _status = widget.labels.taskCanceledStatus;
       });
     }
@@ -490,24 +506,31 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     final taskId = ++_taskSerial;
     if (replaceCurrent) {
       _activeTask?.cancel();
+      unawaited(_activeProgressSubscription?.cancel());
+      _activeProgressSubscription = null;
     }
 
     setState(() {
       _isBusy = true;
+      _progressValue = 0;
       _status = busyLabel;
     });
 
     try {
       final activeTask = task();
       _activeTask = activeTask;
+      _listenToProgress(activeTask, taskId);
       final result = await activeTask.result;
       if (!mounted || taskId != _taskSerial) {
         return;
       }
+      unawaited(_activeProgressSubscription?.cancel());
       setState(() {
         _image = result;
         _isBusy = false;
         _activeTask = null;
+        _activeProgressSubscription = null;
+        _progressValue = null;
         onDone?.call(result);
         _status = widget.labels.completedStatus(doneLabel, result);
       });
@@ -518,6 +541,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       setState(() {
         _isBusy = false;
         _activeTask = null;
+        _activeProgressSubscription = null;
+        _progressValue = null;
         _status = widget.labels.errorMessage(error);
       });
       _showMessage(widget.labels.errorMessage(error));
@@ -533,9 +558,12 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     }
     final taskId = ++_taskSerial;
     _activeTask?.cancel();
+    unawaited(_activeProgressSubscription?.cancel());
+    _activeProgressSubscription = null;
 
     setState(() {
       _isBusy = true;
+      _progressValue = 0;
       _status = widget.labels.croppingStatus;
     });
 
@@ -546,6 +574,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
         outputSettings: widget.outputSettings,
       );
       _activeTask = activeTask;
+      _listenToProgress(activeTask, taskId);
       final cropped = await activeTask.result;
       if (!mounted || taskId != _taskSerial) {
         return null;
@@ -559,6 +588,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       setState(() {
         _isBusy = false;
         _activeTask = null;
+        _activeProgressSubscription = null;
+        _progressValue = null;
         _status = widget.labels.completedStatus(
           widget.labels.cropCompleteStatus,
           cropped,
@@ -588,6 +619,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       setState(() {
         _isBusy = false;
         _activeTask = null;
+        _activeProgressSubscription = null;
+        _progressValue = null;
         _status = widget.labels.errorMessage(error);
       });
       _showMessage(widget.labels.errorMessage(error));
@@ -602,6 +635,19 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _listenToProgress(ImageClipTask<EditedImage> task, int taskId) {
+    unawaited(_activeProgressSubscription?.cancel());
+    _activeProgressSubscription = task.progress.listen((progress) {
+      if (!mounted || taskId != _taskSerial) {
+        return;
+      }
+      setState(() {
+        _progressValue = progress.fraction.clamp(0, 1).toDouble();
+      });
+      widget.onProgress?.call(progress);
+    });
   }
 
   void _resetCropView() {
