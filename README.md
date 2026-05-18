@@ -15,6 +15,7 @@
 - 图像处理：解码、中心裁剪、区域裁剪、旋转、翻转、缩放、调色、PNG/JPEG 导出。
 - 输入探测：可在完整解码前识别 PNG、JPEG、GIF、WebP 的格式和尺寸，用于移动端大图保护。
 - 批处理 pipeline：多步图像操作可合并为一次后台任务，减少重复编解码。
+- 编辑会话：通过 `ImageClipSession` 持有连续编辑状态，减少业务层手动传递中间结果。
 - 可取消任务：通过 `ImageClipTask` 监听进度、取消任务或设置超时。
 - 处理任务通过后台 isolate 执行，并使用 `TransferableTypedData` 传输大字节数组，降低 UI isolate 压力。
 
@@ -24,7 +25,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.6.1
+  flutter_image_clip: ^0.6.2
 ```
 
 然后执行：
@@ -224,6 +225,21 @@ final result = await processor.processBytes(
       ColorAdjustment(brightness: 1.05, contrast: 1.1, saturation: 0.95),
     ),
   ],
+  outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 88),
+);
+```
+
+连续编辑可以使用 session 持有当前图像状态：
+
+```dart
+final source = await processor.decodeBytes(bytes, label: 'input.jpg');
+final session = ImageClipSession(image: source, processor: processor);
+
+await session.rotate();
+await session.cropRegion(
+  const CropRegion(x: 20, y: 20, width: 240, height: 240, cornerRadius: 0),
+);
+final jpeg = await session.exportImage(
   outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 88),
 );
 ```

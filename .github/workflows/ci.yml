@@ -27,7 +27,7 @@ jobs:
         run: flutter pub get
 
       - name: Check formatting
-        run: dart format --set-exit-if-changed lib test example benchmark
+        run: dart format --set-exit-if-changed lib test benchmark
 
       - name: Analyze
         run: flutter analyze
@@ -40,3 +40,15 @@ jobs:
 
       - name: Validate package
         run: dart pub publish --dry-run
+
+      - name: Install example dependencies
+        working-directory: example
+        run: flutter pub get
+
+      - name: Check example formatting
+        working-directory: example
+        run: dart format --set-exit-if-changed lib
+
+      - name: Analyze example
+        working-directory: example
+        run: flutter analyze

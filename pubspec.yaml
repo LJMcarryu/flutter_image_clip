@@ -1,6 +1,6 @@
 name: flutter_image_clip
 description: A reusable Android and iOS Flutter image clipping library with a ready-to-use crop editor UI and image processing APIs.
-version: 0.6.1
+version: 0.6.2
 repository: https://github.com/LJMcarryu/flutter_image_clip
 
 topics:
@@ -25,7 +25,6 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  image_picker: ^1.2.2
 
 flutter:
   uses-material-design: true

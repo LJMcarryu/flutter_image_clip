@@ -1,3 +1,9 @@
+# 0.6.2
+
+- 新增 `ImageClipSession`，用于在连续编辑流程中持有当前图片状态，并支持 session 级任务取消。
+- 将 example 整理为独立 Flutter app，示例依赖迁移到 `example/pubspec.yaml`，避免污染库本身依赖面。
+- 补充移动端图片 fixture 测试，覆盖 EXIF orientation 1-8、透明 PNG 和损坏 JPEG。
+
 # 0.6.1
 
 - 新增 `ImageProcessor.probeBytes` 和 `ImageClipImageInfo`，可在完整解码前识别 PNG、JPEG、GIF、WebP 的格式与尺寸。

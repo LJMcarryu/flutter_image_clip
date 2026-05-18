@@ -16,6 +16,7 @@ export 'pipeline.dart';
 part 'image_job.dart';
 part 'image_operations.dart';
 part 'sample_image.dart';
+part 'session.dart';
 part 'tasks.dart';
 
 /// Performs image decoding and transformations on a background isolate.

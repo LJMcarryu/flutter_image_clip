@@ -5,6 +5,8 @@ import 'package:flutter_image_clip/flutter_image_clip.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 
+import 'fixtures/mobile_image_fixtures.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -66,6 +68,52 @@ void main() {
 
     expect(decoded.width, 3);
     expect(decoded.height, 2);
+  });
+
+  test('decodes common mobile EXIF orientation values', () async {
+    final processor = ImageProcessor();
+
+    for (final fixture in MobileImageFixtures.orientationCases) {
+      final decoded = await processor.decodeBytes(
+        fixture.bytes,
+        label: fixture.label,
+      );
+
+      expect(decoded.width, fixture.expectedWidth, reason: fixture.label);
+      expect(decoded.height, fixture.expectedHeight, reason: fixture.label);
+    }
+  });
+
+  test('preserves transparent PNG pixels through decode and crop', () async {
+    final processor = ImageProcessor();
+    final decoded = await processor.decodeBytes(
+      MobileImageFixtures.transparentPng(),
+      label: 'transparent.png',
+    );
+    final cropped = await processor.cropRegion(
+      decoded,
+      const CropRegion(x: 1, y: 1, width: 2, height: 2, cornerRadius: 0),
+    );
+    final pixels = img.decodePng(cropped.bytes)!;
+
+    expect(decoded.format, ImageClipOutputFormat.png);
+    expect(cropped.width, 2);
+    expect(cropped.height, 2);
+    expect(pixels.getPixel(0, 0).a, 0);
+    expect(pixels.getPixel(1, 1).a, greaterThan(0));
+    expect(pixels.getPixel(1, 1).a, lessThan(255));
+  });
+
+  test('throws a typed exception for corrupt mobile image bytes', () {
+    final processor = ImageProcessor();
+
+    expect(
+      processor.decodeBytes(
+        MobileImageFixtures.corruptJpeg(),
+        label: 'corrupt.jpg',
+      ),
+      throwsA(isA<ImageClipDecodeException>()),
+    );
   });
 
   test('probes encoded image headers without full decoding', () {
@@ -144,6 +192,48 @@ void main() {
     expect(result.width, 300);
     expect(result.height, 220);
     expect(result.bytes, isNotEmpty);
+  });
+
+  test('tracks current image state in an image clip session', () async {
+    final processor = ImageProcessor();
+    final sample = await processor.createSample();
+    final session = ImageClipSession(image: sample, processor: processor);
+
+    final rotated = await session.rotate();
+    expect(rotated.width, 640);
+    expect(rotated.height, 960);
+    expect(session.image, same(rotated));
+    expect(session.operationCount, 1);
+
+    final cropped = await session.cropRegion(
+      const CropRegion(x: 10, y: 20, width: 120, height: 160, cornerRadius: 0),
+      outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 84),
+    );
+    expect(cropped.width, 120);
+    expect(cropped.height, 160);
+    expect(cropped.format, ImageClipOutputFormat.jpeg);
+    expect(session.image, same(cropped));
+    expect(session.operationCount, 2);
+  });
+
+  test('cancels the active image clip session task', () async {
+    final processor = _DelayedPipelineProcessor();
+    final session = ImageClipSession(
+      image: _editedImage('session.png', width: 80, height: 60),
+      processor: processor,
+    );
+
+    final task = session.rotateTask();
+    expect(session.isBusy, isTrue);
+    expect(session.cancelTask(), isTrue);
+
+    await expectLater(
+      task.result,
+      throwsA(isA<ImageClipTaskCanceledException>()),
+    );
+    expect(session.isBusy, isFalse);
+    expect(session.image.label, 'session.png');
+    expect(session.operationCount, 0);
   });
 
   test('emits progress events for pipeline tasks', () async {
@@ -342,4 +432,37 @@ void _writeUint24le(Uint8List bytes, int offset, int value) {
   bytes[offset] = value & 0xFF;
   bytes[offset + 1] = (value >> 8) & 0xFF;
   bytes[offset + 2] = (value >> 16) & 0xFF;
+}
+
+EditedImage _editedImage(
+  String label, {
+  required int width,
+  required int height,
+}) {
+  return EditedImage(
+    bytes: Uint8List.fromList(
+      img.encodePng(img.Image(width: width, height: height)),
+    ),
+    width: width,
+    height: height,
+    label: label,
+    operation: 'Fixture',
+    elapsedMs: 1,
+  );
+}
+
+class _DelayedPipelineProcessor extends ImageProcessor {
+  @override
+  ImageClipTask<EditedImage> processPipelineTask(
+    ImageClipPipeline pipeline, {
+    ImageClipTaskOptions? options,
+  }) {
+    return ImageClipTask<EditedImage>.fromFuture(
+      Future<EditedImage>.delayed(
+        const Duration(seconds: 5),
+        () => _editedImage('late.png', width: 20, height: 20),
+      ),
+      options: options,
+    );
+  }
 }
