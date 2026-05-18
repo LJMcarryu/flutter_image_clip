@@ -1,6 +1,6 @@
 # flutter_image_clip
 
-`flutter_image_clip` 是一个 Flutter 图片裁剪与位图处理库，提供可直接打开的裁剪 UI、可嵌入页面的裁剪组件，以及纯 Dart 图像处理 API。
+`flutter_image_clip` 是一个 Flutter 图片裁剪与位图处理库，提供可直接打开的裁剪 UI、可嵌入页面的裁剪组件，以及基于后台 isolate 的图像处理 API。
 
 ## 功能
 
@@ -12,6 +12,7 @@
 - 文案配置：通过 `ImageClipEditorLabels` 覆盖按钮、状态、结果页文案，默认使用英文。
 - 输出格式：裁剪结果可输出 PNG 或 JPEG，并可配置 JPEG quality。
 - 图像处理：解码、中心裁剪、区域裁剪、旋转、翻转、缩放、调色、PNG/JPEG 导出。
+- 批处理 pipeline：多步图像操作可合并为一次后台任务，减少重复编解码。
 - 处理任务通过 Flutter `compute` 执行，降低 UI isolate 压力。
 
 ## 安装
@@ -20,7 +21,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.4.0
+  flutter_image_clip: ^0.5.0
 ```
 
 然后执行：
@@ -196,6 +197,25 @@ final adjusted = await processor.adjustColor(
 );
 final png = await processor.exportPng(adjusted);
 final jpeg = await processor.exportJpeg(adjusted, quality: 88);
+```
+
+多步处理建议使用 pipeline，这样会在一次后台任务里完成 decode、transform 和 encode：
+
+```dart
+final result = await processor.processBytes(
+  bytes,
+  label: 'input.jpg',
+  steps: const [
+    ImageClipPipelineStep.rotate(),
+    ImageClipPipelineStep.cropRegion(
+      CropRegion(x: 20, y: 20, width: 240, height: 240, cornerRadius: 0),
+    ),
+    ImageClipPipelineStep.adjustColor(
+      ColorAdjustment(brightness: 1.05, contrast: 1.1, saturation: 0.95),
+    ),
+  ],
+  outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 88),
+);
 ```
 
 `decodeBytes` 和后续裁剪/旋转处理会自动烘焙 EXIF orientation，手机拍摄的旋转照片会按视觉方向进入裁剪流程。

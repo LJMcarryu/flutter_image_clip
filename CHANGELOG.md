@@ -1,3 +1,11 @@
+# 0.5.0
+
+- 新增 `ImageClipPipeline` 和 `ImageClipPipelineStep`，支持把解码、旋转、裁剪、翻转、缩放、调色和导出合并为一次后台任务。
+- 新增 `ImageProcessor.processPipeline` 和 `ImageProcessor.processBytes`，减少多步处理时的重复 decode/encode 和 isolate 往返。
+- 重构图像处理层文件结构，将异常、模型、pipeline 描述、isolate job、像素操作和示例图生成拆分到独立模块。
+- 保留 `cropRegion`、`rotate`、`adjustColor`、`exportJpeg` 等既有单步 API，旧调用方式无需迁移。
+- 补充 pipeline 多步处理测试，覆盖从原始字节和已有 `EditedImage` 两种入口运行。
+
 # 0.4.0
 
 - 新增 `ImageClipEditorController`，支持父组件主动加载图片、清空图片、重置裁剪视图、旋转图片、读取当前裁剪区域并触发裁剪。

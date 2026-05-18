@@ -3,346 +3,17 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 
-/// Base exception type thrown by `flutter_image_clip`.
-class ImageClipException implements Exception {
-  /// Creates an image clip exception with a readable [message].
-  const ImageClipException(this.message, {this.cause});
+import 'exceptions.dart';
+import 'models.dart';
+import 'pipeline.dart';
 
-  /// Human-readable error message.
-  final String message;
+export 'exceptions.dart';
+export 'models.dart';
+export 'pipeline.dart';
 
-  /// Optional lower-level error that caused this exception.
-  final Object? cause;
-
-  @override
-  String toString() {
-    if (cause == null) {
-      return '$runtimeType: $message';
-    }
-    return '$runtimeType: $message ($cause)';
-  }
-}
-
-/// Thrown when encoded image bytes cannot be decoded.
-class ImageClipDecodeException extends ImageClipException {
-  /// Creates a decode exception.
-  const ImageClipDecodeException(super.message, {super.cause});
-}
-
-/// Thrown when an image processing operation fails.
-class ImageClipProcessingException extends ImageClipException {
-  /// Creates a processing exception.
-  const ImageClipProcessingException(super.message, {super.cause});
-}
-
-/// Thrown when a crop region is invalid.
-class ImageClipInvalidCropRegionException extends ImageClipException {
-  /// Creates an invalid crop region exception.
-  const ImageClipInvalidCropRegionException(super.message);
-}
-
-/// Thrown when an image exceeds configured pixel limits.
-class ImageClipImageTooLargeException extends ImageClipException {
-  /// Creates an image size limit exception.
-  const ImageClipImageTooLargeException(
-    super.message, {
-    required this.width,
-    required this.height,
-    required this.maxPixels,
-  });
-
-  /// Image width in pixels.
-  final int width;
-
-  /// Image height in pixels.
-  final int height;
-
-  /// Configured pixel limit that was exceeded.
-  final int maxPixels;
-}
-
-/// Encoded output formats supported by [ImageProcessor].
-enum ImageClipOutputFormat {
-  /// Portable Network Graphics output with lossless compression.
-  png,
-
-  /// JPEG output with configurable lossy compression quality.
-  jpeg,
-}
-
-/// Runtime guardrails for decoding and writing image pixels.
-class ImageClipProcessingSettings {
-  /// Creates processing settings.
-  const ImageClipProcessingSettings({
-    this.maxInputPixels = 48000000,
-    this.maxOutputPixels = 16000000,
-    this.autoDownscale = true,
-  });
-
-  /// Creates settings without input or output pixel limits.
-  const ImageClipProcessingSettings.unrestricted()
-    : maxInputPixels = null,
-      maxOutputPixels = null,
-      autoDownscale = false;
-
-  /// Maximum decoded input pixels before processing starts.
-  ///
-  /// Set to null to allow any input size.
-  final int? maxInputPixels;
-
-  /// Maximum output pixels after processing.
-  ///
-  /// When [autoDownscale] is true, larger outputs are resized down. When false,
-  /// larger outputs throw [ImageClipImageTooLargeException].
-  final int? maxOutputPixels;
-
-  /// Whether output images larger than [maxOutputPixels] should be resized.
-  final bool autoDownscale;
-
-  /// Converts these settings to the map used by the background processor.
-  Map<String, Object?> toMap() => <String, Object?>{
-    'maxInputPixels': maxInputPixels,
-    'maxOutputPixels': maxOutputPixels,
-    'autoDownscale': autoDownscale,
-  };
-
-  /// Creates settings from the map used by the background processor.
-  static ImageClipProcessingSettings fromMap(Map<Object?, Object?>? map) {
-    if (map == null) {
-      return const ImageClipProcessingSettings();
-    }
-    return ImageClipProcessingSettings(
-      maxInputPixels: _nullableIntOf(map['maxInputPixels']),
-      maxOutputPixels: _nullableIntOf(map['maxOutputPixels']),
-      autoDownscale: _boolOf(map['autoDownscale'], fallback: true),
-    );
-  }
-}
-
-/// Encoding options used when an image operation writes output bytes.
-class ImageClipOutputSettings {
-  /// Creates output encoding settings.
-  const ImageClipOutputSettings({
-    this.format = ImageClipOutputFormat.png,
-    this.jpegQuality = 90,
-    this.pngLevel = 6,
-  });
-
-  /// Creates lossless PNG output settings.
-  const ImageClipOutputSettings.png({this.pngLevel = 6})
-    : format = ImageClipOutputFormat.png,
-      jpegQuality = 90;
-
-  /// Creates JPEG output settings.
-  const ImageClipOutputSettings.jpeg({this.jpegQuality = 90})
-    : format = ImageClipOutputFormat.jpeg,
-      pngLevel = 6;
-
-  /// Encoded output format.
-  final ImageClipOutputFormat format;
-
-  /// JPEG quality from 1 to 100.
-  final int jpegQuality;
-
-  /// PNG compression level from 0 to 9.
-  final int pngLevel;
-
-  /// MIME type for [format].
-  String get mimeType => switch (format) {
-    ImageClipOutputFormat.png => 'image/png',
-    ImageClipOutputFormat.jpeg => 'image/jpeg',
-  };
-
-  /// File extension for [format], without a leading dot.
-  String get fileExtension => switch (format) {
-    ImageClipOutputFormat.png => 'png',
-    ImageClipOutputFormat.jpeg => 'jpg',
-  };
-
-  /// Converts these settings to the map used by the background processor.
-  Map<String, Object?> toMap() => <String, Object?>{
-    'format': format.name,
-    'jpegQuality': jpegQuality,
-    'pngLevel': pngLevel,
-  };
-
-  /// Creates settings from the map used by the background processor.
-  static ImageClipOutputSettings fromMap(Map<Object?, Object?>? map) {
-    if (map == null) {
-      return const ImageClipOutputSettings();
-    }
-    return ImageClipOutputSettings(
-      format: _formatFromName(map['format'] as String?),
-      jpegQuality: _intOf(map['jpegQuality'], fallback: 90),
-      pngLevel: _intOf(map['pngLevel'], fallback: 6),
-    );
-  }
-}
-
-/// Describes an image generated or transformed by [ImageProcessor].
-class EditedImage {
-  /// Creates an immutable image processing result.
-  const EditedImage({
-    required this.bytes,
-    required this.width,
-    required this.height,
-    required this.label,
-    required this.operation,
-    required this.elapsedMs,
-    this.format = ImageClipOutputFormat.png,
-  });
-
-  /// Encoded bytes for the image.
-  final Uint8List bytes;
-
-  /// Width of the image in physical pixels.
-  final int width;
-
-  /// Height of the image in physical pixels.
-  final int height;
-
-  /// Human-readable image label preserved through processing operations.
-  final String label;
-
-  /// Human-readable name of the operation that produced this image.
-  final String operation;
-
-  /// Processing time in milliseconds.
-  final int elapsedMs;
-
-  /// Encoded output format for [bytes].
-  final ImageClipOutputFormat format;
-
-  /// MIME type for [format].
-  String get mimeType => switch (format) {
-    ImageClipOutputFormat.png => 'image/png',
-    ImageClipOutputFormat.jpeg => 'image/jpeg',
-  };
-
-  /// File extension for [format], without a leading dot.
-  String get fileExtension => switch (format) {
-    ImageClipOutputFormat.png => 'png',
-    ImageClipOutputFormat.jpeg => 'jpg',
-  };
-
-  /// Image dimensions formatted as `widthxheight`.
-  String get dimensionsLabel => '${width}x$height';
-
-  /// Encoded byte length formatted for display.
-  String get bytesLabel => _formatBytes(bytes.length);
-
-  /// Converts this result to a map that can be sent across Flutter isolates.
-  Map<String, Object?> toMap() => <String, Object?>{
-    'bytes': bytes,
-    'width': width,
-    'height': height,
-    'label': label,
-    'operation': operation,
-    'elapsedMs': elapsedMs,
-    'format': format.name,
-  };
-
-  /// Creates an [EditedImage] from the isolate-safe map returned by [toMap].
-  static EditedImage fromMap(Map<String, Object?> map) {
-    return EditedImage(
-      bytes: map['bytes']! as Uint8List,
-      width: map['width']! as int,
-      height: map['height']! as int,
-      label: map['label']! as String,
-      operation: map['operation']! as String,
-      elapsedMs: map['elapsedMs']! as int,
-      format: _formatFromName(map['format'] as String?),
-    );
-  }
-}
-
-/// Relative crop settings used by [ImageProcessor.cropCenter].
-class CropSettings {
-  /// Creates center-crop settings with width, height, and corner radius values.
-  const CropSettings({
-    required this.widthRatio,
-    required this.heightRatio,
-    required this.cornerRadius,
-  });
-
-  /// Fraction of the source image width to keep, clamped between 0.1 and 1.0.
-  final double widthRatio;
-
-  /// Fraction of the source image height to keep, clamped between 0.1 and 1.0.
-  final double heightRatio;
-
-  /// Rounded corner radius in source-image pixels.
-  final double cornerRadius;
-
-  /// Converts these settings to the map used by the background processor.
-  Map<String, Object?> toMap() => <String, Object?>{
-    'widthRatio': widthRatio,
-    'heightRatio': heightRatio,
-    'cornerRadius': cornerRadius,
-  };
-}
-
-/// Pixel crop rectangle used by [ImageProcessor.cropRegion].
-class CropRegion {
-  /// Creates a crop rectangle in source-image pixel coordinates.
-  const CropRegion({
-    required this.x,
-    required this.y,
-    required this.width,
-    required this.height,
-    required this.cornerRadius,
-  });
-
-  /// Left edge of the crop rectangle in source-image pixels.
-  final int x;
-
-  /// Top edge of the crop rectangle in source-image pixels.
-  final int y;
-
-  /// Width of the crop rectangle in source-image pixels.
-  final int width;
-
-  /// Height of the crop rectangle in source-image pixels.
-  final int height;
-
-  /// Rounded corner radius in source-image pixels.
-  final double cornerRadius;
-
-  /// Converts this region to the map used by the background processor.
-  Map<String, Object?> toMap() => <String, Object?>{
-    'x': x,
-    'y': y,
-    'width': width,
-    'height': height,
-    'cornerRadius': cornerRadius,
-  };
-}
-
-/// Multipliers used by [ImageProcessor.adjustColor].
-class ColorAdjustment {
-  /// Creates color adjustment multipliers.
-  const ColorAdjustment({
-    required this.brightness,
-    required this.contrast,
-    required this.saturation,
-  });
-
-  /// Brightness multiplier passed to the image package.
-  final double brightness;
-
-  /// Contrast multiplier passed to the image package.
-  final double contrast;
-
-  /// Saturation multiplier passed to the image package.
-  final double saturation;
-
-  /// Converts these multipliers to the map used by the background processor.
-  Map<String, Object?> toMap() => <String, Object?>{
-    'brightness': brightness,
-    'contrast': contrast,
-    'saturation': saturation,
-  };
-}
+part 'image_job.dart';
+part 'image_operations.dart';
+part 'sample_image.dart';
 
 /// Performs image decoding and transformations on a background isolate.
 class ImageProcessor {
@@ -360,11 +31,44 @@ class ImageProcessor {
 
   /// Decodes encoded image [bytes] into a normalized PNG [EditedImage].
   Future<EditedImage> decodeBytes(Uint8List bytes, {required String label}) {
+    return processPipeline(
+      ImageClipPipeline.decode(
+        bytes: bytes,
+        label: label,
+        operationLabel: 'Decode',
+      ),
+    );
+  }
+
+  /// Runs [pipeline] as a single background image job.
+  ///
+  /// Unlike chaining single-operation methods, a pipeline decodes the source
+  /// image once, applies all steps in order, and encodes only the final result.
+  Future<EditedImage> processPipeline(ImageClipPipeline pipeline) {
     return _run(<String, Object?>{
-      'kind': 'decode',
-      'bytes': bytes,
-      'label': label,
+      'kind': 'pipeline',
+      'pipeline': pipeline.toMap(),
     });
+  }
+
+  /// Decodes [bytes], applies [steps], and encodes the final result.
+  Future<EditedImage> processBytes(
+    Uint8List bytes, {
+    required String label,
+    List<ImageClipPipelineStep> steps = const <ImageClipPipelineStep>[],
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
+    String? operationLabel,
+  }) {
+    return processPipeline(
+      ImageClipPipeline.decode(
+        bytes: bytes,
+        label: label,
+        steps: steps,
+        outputSettings: outputSettings,
+        operationLabel: operationLabel,
+      ),
+    );
   }
 
   /// Crops the center of [source] using relative [settings].
@@ -374,12 +78,16 @@ class ImageProcessor {
     ImageClipOutputSettings outputSettings =
         const ImageClipOutputSettings.png(),
   }) {
-    return _run(<String, Object?>{
-      'kind': 'crop',
-      'source': source.toMap(),
-      ...settings.toMap(),
-      'output': outputSettings.toMap(),
-    });
+    return processPipeline(
+      ImageClipPipeline.fromImage(
+        source: source,
+        steps: <ImageClipPipelineStep>[
+          ImageClipPipelineStep.cropCenter(settings),
+        ],
+        outputSettings: outputSettings,
+        operationLabel: 'Crop',
+      ),
+    );
   }
 
   /// Crops [source] to an explicit pixel [region].
@@ -389,21 +97,29 @@ class ImageProcessor {
     ImageClipOutputSettings outputSettings =
         const ImageClipOutputSettings.png(),
   }) {
-    return _run(<String, Object?>{
-      'kind': 'cropRegion',
-      'source': source.toMap(),
-      ...region.toMap(),
-      'output': outputSettings.toMap(),
-    });
+    return processPipeline(
+      ImageClipPipeline.fromImage(
+        source: source,
+        steps: <ImageClipPipelineStep>[
+          ImageClipPipelineStep.cropRegion(region),
+        ],
+        outputSettings: outputSettings,
+        operationLabel: 'Crop region',
+      ),
+    );
   }
 
   /// Rotates [source] clockwise by [degrees].
   Future<EditedImage> rotate(EditedImage source, {int degrees = 90}) {
-    return _run(<String, Object?>{
-      'kind': 'rotate',
-      'source': source.toMap(),
-      'angle': degrees,
-    });
+    return processPipeline(
+      ImageClipPipeline.fromImage(
+        source: source,
+        steps: <ImageClipPipelineStep>[
+          ImageClipPipelineStep.rotate(degrees: degrees),
+        ],
+        operationLabel: 'Rotate',
+      ),
+    );
   }
 
   /// Rotates [source] clockwise by 90 degrees.
@@ -411,27 +127,41 @@ class ImageProcessor {
 
   /// Flips [source] around the vertical axis.
   Future<EditedImage> flipHorizontal(EditedImage source) {
-    return _run(<String, Object?>{
-      'kind': 'flipHorizontal',
-      'source': source.toMap(),
-    });
+    return processPipeline(
+      ImageClipPipeline.fromImage(
+        source: source,
+        steps: const <ImageClipPipelineStep>[
+          ImageClipPipelineStep.flipHorizontal(),
+        ],
+        operationLabel: 'Flip horizontal',
+      ),
+    );
   }
 
   /// Flips [source] around the horizontal axis.
   Future<EditedImage> flipVertical(EditedImage source) {
-    return _run(<String, Object?>{
-      'kind': 'flipVertical',
-      'source': source.toMap(),
-    });
+    return processPipeline(
+      ImageClipPipeline.fromImage(
+        source: source,
+        steps: const <ImageClipPipelineStep>[
+          ImageClipPipelineStep.flipVertical(),
+        ],
+        operationLabel: 'Flip vertical',
+      ),
+    );
   }
 
   /// Resizes [source] so its longest side is [maxSide] pixels.
   Future<EditedImage> resizeLongSide(EditedImage source, int maxSide) {
-    return _run(<String, Object?>{
-      'kind': 'resize',
-      'source': source.toMap(),
-      'maxSide': maxSide,
-    });
+    return processPipeline(
+      ImageClipPipeline.fromImage(
+        source: source,
+        steps: <ImageClipPipelineStep>[
+          ImageClipPipelineStep.resizeLongSide(maxSide),
+        ],
+        operationLabel: 'Resize',
+      ),
+    );
   }
 
   /// Applies brightness, contrast, and saturation multipliers to [source].
@@ -439,11 +169,15 @@ class ImageProcessor {
     EditedImage source,
     ColorAdjustment adjustment,
   ) {
-    return _run(<String, Object?>{
-      'kind': 'adjust',
-      'source': source.toMap(),
-      ...adjustment.toMap(),
-    });
+    return processPipeline(
+      ImageClipPipeline.fromImage(
+        source: source,
+        steps: <ImageClipPipelineStep>[
+          ImageClipPipelineStep.adjustColor(adjustment),
+        ],
+        operationLabel: 'Adjust color',
+      ),
+    );
   }
 
   /// Re-encodes [source] using [outputSettings].
@@ -452,11 +186,13 @@ class ImageProcessor {
     ImageClipOutputSettings outputSettings =
         const ImageClipOutputSettings.png(),
   }) {
-    return _run(<String, Object?>{
-      'kind': 'exportImage',
-      'source': source.toMap(),
-      'output': outputSettings.toMap(),
-    });
+    return processPipeline(
+      ImageClipPipeline.fromImage(
+        source: source,
+        outputSettings: outputSettings,
+        operationLabel: 'Export ${outputSettings.format.name.toUpperCase()}',
+      ),
+    );
   }
 
   /// Re-encodes [source] as a PNG [EditedImage].
@@ -484,461 +220,4 @@ class ImageProcessor {
     );
     return EditedImage.fromMap(result);
   }
-}
-
-Map<String, Object?> _runImageJob(Map<String, Object?> request) {
-  final stopwatch = Stopwatch()..start();
-  final kind = request['kind']! as String;
-  final label =
-      (request['label'] as String?) ?? _sourceMap(request)['label']! as String;
-  final outputSettings = ImageClipOutputSettings.fromMap(
-    request['output'] == null
-        ? null
-        : Map<Object?, Object?>.from(request['output']! as Map),
-  );
-  final processingSettings = ImageClipProcessingSettings.fromMap(
-    request['processing'] == null
-        ? null
-        : Map<Object?, Object?>.from(request['processing']! as Map),
-  );
-
-  late img.Image image;
-  late String operation;
-
-  switch (kind) {
-    case 'sample':
-      image = _createSampleImage();
-      operation = 'Create sample';
-      break;
-    case 'decode':
-      image = _decode(request['bytes']! as Uint8List, processingSettings);
-      operation = 'Decode';
-      break;
-    case 'crop':
-      image = _decodeSource(request, processingSettings);
-      image = _cropCenter(
-        image,
-        widthRatio: _doubleOf(request['widthRatio'], fallback: 0.75),
-        heightRatio: _doubleOf(request['heightRatio'], fallback: 0.75),
-        cornerRadius: _doubleOf(request['cornerRadius'], fallback: 0),
-      );
-      operation = 'Crop';
-      break;
-    case 'cropRegion':
-      image = _decodeSource(request, processingSettings);
-      image = _cropRegion(
-        image,
-        x: _intOf(request['x'], fallback: 0),
-        y: _intOf(request['y'], fallback: 0),
-        width: _intOf(request['width'], fallback: image.width),
-        height: _intOf(request['height'], fallback: image.height),
-        cornerRadius: _doubleOf(request['cornerRadius'], fallback: 0),
-      );
-      operation = 'Crop region';
-      break;
-    case 'rotate':
-      image = _decodeSource(request, processingSettings);
-      image = img.copyRotate(
-        image,
-        angle: _intOf(request['angle'], fallback: 90),
-        interpolation: img.Interpolation.linear,
-      );
-      operation = 'Rotate';
-      break;
-    case 'flipHorizontal':
-      image = _decodeSource(request, processingSettings);
-      image = img.flipHorizontal(image);
-      operation = 'Flip horizontal';
-      break;
-    case 'flipVertical':
-      image = _decodeSource(request, processingSettings);
-      image = img.flipVertical(image);
-      operation = 'Flip vertical';
-      break;
-    case 'resize':
-      image = _decodeSource(request, processingSettings);
-      image = _resizeLongSide(
-        image,
-        _intOf(request['maxSide'], fallback: 1080),
-      );
-      operation = 'Resize';
-      break;
-    case 'adjust':
-      image = _decodeSource(request, processingSettings);
-      image = img.adjustColor(
-        image,
-        brightness: _doubleOf(request['brightness'], fallback: 1),
-        contrast: _doubleOf(request['contrast'], fallback: 1),
-        saturation: _doubleOf(request['saturation'], fallback: 1),
-      );
-      operation = 'Adjust color';
-      break;
-    case 'exportImage':
-    case 'exportPng':
-      image = _decodeSource(request, processingSettings);
-      operation = 'Export ${outputSettings.format.name.toUpperCase()}';
-      break;
-    default:
-      throw ImageClipProcessingException(
-        'Unsupported image processing task: $kind',
-      );
-  }
-
-  image = _prepareOutputImage(image, processingSettings);
-  final encoded = _encodeImage(image, outputSettings);
-  stopwatch.stop();
-
-  return <String, Object?>{
-    'bytes': encoded,
-    'width': image.width,
-    'height': image.height,
-    'label': label,
-    'operation': operation,
-    'elapsedMs': stopwatch.elapsedMilliseconds,
-    'format': outputSettings.format.name,
-  };
-}
-
-img.Image _decodeSource(
-  Map<String, Object?> request,
-  ImageClipProcessingSettings settings,
-) {
-  final source = _sourceMap(request);
-  return _decode(source['bytes']! as Uint8List, settings);
-}
-
-Map<Object?, Object?> _sourceMap(Map<String, Object?> request) {
-  return Map<Object?, Object?>.from(request['source']! as Map);
-}
-
-img.Image _decode(Uint8List bytes, ImageClipProcessingSettings settings) {
-  img.Image? decoded;
-  try {
-    decoded = img.decodeImage(bytes);
-  } catch (error) {
-    throw ImageClipDecodeException(
-      'Unable to decode image bytes',
-      cause: error,
-    );
-  }
-  if (decoded == null) {
-    throw const ImageClipDecodeException('Unsupported image format');
-  }
-  final oriented = img.bakeOrientation(decoded);
-  _checkInputPixelLimit(oriented, settings);
-  return _prepareOutputImage(oriented, settings).convert(numChannels: 4);
-}
-
-void _checkInputPixelLimit(
-  img.Image image,
-  ImageClipProcessingSettings settings,
-) {
-  final maxPixels = settings.maxInputPixels;
-  if (maxPixels == null) {
-    return;
-  }
-  final pixels = _pixelCount(image);
-  if (pixels > maxPixels) {
-    throw ImageClipImageTooLargeException(
-      'Input image has $pixels pixels, which exceeds the configured limit of '
-      '$maxPixels pixels',
-      width: image.width,
-      height: image.height,
-      maxPixels: maxPixels,
-    );
-  }
-}
-
-img.Image _prepareOutputImage(
-  img.Image image,
-  ImageClipProcessingSettings settings,
-) {
-  final maxPixels = settings.maxOutputPixels;
-  if (maxPixels == null) {
-    return image;
-  }
-
-  final pixels = _pixelCount(image);
-  if (pixels <= maxPixels) {
-    return image;
-  }
-
-  if (!settings.autoDownscale) {
-    throw ImageClipImageTooLargeException(
-      'Output image has $pixels pixels, which exceeds the configured limit of '
-      '$maxPixels pixels',
-      width: image.width,
-      height: image.height,
-      maxPixels: maxPixels,
-    );
-  }
-
-  final scale = math.sqrt(maxPixels / pixels);
-  final targetWidth = math.max(1, (image.width * scale).floor());
-  final targetHeight = math.max(1, (image.height * scale).floor());
-  return img.copyResize(
-    image,
-    width: targetWidth,
-    height: targetHeight,
-    interpolation: img.Interpolation.linear,
-  );
-}
-
-int _pixelCount(img.Image image) => image.width * image.height;
-
-Uint8List _encodeImage(img.Image image, ImageClipOutputSettings settings) {
-  return switch (settings.format) {
-    ImageClipOutputFormat.png => Uint8List.fromList(
-      img.encodePng(image, level: settings.pngLevel.clamp(0, 9).toInt()),
-    ),
-    ImageClipOutputFormat.jpeg => Uint8List.fromList(
-      img.encodeJpg(image, quality: settings.jpegQuality.clamp(1, 100).toInt()),
-    ),
-  };
-}
-
-ImageClipOutputFormat _formatFromName(String? name) {
-  for (final format in ImageClipOutputFormat.values) {
-    if (format.name == name) {
-      return format;
-    }
-  }
-  return ImageClipOutputFormat.png;
-}
-
-img.Image _cropCenter(
-  img.Image source, {
-  required double widthRatio,
-  required double heightRatio,
-  required double cornerRadius,
-}) {
-  final widthScale = widthRatio.clamp(0.1, 1.0).toDouble();
-  final heightScale = heightRatio.clamp(0.1, 1.0).toDouble();
-  final cropWidth = (source.width * widthScale)
-      .round()
-      .clamp(1, source.width)
-      .toInt();
-  final cropHeight = (source.height * heightScale)
-      .round()
-      .clamp(1, source.height)
-      .toInt();
-  final x = ((source.width - cropWidth) / 2).round();
-  final y = ((source.height - cropHeight) / 2).round();
-  final radius = cornerRadius.clamp(0, math.min(cropWidth, cropHeight) / 2);
-
-  return img.copyCrop(
-    source,
-    x: x,
-    y: y,
-    width: cropWidth,
-    height: cropHeight,
-    radius: radius,
-  );
-}
-
-img.Image _cropRegion(
-  img.Image source, {
-  required int x,
-  required int y,
-  required int width,
-  required int height,
-  required double cornerRadius,
-}) {
-  if (width <= 0 || height <= 0) {
-    throw ImageClipInvalidCropRegionException(
-      'Crop region width and height must be greater than zero',
-    );
-  }
-  final safeX = x.clamp(0, source.width - 1).toInt();
-  final safeY = y.clamp(0, source.height - 1).toInt();
-  final safeWidth = width.clamp(1, source.width - safeX).toInt();
-  final safeHeight = height.clamp(1, source.height - safeY).toInt();
-  final radius = cornerRadius.clamp(0, math.min(safeWidth, safeHeight) / 2);
-
-  return img.copyCrop(
-    source,
-    x: safeX,
-    y: safeY,
-    width: safeWidth,
-    height: safeHeight,
-    radius: radius,
-  );
-}
-
-img.Image _resizeLongSide(img.Image source, int maxSide) {
-  final safeMaxSide = maxSide.clamp(128, 4096).toInt();
-  final currentLongSide = math.max(source.width, source.height);
-  if (currentLongSide == safeMaxSide) {
-    return img.Image.from(source);
-  }
-
-  if (source.width >= source.height) {
-    return img.copyResize(
-      source,
-      width: safeMaxSide,
-      interpolation: img.Interpolation.linear,
-    );
-  }
-
-  return img.copyResize(
-    source,
-    height: safeMaxSide,
-    interpolation: img.Interpolation.linear,
-  );
-}
-
-img.Image _createSampleImage() {
-  const width = 960;
-  const height = 640;
-  final image = img.Image(width: width, height: height, numChannels: 4);
-
-  for (var y = 0; y < height; y++) {
-    for (var x = 0; x < width; x++) {
-      final dx = x / (width - 1);
-      final dy = y / (height - 1);
-      final r = (32 + 122 * dx + 28 * math.sin(dy * math.pi)).round();
-      final g = (76 + 100 * dy + 42 * math.cos(dx * math.pi)).round();
-      final b = (112 + 88 * (1 - dx) + 26 * math.sin((dx + dy) * math.pi))
-          .round();
-      image.setPixelRgba(x, y, r, g, b, 255);
-    }
-  }
-
-  _fillRect(image, 76, 72, 318, 210, 255, 236, 179, 0.86);
-  _fillRect(image, 116, 350, 462, 164, 34, 176, 166, 0.72);
-  _fillRect(image, 574, 92, 258, 386, 239, 118, 122, 0.74);
-  _fillCircle(image, 720, 446, 126, 248, 248, 248, 0.68);
-  _fillCircle(image, 250, 274, 96, 2, 48, 71, 0.48);
-  _drawDiagonalStripes(image, 0, 0, width, height);
-
-  return image;
-}
-
-void _fillRect(
-  img.Image image,
-  int left,
-  int top,
-  int width,
-  int height,
-  int r,
-  int g,
-  int b,
-  double opacity,
-) {
-  final startX = math.max(0, left);
-  final startY = math.max(0, top);
-  final right = math.min(left + width, image.width);
-  final bottom = math.min(top + height, image.height);
-  for (var y = startY; y < bottom; y++) {
-    for (var x = startX; x < right; x++) {
-      _blendPixel(image, x, y, r, g, b, opacity);
-    }
-  }
-}
-
-void _fillCircle(
-  img.Image image,
-  int cx,
-  int cy,
-  int radius,
-  int r,
-  int g,
-  int b,
-  double opacity,
-) {
-  final r2 = radius * radius;
-  final left = math.max(0, cx - radius);
-  final right = math.min(image.width - 1, cx + radius);
-  final top = math.max(0, cy - radius);
-  final bottom = math.min(image.height - 1, cy + radius);
-
-  for (var y = top; y <= bottom; y++) {
-    for (var x = left; x <= right; x++) {
-      final dx = x - cx;
-      final dy = y - cy;
-      if (dx * dx + dy * dy <= r2) {
-        _blendPixel(image, x, y, r, g, b, opacity);
-      }
-    }
-  }
-}
-
-void _drawDiagonalStripes(
-  img.Image image,
-  int left,
-  int top,
-  int width,
-  int height,
-) {
-  final startX = math.max(0, left);
-  final startY = math.max(0, top);
-  final right = math.min(left + width, image.width);
-  final bottom = math.min(top + height, image.height);
-  for (var y = startY; y < bottom; y++) {
-    for (var x = startX; x < right; x++) {
-      if (((x + y) ~/ 22).isEven) {
-        _blendPixel(image, x, y, 255, 255, 255, 0.055);
-      }
-    }
-  }
-}
-
-void _blendPixel(
-  img.Image image,
-  int x,
-  int y,
-  int r,
-  int g,
-  int b,
-  double opacity,
-) {
-  final pixel = image.getPixel(x, y);
-  final alpha = opacity.clamp(0, 1);
-  final inverse = 1 - alpha;
-  image.setPixelRgba(
-    x,
-    y,
-    (pixel.r * inverse + r * alpha).round(),
-    (pixel.g * inverse + g * alpha).round(),
-    (pixel.b * inverse + b * alpha).round(),
-    pixel.a,
-  );
-}
-
-double _doubleOf(Object? value, {required double fallback}) {
-  if (value is num) {
-    return value.toDouble();
-  }
-  return fallback;
-}
-
-int _intOf(Object? value, {required int fallback}) {
-  if (value is num) {
-    return value.round();
-  }
-  return fallback;
-}
-
-int? _nullableIntOf(Object? value) {
-  if (value is num) {
-    return value.round();
-  }
-  return null;
-}
-
-bool _boolOf(Object? value, {required bool fallback}) {
-  if (value is bool) {
-    return value;
-  }
-  return fallback;
-}
-
-String _formatBytes(int value) {
-  if (value < 1024) {
-    return '$value B';
-  }
-  if (value < 1024 * 1024) {
-    return '${(value / 1024).toStringAsFixed(1)} KB';
-  }
-  return '${(value / (1024 * 1024)).toStringAsFixed(2)} MB';
 }

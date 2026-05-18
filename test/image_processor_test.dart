@@ -65,6 +65,54 @@ void main() {
     expect(decoded.height, 2);
   });
 
+  test('runs multiple image operations as a single pipeline', () async {
+    final processor = ImageProcessor();
+    final source = img.Image(width: 400, height: 300);
+
+    final result = await processor.processBytes(
+      img.encodePng(source),
+      label: 'pipeline.png',
+      steps: const <ImageClipPipelineStep>[
+        ImageClipPipelineStep.rotate(),
+        ImageClipPipelineStep.cropRegion(
+          CropRegion(x: 0, y: 0, width: 100, height: 200, cornerRadius: 0),
+        ),
+        ImageClipPipelineStep.resizeLongSide(160),
+      ],
+      outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 80),
+    );
+
+    expect(result.operation, 'Pipeline');
+    expect(result.label, 'pipeline.png');
+    expect(result.width, 80);
+    expect(result.height, 160);
+    expect(result.format, ImageClipOutputFormat.jpeg);
+    expect(result.bytes.sublist(0, 2), <int>[0xFF, 0xD8]);
+  });
+
+  test('processes existing EditedImage values through a pipeline', () async {
+    final processor = ImageProcessor();
+    final sample = await processor.createSample();
+
+    final result = await processor.processPipeline(
+      ImageClipPipeline.fromImage(
+        source: sample,
+        steps: const <ImageClipPipelineStep>[
+          ImageClipPipelineStep.cropRegion(
+            CropRegion(x: 120, y: 80, width: 300, height: 220, cornerRadius: 0),
+          ),
+          ImageClipPipelineStep.flipHorizontal(),
+        ],
+      ),
+    );
+
+    expect(result.operation, 'Pipeline');
+    expect(result.label, sample.label);
+    expect(result.width, 300);
+    expect(result.height, 220);
+    expect(result.bytes, isNotEmpty);
+  });
+
   test(
     'downscales decoded images to the configured output pixel limit',
     () async {
