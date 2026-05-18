@@ -1,6 +1,9 @@
 part of 'image_processor.dart';
 
-Map<String, Object?> _runImageJob(Map<String, Object?> request) {
+Map<String, Object?> _runImageJob(
+  Map<String, Object?> request, {
+  void Function(ImageClipTaskProgress progress)? reportProgress,
+}) {
   final stopwatch = Stopwatch()..start();
   final kind = request['kind']! as String;
   final processingSettings = ImageClipProcessingSettings.fromMap(
@@ -16,6 +19,14 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
 
   switch (kind) {
     case 'sample':
+      reportProgress?.call(
+        const ImageClipTaskProgress(
+          stage: ImageClipTaskProgressStage.processing,
+          completedSteps: 0,
+          totalSteps: 1,
+          message: 'Generating sample image',
+        ),
+      );
       image = _createSampleImage();
       label = (request['label'] as String?) ?? 'Sample image';
       operation = 'Create sample';
@@ -23,7 +34,11 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
       break;
     case 'pipeline':
       final pipeline = Map<Object?, Object?>.from(request['pipeline']! as Map);
-      final result = _runPipeline(pipeline, processingSettings);
+      final result = _runPipeline(
+        pipeline,
+        processingSettings,
+        reportProgress: reportProgress,
+      );
       image = result.image;
       label = result.label;
       operation = result.operation;
@@ -35,6 +50,14 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
       );
   }
 
+  reportProgress?.call(
+    ImageClipTaskProgress(
+      stage: ImageClipTaskProgressStage.encoding,
+      completedSteps: 1,
+      totalSteps: 1,
+      message: 'Encoding image',
+    ),
+  );
   image = _prepareOutputImage(image, processingSettings);
   final encoded = _encodeImage(image, outputSettings);
   stopwatch.stop();
@@ -52,8 +75,9 @@ Map<String, Object?> _runImageJob(Map<String, Object?> request) {
 
 _PipelineJobResult _runPipeline(
   Map<Object?, Object?> pipeline,
-  ImageClipProcessingSettings processingSettings,
-) {
+  ImageClipProcessingSettings processingSettings, {
+  void Function(ImageClipTaskProgress progress)? reportProgress,
+}) {
   final outputSettings = ImageClipOutputSettings.fromMap(
     pipeline['output'] == null
         ? null
@@ -73,6 +97,17 @@ _PipelineJobResult _runPipeline(
     );
   }
 
+  final totalSteps =
+      (pipeline['steps'] as List<Object?>? ?? const <Object?>[]).length;
+  reportProgress?.call(
+    ImageClipTaskProgress(
+      stage: ImageClipTaskProgressStage.decoding,
+      completedSteps: 0,
+      totalSteps: totalSteps,
+      message: 'Decoding image',
+    ),
+  );
+
   var image = _decode(
     source == null ? bytes! : source['bytes']! as Uint8List,
     processingSettings,
@@ -81,8 +116,17 @@ _PipelineJobResult _runPipeline(
       .map((step) => Map<Object?, Object?>.from(step! as Map))
       .toList(growable: false);
 
-  for (final step in stepMaps) {
+  for (var index = 0; index < stepMaps.length; index++) {
+    final step = stepMaps[index];
     image = _applyPipelineStep(image, step);
+    reportProgress?.call(
+      ImageClipTaskProgress(
+        stage: ImageClipTaskProgressStage.processing,
+        completedSteps: index + 1,
+        totalSteps: stepMaps.length,
+        message: _pipelineStepOperationLabel(step['kind']! as String),
+      ),
+    );
   }
 
   final operation =

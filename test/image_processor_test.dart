@@ -113,6 +113,54 @@ void main() {
     expect(result.bytes, isNotEmpty);
   });
 
+  test('emits progress events for pipeline tasks', () async {
+    final processor = ImageProcessor();
+    final source = img.Image(width: 120, height: 90);
+    final progressEvents = <ImageClipTaskProgress>[];
+
+    final result = await processor
+        .processBytesTask(
+          img.encodePng(source),
+          label: 'progress.png',
+          steps: const <ImageClipPipelineStep>[
+            ImageClipPipelineStep.rotate(),
+            ImageClipPipelineStep.cropRegion(
+              CropRegion(x: 0, y: 0, width: 40, height: 60, cornerRadius: 0),
+            ),
+          ],
+          options: ImageClipTaskOptions(onProgress: progressEvents.add),
+        )
+        .result;
+
+    expect(result.bytes, isNotEmpty);
+    expect(
+      progressEvents.map((event) => event.stage),
+      containsAll(<ImageClipTaskProgressStage>[
+        ImageClipTaskProgressStage.decoding,
+        ImageClipTaskProgressStage.processing,
+        ImageClipTaskProgressStage.encoding,
+        ImageClipTaskProgressStage.completed,
+      ]),
+    );
+    expect(progressEvents.last.fraction, 1);
+  });
+
+  test('cancels image processing tasks', () async {
+    final task = ImageClipTask<EditedImage>.fromFuture(
+      Future<EditedImage>.delayed(
+        const Duration(seconds: 5),
+        () => throw StateError('should not complete'),
+      ),
+    );
+
+    expect(task.cancel(), isTrue);
+    await expectLater(
+      task.result,
+      throwsA(isA<ImageClipTaskCanceledException>()),
+    );
+    expect(task.isCanceled, isTrue);
+  });
+
   test(
     'downscales decoded images to the configured output pixel limit',
     () async {

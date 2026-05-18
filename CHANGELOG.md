@@ -1,3 +1,13 @@
+# 0.6.0
+
+- 将发布包平台声明收敛为仅支持 Android 和 iOS。
+- 更新 README 和 pubspec 描述，移除面向桌面/Web 的平台暗示。
+- 拆分编辑器 UI 层，将控制器、编辑器主体、预览面板、工具栏、结果页、主题、文案和裁剪遮罩 painter 拆到独立文件。
+- 新增 `ImageClipTask`、`ImageClipTaskOptions` 和 `ImageClipTaskProgress`，支持任务取消、进度监听和超时取消。
+- `ImageClipEditorController` 新增 `cancelTask()`，可取消当前编辑器后台处理任务。
+- 新增 `benchmark/image_processor_benchmark.dart`，覆盖解码、旋转裁剪导出 JPEG 和大图 downscale 的耗时基准。
+- 补充任务进度和取消测试。
+
 # 0.5.0
 
 - 新增 `ImageClipPipeline` 和 `ImageClipPipelineStep`，支持把解码、旋转、裁剪、翻转、缩放、调色和导出合并为一次后台任务。

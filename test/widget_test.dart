@@ -355,6 +355,37 @@ void main() {
     expect(controller.image?.label, 'second.png');
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('controller can cancel the active image task', (tester) async {
+    final controller = ImageClipEditorController();
+    final processor = _DelayedDecodeProcessor();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: controller,
+          processor: processor,
+          loadSampleOnStart: false,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final loadFuture = controller.loadImage(
+      _pngBytes(64, 64),
+      label: 'cancel.png',
+    );
+    await tester.pump();
+
+    expect(controller.isBusy, isTrue);
+    expect(controller.cancelTask(), isTrue);
+    await tester.pump();
+    await loadFuture;
+
+    expect(controller.isBusy, isFalse);
+    expect(controller.image, isNull);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Uint8List _pngBytes(int width, int height) {
@@ -382,10 +413,17 @@ class _DelayedDecodeProcessor extends ImageProcessor {
   final _pending = <String, Completer<EditedImage>>{};
 
   @override
-  Future<EditedImage> decodeBytes(Uint8List bytes, {required String label}) {
+  ImageClipTask<EditedImage> decodeBytesTask(
+    Uint8List bytes, {
+    required String label,
+    ImageClipTaskOptions? options,
+  }) {
     final completer = Completer<EditedImage>();
     _pending[label] = completer;
-    return completer.future;
+    return ImageClipTask<EditedImage>.fromFuture(
+      completer.future,
+      options: options,
+    );
   }
 
   void complete(String label, {required int width, required int height}) {

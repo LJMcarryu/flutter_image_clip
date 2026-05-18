@@ -55,3 +55,20 @@ class ImageClipImageTooLargeException extends ImageClipException {
   /// Configured pixel limit that was exceeded.
   final int maxPixels;
 }
+
+/// Thrown when an image task is canceled before it finishes.
+class ImageClipTaskCanceledException extends ImageClipException {
+  /// Creates a task cancellation exception.
+  const ImageClipTaskCanceledException([
+    super.message = 'Image processing task was canceled',
+  ]);
+}
+
+/// Thrown when an image task exceeds its configured timeout.
+class ImageClipTaskTimeoutException extends ImageClipException {
+  /// Creates a task timeout exception.
+  const ImageClipTaskTimeoutException(super.message, {required this.timeout});
+
+  /// Timeout duration that was exceeded.
+  final Duration timeout;
+}

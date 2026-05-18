@@ -7,13 +7,15 @@
 - `showImageClipEditor`：一行代码打开完整裁剪界面。
 - `ImageClipEditor`：可嵌入业务页面的裁剪 Widget。
 - `ImageClipEditorController`：从父组件主动加载图片、重置视图、旋转和触发裁剪。
-- 手势支持：拖动、双指缩放、鼠标滚轮缩放、双击复位。
+- 平台支持：Android 和 iOS。
+- 手势支持：拖动、双指缩放、双击复位。
 - 裁剪模式：可配置命名比例预设、Fit / Fill、90 度旋转。
 - 文案配置：通过 `ImageClipEditorLabels` 覆盖按钮、状态、结果页文案，默认使用英文。
 - 输出格式：裁剪结果可输出 PNG 或 JPEG，并可配置 JPEG quality。
 - 图像处理：解码、中心裁剪、区域裁剪、旋转、翻转、缩放、调色、PNG/JPEG 导出。
 - 批处理 pipeline：多步图像操作可合并为一次后台任务，减少重复编解码。
-- 处理任务通过 Flutter `compute` 执行，降低 UI isolate 压力。
+- 可取消任务：通过 `ImageClipTask` 监听进度、取消任务或设置超时。
+- 处理任务通过后台 isolate 执行，降低 UI isolate 压力。
 
 ## 安装
 
@@ -21,7 +23,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.5.0
+  flutter_image_clip: ^0.6.0
 ```
 
 然后执行：
@@ -138,6 +140,7 @@ if (result != null) {
   final croppedBytes = result.cropped.bytes;
 }
 final region = controller.currentCropRegion();
+controller.cancelTask();
 ```
 
 当新的图片加载请求早于旧请求完成时，编辑器会忽略旧请求的回写结果，避免业务快速切换图片时显示过期裁剪状态。
@@ -218,7 +221,39 @@ final result = await processor.processBytes(
 );
 ```
 
+如果需要进度、取消或超时控制，可以使用 task API：
+
+```dart
+final task = processor.processBytesTask(
+  bytes,
+  label: 'input.jpg',
+  steps: const [
+    ImageClipPipelineStep.rotate(),
+    ImageClipPipelineStep.cropRegion(
+      CropRegion(x: 20, y: 20, width: 240, height: 240, cornerRadius: 0),
+    ),
+  ],
+  options: ImageClipTaskOptions(
+    timeout: Duration(seconds: 8),
+    onProgress: (progress) {
+      debugPrint('${progress.message}: ${progress.fraction}');
+    },
+  ),
+);
+
+// task.cancel();
+final result = await task.result;
+```
+
 `decodeBytes` 和后续裁剪/旋转处理会自动烘焙 EXIF orientation，手机拍摄的旋转照片会按视觉方向进入裁剪流程。
+
+## 性能基准
+
+```sh
+dart run benchmark/image_processor_benchmark.dart
+```
+
+基准脚本会输出解码、旋转裁剪导出 JPEG、大图 downscale 的平均耗时、中位耗时、输出尺寸和字节数。
 
 ## 大图保护与异常处理
 
