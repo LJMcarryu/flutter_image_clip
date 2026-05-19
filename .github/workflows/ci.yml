@@ -182,9 +182,4 @@ jobs:
           api-level: 35
           target: google_apis
           arch: x86_64
-          script: >-
-            cd example &&
-            flutter pub get &&
-            flutter create --platforms=android --project-name flutter_image_clip_example . &&
-            flutter pub get &&
-            timeout 12m flutter test integration_test -d emulator-5554
+          script: bash tool/run_android_integration.sh
