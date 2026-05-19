@@ -21,7 +21,7 @@ jobs:
           - stable
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up minimum Flutter
         if: matrix.flutter-version != 'stable'
@@ -90,7 +90,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -114,7 +114,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -150,7 +150,7 @@ jobs:
           - stable
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up minimum Flutter
         if: matrix.flutter-version != 'stable'
@@ -176,8 +176,9 @@ jobs:
           api-level: 35
           target: google_apis
           arch: x86_64
-          script: |
-            cd example
-            flutter pub get
-            flutter create --platforms=android --project-name flutter_image_clip_example .
+          script: >-
+            cd example &&
+            flutter pub get &&
+            flutter create --platforms=android --project-name flutter_image_clip_example . &&
+            flutter pub get &&
             timeout 12m flutter test integration_test -d emulator-5554
