@@ -29,7 +29,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.7.0
+  flutter_image_clip: ^0.7.1
 ```
 
 然后执行：
@@ -51,6 +51,10 @@ dependencies:
 - [常见接入配方](guides/接入配方.md)：头像、封面、`image_picker`、HEIC、文件路径、大图和异常处理。
 - [平台与 CI 矩阵](guides/平台矩阵.md)：Android/iOS 原生解码能力、设备测试覆盖和发布前校验。
 - [可访问性检查清单](guides/可访问性检查清单.md)：VoiceOver、TalkBack、大字体、键盘和对比度验收项。
+- [故障排查](guides/故障排查.md)：HEIC、大图内存、EXIF、golden、iOS privacy 和 pub.dev 自动发布问题。
+- [迁移指南](guides/迁移指南.md)：按版本说明兼容性变化和升级检查项。
+- [发布流程](guides/发布流程.md)：tag、release checks、pub.dev OIDC 自动发布和失败处理。
+- [真实设备验收](guides/真实设备验收.md)：Android/iOS 真机图片样本和发布前验收记录。
 
 ## 使用裁剪 UI
 
@@ -456,9 +460,10 @@ dart run benchmark/image_processor_benchmark.dart
 dart run benchmark/image_processor_benchmark.dart --json
 dart run benchmark/image_processor_benchmark.dart --check benchmark/baseline.json
 dart run tool/check_api_snapshot.dart
+dart run tool/check_public_api_docs.dart
 ```
 
-基准脚本会输出解码、旋转裁剪导出 JPEG、大图 downscale、JPEG 预览解码和文件路径裁剪导出的平均耗时、中位耗时、输出尺寸和字节数。`--check` 会按 `benchmark/baseline.json` 检查中位耗时和输出字节数，适合放进 CI 防止性能回退。`tool/check_api_snapshot.dart` 会检查核心公共 API 片段，避免无意破坏 semver。
+基准脚本会输出解码、旋转裁剪导出 JPEG、大图 downscale、JPEG 预览解码和文件路径裁剪导出的平均耗时、中位耗时、进程 RSS delta、输出尺寸和字节数。`--check` 会按 `benchmark/baseline.json` 检查中位耗时、内存变化和输出字节数，适合放进 CI 防止性能回退。`tool/check_api_snapshot.dart` 会检查核心公共 API 片段，避免无意破坏 semver；`tool/check_public_api_docs.dart` 会阻止新增公开 API 时漏写 dartdoc。
 
 ## 大图保护与异常处理
 
@@ -504,6 +509,7 @@ dart format lib test benchmark tool example/lib example/integration_test
 flutter analyze
 flutter test
 dart run tool/check_api_snapshot.dart
+dart run tool/check_public_api_docs.dart
 dart run benchmark/image_processor_benchmark.dart --check benchmark/baseline.json
 dart doc --output doc/api
 dart pub publish --dry-run

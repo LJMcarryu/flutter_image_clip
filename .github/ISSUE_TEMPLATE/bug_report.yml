@@ -1,0 +1,85 @@
+name: 缺陷反馈
+description: 报告 flutter_image_clip 的崩溃、错误结果或平台兼容问题。
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题描述
+      description: 说明你期望发生什么，实际发生了什么。
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 选择图片...
+        2. 打开裁剪器...
+        3. 点击保存...
+    validations:
+      required: true
+
+  - type: input
+    id: package_version
+    attributes:
+      label: flutter_image_clip 版本
+      placeholder: "0.7.1"
+    validations:
+      required: true
+
+  - type: input
+    id: flutter_version
+    attributes:
+      label: Flutter / Dart 版本
+      placeholder: "Flutter 3.38.1 / Dart 3.10.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 平台
+      options:
+        - Android 真机
+        - Android emulator
+        - iOS 真机
+        - iOS simulator
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: 设备与系统版本
+      placeholder: "Pixel 7 / Android 14, iPhone 14 / iOS 17"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: image_format
+    attributes:
+      label: 图片格式
+      options:
+        - JPEG
+        - PNG
+        - HEIC / HEIF
+        - WebP
+        - GIF
+        - 其他
+    validations:
+      required: true
+
+  - type: input
+    id: image_size
+    attributes:
+      label: 图片尺寸与大小
+      placeholder: "4032x3024, 3.8 MB"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志或异常
+      render: text

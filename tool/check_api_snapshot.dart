@@ -48,10 +48,7 @@ void main(List<String> args) {
 }
 
 Map<String, Object?> _buildSnapshot() {
-  final files = <String>{};
-  for (final entrypoint in _entrypoints) {
-    _collectLibraryFiles(entrypoint, files);
-  }
+  final files = collectPublicApiFiles();
 
   final libraries = <Map<String, Object?>>[];
   for (final file in files.toList()..sort()) {
@@ -68,6 +65,14 @@ Map<String, Object?> _buildSnapshot() {
   return <String, Object?>{'entrypoints': _entrypoints, 'libraries': libraries};
 }
 
+Set<String> collectPublicApiFiles() {
+  final files = <String>{};
+  for (final entrypoint in _entrypoints) {
+    _collectLibraryFiles(entrypoint, files);
+  }
+  return files;
+}
+
 void _collectLibraryFiles(String path, Set<String> files) {
   if (!files.add(path)) {
     return;
@@ -78,7 +83,7 @@ void _collectLibraryFiles(String path, Set<String> files) {
     throw StateError('Public API file is missing: $path');
   }
 
-  final unit = _parse(path);
+  final unit = parseApiFile(path);
   final baseUri = file.parent.uri;
   for (final directive in unit.directives) {
     if (directive is ExportDirective || directive is PartDirective) {
@@ -99,32 +104,32 @@ void _collectLibraryFiles(String path, Set<String> files) {
 }
 
 List<String> _publicDeclarationsFor(String path) {
-  final unit = _parse(path);
+  final unit = parseApiFile(path);
   final declarations = <String>[];
 
   for (final declaration in unit.declarations) {
     switch (declaration) {
       case ClassDeclaration():
-        if (_isPrivate(declaration.name.lexeme)) {
+        if (isPrivateName(declaration.name.lexeme)) {
           continue;
         }
         declarations.add(_classSignature(declaration));
         declarations.addAll(_classMembers(declaration));
       case EnumDeclaration():
-        if (_isPrivate(declaration.name.lexeme)) {
+        if (isPrivateName(declaration.name.lexeme)) {
           continue;
         }
         declarations.add(_enumSignature(declaration));
         final enumName = declaration.name.lexeme;
         declarations.addAll(
           declaration.constants
-              .where((constant) => !_isPrivate(constant.name.lexeme))
+              .where((constant) => !isPrivateName(constant.name.lexeme))
               .map(
                 (constant) => '  enumValue $enumName.${constant.name.lexeme}',
               ),
         );
       case FunctionDeclaration():
-        if (_isPrivate(declaration.name.lexeme)) {
+        if (isPrivateName(declaration.name.lexeme)) {
           continue;
         }
         declarations.add(_functionSignature(declaration));
@@ -132,7 +137,7 @@ List<String> _publicDeclarationsFor(String path) {
         declarations.addAll(_variableSignatures(declaration, 'topLevel '));
       case ExtensionDeclaration():
         final name = declaration.name?.lexeme;
-        if (name == null || _isPrivate(name)) {
+        if (name == null || isPrivateName(name)) {
           continue;
         }
         declarations.add('extension $name');
@@ -156,13 +161,13 @@ Iterable<String> _classMembers(ClassDeclaration declaration) sync* {
     switch (member) {
       case ConstructorDeclaration():
         final name = member.name?.lexeme;
-        if (name != null && _isPrivate(name)) {
+        if (name != null && isPrivateName(name)) {
           continue;
         }
         final suffix = name == null ? '' : '.$name';
         yield '  constructor $className$suffix${_parameterList(member.parameters)}';
       case MethodDeclaration():
-        if (_isPrivate(member.name.lexeme)) {
+        if (isPrivateName(member.name.lexeme)) {
           continue;
         }
         final kind = member.isGetter
@@ -198,7 +203,7 @@ Iterable<String> _variableSignatures(
     _ => const <VariableDeclaration>[],
   };
   for (final variable in variables) {
-    if (_isPrivate(variable.name.lexeme)) {
+    if (isPrivateName(variable.name.lexeme)) {
       continue;
     }
     yield '$prefix${variable.name.lexeme}';
@@ -221,7 +226,7 @@ String _parameterList(FormalParameterList? parameters) {
   return '($normalized)';
 }
 
-bool _isPrivate(String name) => name.startsWith('_');
+bool isPrivateName(String name) => name.startsWith('_');
 
 String _relativePath(String absolutePath) {
   final root = Directory.current.absolute.path;
@@ -233,7 +238,7 @@ String _relativePath(String absolutePath) {
   return absolutePath;
 }
 
-CompilationUnit _parse(String path) {
+CompilationUnit parseApiFile(String path) {
   return parseFile(
     path: path,
     featureSet: FeatureSet.latestLanguageVersion(),

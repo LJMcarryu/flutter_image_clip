@@ -107,20 +107,26 @@ Future<_BenchmarkResult> _measure(
   await run();
 
   final times = <int>[];
+  final rssDeltas = <int>[];
   EditedImage? last;
   for (var i = 0; i < iterations; i++) {
+    final rssBefore = ProcessInfo.currentRss;
     final stopwatch = Stopwatch()..start();
     last = await run();
     stopwatch.stop();
+    final rssAfter = ProcessInfo.currentRss;
     times.add(stopwatch.elapsedMilliseconds);
+    rssDeltas.add((rssAfter - rssBefore).clamp(0, 1 << 62).toInt());
   }
 
   times.sort();
+  rssDeltas.sort();
   final total = times.fold<int>(0, (sum, value) => sum + value);
   return _BenchmarkResult(
     name: name,
     averageMs: total / times.length,
     medianMs: times[times.length ~/ 2],
+    maxRssDeltaBytes: rssDeltas.last,
     outputBytes: last!.bytes.length,
     outputSize: last.dimensionsLabel,
   );
@@ -162,12 +168,15 @@ Uint8List _jpegBytes(int width, int height) {
 }
 
 void _printTableResults(List<_BenchmarkResult> results) {
-  stdout.writeln('| case | avg ms | median ms | output | bytes |');
-  stdout.writeln('| --- | ---: | ---: | --- | ---: |');
+  stdout.writeln(
+    '| case | avg ms | median ms | max RSS delta | output | bytes |',
+  );
+  stdout.writeln('| --- | ---: | ---: | ---: | --- | ---: |');
   for (final result in results) {
     stdout.writeln(
       '| ${result.name} | ${result.averageMs.toStringAsFixed(1)} | '
-      '${result.medianMs} | ${result.outputSize} | ${result.outputBytes} |',
+      '${result.medianMs} | ${result.maxRssDeltaBytes} | '
+      '${result.outputSize} | ${result.outputBytes} |',
     );
   }
 }
@@ -217,6 +226,12 @@ void _checkBaseline(List<_BenchmarkResult> results, File file) {
         '${limit.maxOutputBytes} bytes',
       );
     }
+    if (result.maxRssDeltaBytes > limit.maxRssDeltaBytes) {
+      failures.add(
+        '${result.name}: RSS delta ${result.maxRssDeltaBytes} bytes > '
+        '${limit.maxRssDeltaBytes} bytes',
+      );
+    }
   }
   if (failures.isNotEmpty) {
     stderr.writeln('Benchmark regression detected:');
@@ -234,6 +249,7 @@ class _BenchmarkResult {
     required this.name,
     required this.averageMs,
     required this.medianMs,
+    required this.maxRssDeltaBytes,
     required this.outputBytes,
     required this.outputSize,
   });
@@ -241,6 +257,7 @@ class _BenchmarkResult {
   final String name;
   final double averageMs;
   final int medianMs;
+  final int maxRssDeltaBytes;
   final int outputBytes;
   final String outputSize;
 
@@ -248,6 +265,7 @@ class _BenchmarkResult {
     'case': name,
     'averageMs': averageMs,
     'medianMs': medianMs,
+    'maxRssDeltaBytes': maxRssDeltaBytes,
     'outputBytes': outputBytes,
     'outputSize': outputSize,
   };
@@ -256,16 +274,29 @@ class _BenchmarkResult {
 class _BenchmarkLimit {
   const _BenchmarkLimit({
     required this.maxMedianMs,
+    required this.maxRssDeltaBytes,
     required this.maxOutputBytes,
   });
 
   factory _BenchmarkLimit.fromJson(Map<String, Object?> json) {
     return _BenchmarkLimit(
       maxMedianMs: json['maxMedianMs']! as int,
+      maxRssDeltaBytes: _intOf(
+        json['maxRssDeltaBytes'],
+        fallback: 256 * 1024 * 1024,
+      ),
       maxOutputBytes: json['maxOutputBytes']! as int,
     );
   }
 
   final int maxMedianMs;
+  final int maxRssDeltaBytes;
   final int maxOutputBytes;
+}
+
+int _intOf(Object? value, {required int fallback}) {
+  if (value is num) {
+    return value.round();
+  }
+  return fallback;
 }

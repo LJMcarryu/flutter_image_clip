@@ -1,3 +1,12 @@
+# 0.7.1
+
+- 修复远端 Linux / Flutter stable 环境下 full-page golden 因微小抗锯齿差异导致 release checks 失败的问题，保留 1% 像素容差并继续用布局与语义测试兜底。
+- Release workflow 增加 gated `Publish to pub.dev` job，tag 校验全部通过且启用 `PUB_DEV_AUTOMATED_PUBLISHING` 后再通过 pub.dev GitHub Actions OIDC 发布。
+- Benchmark baseline 增加进程 RSS delta 指标，开始监控大图处理内存回归。
+- 新增公开 API dartdoc 检查，避免新增 public API 时漏写文档。
+- 新增 Dependabot、Dependency Review、issue 表单、PR 模板和 `SECURITY.md`。
+- 新增发布流程、故障排查、迁移指南和真实设备验收文档。
+
 # 0.7.0
 
 - Android 集成测试迁移到 `example/integration_test`，避免根包本地 app scaffold 干扰插件编译；CI 会在 example 中创建 Android 工程后运行设备测试。

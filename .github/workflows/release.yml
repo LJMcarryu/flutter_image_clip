@@ -52,6 +52,9 @@ jobs:
       - name: Check public API snapshot
         run: dart run tool/check_api_snapshot.dart
 
+      - name: Check public API docs
+        run: dart run tool/check_public_api_docs.dart
+
       - name: Check benchmark baseline
         run: dart run benchmark/image_processor_benchmark.dart --check benchmark/baseline.json
 
@@ -60,3 +63,34 @@ jobs:
 
       - name: Validate package
         run: dart pub publish --dry-run
+
+  publish:
+    name: Publish to pub.dev
+    needs: validate-release
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && vars.PUB_DEV_AUTOMATED_PUBLISHING == 'true' }}
+    runs-on: ubuntu-latest
+    environment: pub.dev
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Configure pub.dev OIDC
+        uses: dart-lang/setup-dart@v1
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Validate package
+        run: flutter pub publish --dry-run
+
+      - name: Publish package
+        run: flutter pub publish --force

@@ -1,0 +1,40 @@
+name: 功能建议
+description: 提议新的裁剪、解码、UI 扩展或平台能力。
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 业务场景
+      description: 说明你遇到的真实接入场景，以及现有 API 为什么不够。
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 期望能力
+      description: 说明你希望新增的 API、行为或文档。
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 影响范围
+      options:
+        - 裁剪 UI
+        - 图像处理 API
+        - 原生解码
+        - 性能
+        - 可访问性
+        - 文档
+        - CI / 发布
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 已尝试的替代方案

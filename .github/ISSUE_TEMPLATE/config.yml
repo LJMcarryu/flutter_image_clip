@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 接入配方
+    url: https://github.com/LJMcarryu/flutter_image_clip/blob/main/guides/%E6%8E%A5%E5%85%A5%E9%85%8D%E6%96%B9.md
+    about: 常见头像、封面、大图、HEIC 和异常处理接入方式。
+  - name: 平台矩阵
+    url: https://github.com/LJMcarryu/flutter_image_clip/blob/main/guides/%E5%B9%B3%E5%8F%B0%E7%9F%A9%E9%98%B5.md
+    about: Android/iOS 原生解码能力和 CI 覆盖范围。

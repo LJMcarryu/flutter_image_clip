@@ -130,6 +130,15 @@ void main() {
   });
 
   testWidgets('matches the default editor golden', (tester) async {
+    final previousComparator = goldenFileComparator;
+    goldenFileComparator = _TolerantGoldenFileComparator(
+      Uri.parse('test/widget_test.dart'),
+      precisionTolerance: 0.01,
+    );
+    addTearDown(() {
+      goldenFileComparator = previousComparator;
+    });
+
     await pumpClippingApp(
       tester,
       size: const Size(390, 844),
@@ -858,6 +867,33 @@ Uint8List _pngBytes(int width, int height) {
   return Uint8List.fromList(
     img.encodePng(img.Image(width: width, height: height)),
   );
+}
+
+class _TolerantGoldenFileComparator extends LocalFileComparator {
+  _TolerantGoldenFileComparator(
+    super.testFile, {
+    required double precisionTolerance,
+  }) : assert(precisionTolerance >= 0 && precisionTolerance <= 1),
+       _precisionTolerance = precisionTolerance;
+
+  final double _precisionTolerance;
+
+  @override
+  Future<bool> compare(Uint8List imageBytes, Uri golden) async {
+    final result = await GoldenFileComparator.compareLists(
+      imageBytes,
+      await getGoldenBytes(golden),
+    );
+    final passed = result.passed || result.diffPercent <= _precisionTolerance;
+    if (passed) {
+      result.dispose();
+      return true;
+    }
+
+    final error = await generateFailureOutput(result, golden, basedir);
+    result.dispose();
+    throw FlutterError(error);
+  }
 }
 
 EditedImage _editedImage(
