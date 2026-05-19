@@ -8,6 +8,7 @@ class _PreviewPanel extends StatefulWidget {
     required this.status,
     required this.cropAspectRatio,
     required this.scaleMode,
+    required this.transform,
     required this.labels,
     required this.theme,
   });
@@ -17,6 +18,7 @@ class _PreviewPanel extends StatefulWidget {
   final String status;
   final double cropAspectRatio;
   final ImageClipScaleMode scaleMode;
+  final ImageClipCropTransform transform;
   final ImageClipEditorLabels labels;
   final ImageClipEditorTheme theme;
 
@@ -38,7 +40,8 @@ class _PreviewPanelState extends State<_PreviewPanel> {
   @override
   void didUpdateWidget(covariant _PreviewPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.scaleMode != widget.scaleMode) {
+    if (oldWidget.scaleMode != widget.scaleMode ||
+        oldWidget.transform != widget.transform) {
       final layout = _layout;
       if (layout != null) {
         _resetToLayout(layout);
@@ -53,28 +56,32 @@ class _PreviewPanelState extends State<_PreviewPanel> {
       return null;
     }
 
+    final visualSize = widget.transform.visualSize(
+      sourceWidth: image.width,
+      sourceHeight: image.height,
+    );
     final imageLeft = layout.baseRect.left + _offset.dx;
     final imageTop = layout.baseRect.top + _offset.dy;
     final pixelsPerLogicalPixel =
-        image.width / (layout.baseRect.width * _scale);
+        visualSize.width / (layout.baseRect.width * _scale);
     final cropLeft =
         ((layout.cropRect.left - imageLeft) * pixelsPerLogicalPixel)
             .round()
-            .clamp(0, image.width - 1)
+            .clamp(0, visualSize.width - 1)
             .toInt();
     final cropTop = ((layout.cropRect.top - imageTop) * pixelsPerLogicalPixel)
         .round()
-        .clamp(0, image.height - 1)
+        .clamp(0, visualSize.height - 1)
         .toInt();
     final cropRight =
         ((layout.cropRect.right - imageLeft) * pixelsPerLogicalPixel)
             .round()
-            .clamp(cropLeft + 1, image.width)
+            .clamp(cropLeft + 1, visualSize.width)
             .toInt();
     final cropBottom =
         ((layout.cropRect.bottom - imageTop) * pixelsPerLogicalPixel)
             .round()
-            .clamp(cropTop + 1, image.height)
+            .clamp(cropTop + 1, visualSize.height)
             .toInt();
 
     return CropRegion(
@@ -145,11 +152,18 @@ class _PreviewPanelState extends State<_PreviewPanel> {
                       top: layout.baseRect.top + _offset.dy,
                       width: layout.baseRect.width * _scale,
                       height: layout.baseRect.height * _scale,
-                      child: Image.memory(
-                        image.bytes,
-                        fit: BoxFit.fill,
-                        gaplessPlayback: true,
-                        filterQuality: FilterQuality.high,
+                      child: Transform.scale(
+                        scaleX: widget.transform.flipHorizontal ? -1 : 1,
+                        scaleY: widget.transform.flipVertical ? -1 : 1,
+                        child: RotatedBox(
+                          quarterTurns: widget.transform.quarterTurns,
+                          child: Image.memory(
+                            image.bytes,
+                            fit: BoxFit.fill,
+                            gaplessPlayback: true,
+                            filterQuality: FilterQuality.high,
+                          ),
+                        ),
                       ),
                     ),
                     _CropShade(rect: layout.cropRect, theme: widget.theme),
@@ -187,16 +201,23 @@ class _PreviewPanelState extends State<_PreviewPanel> {
       size.width.isFinite ? size.width : 1,
       size.height.isFinite ? size.height : 1,
     );
-    final imageWidthScale = (safeSize.width / image.width)
+    final visualSize = widget.transform.visualSize(
+      sourceWidth: image.width,
+      sourceHeight: image.height,
+    );
+    final imageWidthScale = (safeSize.width / visualSize.width)
         .clamp(0, double.infinity)
         .toDouble();
-    final imageHeightScale = (safeSize.height / image.height)
+    final imageHeightScale = (safeSize.height / visualSize.height)
         .clamp(0, double.infinity)
         .toDouble();
     final baseScale = imageWidthScale < imageHeightScale
         ? imageWidthScale
         : imageHeightScale;
-    final baseSize = Size(image.width * baseScale, image.height * baseScale);
+    final baseSize = Size(
+      visualSize.width * baseScale,
+      visualSize.height * baseScale,
+    );
     final baseRect =
         Offset(
           (safeSize.width - baseSize.width) / 2,
@@ -231,7 +252,9 @@ class _PreviewPanelState extends State<_PreviewPanel> {
   void _rememberLayout(_CropPreviewLayout layout, EditedImage image) {
     _layout = layout;
     final imageKey =
-        '${image.label}:${image.width}x${image.height}:${image.bytes.length}';
+        '${image.label}:${image.width}x${image.height}:'
+        '${image.bytes.length}:r${widget.transform.normalizedRotation}:'
+        'h${widget.transform.flipHorizontal}:v${widget.transform.flipVertical}';
     if (_lastImageKey != imageKey) {
       _lastImageKey = imageKey;
       _resetToLayout(layout);

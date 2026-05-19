@@ -68,6 +68,8 @@ void main() {
     expect(find.text('Cancel'), findsOneWidget);
     expect(find.text('Save'), findsOneWidget);
     expect(find.text('Fit'), findsOneWidget);
+    expect(find.text('Flip H'), findsOneWidget);
+    expect(find.text('Flip V'), findsOneWidget);
     expect(find.text('Rotate'), findsOneWidget);
     expect(find.text('Portrait'), findsOneWidget);
     expect(find.text('Landscape'), findsOneWidget);
@@ -85,6 +87,8 @@ void main() {
       expect(find.bySemanticsLabel('Image crop preview'), findsOneWidget);
       expect(find.bySemanticsLabel('Crop frame'), findsOneWidget);
       expect(find.bySemanticsLabel('Fit'), findsOneWidget);
+      expect(find.bySemanticsLabel('Flip H'), findsOneWidget);
+      expect(find.bySemanticsLabel('Flip V'), findsOneWidget);
       expect(find.bySemanticsLabel('Rotate'), findsOneWidget);
       expect(find.bySemanticsLabel('Portrait'), findsOneWidget);
       expect(find.bySemanticsLabel('Landscape'), findsOneWidget);
@@ -131,8 +135,72 @@ void main() {
     await pumpUntilIdle(tester);
     expect(tester.takeException(), isNull);
 
+    await tester.tap(find.text('Flip H'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Flip V'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.takeException(), isNull);
+
     await tester.tap(find.text('Save'));
     await pumpUntilIdle(tester);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('rotate updates the preview without starting a processing task', (
+    tester,
+  ) async {
+    var progressEvents = 0;
+
+    await pumpClippingApp(
+      tester,
+      editor: ImageClipEditor(
+        initialImageBytes: _pngBytes(120, 80),
+        initialImageLabel: 'instant-rotate.png',
+        loadSampleOnStart: false,
+        onProgress: (_) {
+          progressEvents++;
+        },
+      ),
+    );
+    await pumpUntilIdle(tester);
+    final eventsAfterLoad = progressEvents;
+
+    await tester.tap(find.text('Rotate'));
+    await tester.pump();
+
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(progressEvents, eventsAfterLoad);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('flip updates the preview without starting a processing task', (
+    tester,
+  ) async {
+    var progressEvents = 0;
+
+    await pumpClippingApp(
+      tester,
+      editor: ImageClipEditor(
+        initialImageBytes: _pngBytes(120, 80),
+        initialImageLabel: 'instant-flip.png',
+        loadSampleOnStart: false,
+        onProgress: (_) {
+          progressEvents++;
+        },
+      ),
+    );
+    await pumpUntilIdle(tester);
+    final eventsAfterLoad = progressEvents;
+
+    await tester.tap(find.text('Flip H'));
+    await tester.pump();
+    await tester.tap(find.text('Flip V'));
+    await tester.pump();
+
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(progressEvents, eventsAfterLoad);
     expect(tester.takeException(), isNull);
   });
 
@@ -160,6 +228,8 @@ void main() {
 
     await tester.tap(find.text('Rotate'));
     await pumpUntilIdle(tester);
+    await tester.tap(find.text('Flip H'));
+    await tester.pump();
     await tester.tap(find.text('Save'));
     await pumpUntilIdle(tester);
     await tester.pumpAndSettle();
@@ -168,10 +238,63 @@ void main() {
     expect(find.text('Crop details'), findsOneWidget);
     expect(find.text('Rotation'), findsOneWidget);
     expect(find.text('90°'), findsOneWidget);
+    expect(find.text('Flip H'), findsOneWidget);
     expect(find.text('Result data'), findsOneWidget);
     expect(find.textContaining('rotationDegrees: 90'), findsOneWidget);
+    expect(find.textContaining('flippedHorizontally: true'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'rotated crop maps preview coordinates back to the source image',
+    (tester) async {
+      final controller = ImageClipEditorController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ImageClipEditor(
+            controller: controller,
+            initialImageBytes: _pngBytes(120, 80),
+            initialImageLabel: 'rotated-crop.png',
+            loadSampleOnStart: false,
+            showResultPage: false,
+          ),
+        ),
+      );
+      await pumpUntilIdle(tester);
+
+      await tester.tap(find.text('Rotate'));
+      await tester.pump();
+      await tester.tap(find.text('Flip H'));
+      await tester.pump();
+
+      final result = await tester.runAsync(controller.crop);
+      await tester.pump();
+
+      expect(result, isNotNull);
+      expect(result!.rotationDegrees, 90);
+      expect(result.flippedHorizontally, isTrue);
+      expect(result.flippedVertically, isFalse);
+      expect(result.previewRegion.width, greaterThan(0));
+      expect(result.previewRegion.height, greaterThan(0));
+      final expectedRegion =
+          const ImageClipCropTransform(
+            rotationDegrees: 90,
+            flipHorizontal: true,
+          ).sourceRegionForPreview(
+            sourceWidth: 120,
+            sourceHeight: 80,
+            previewRegion: result.previewRegion,
+          );
+      expect(result.region.x, expectedRegion.x);
+      expect(result.region.y, expectedRegion.y);
+      expect(result.region.width, expectedRegion.width);
+      expect(result.region.height, expectedRegion.height);
+      expect(result.cropped.width, result.previewRegion.width);
+      expect(result.cropped.height, result.previewRegion.height);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('supports custom labels and aspect ratio presets', (
     tester,
@@ -182,6 +305,8 @@ void main() {
         labels: ImageClipEditorLabels(
           cancelButton: 'Dismiss',
           saveButton: 'Crop',
+          flipHorizontalButton: 'Mirror H',
+          flipVerticalButton: 'Mirror V',
           rotateButton: 'Turn',
         ),
         initialAspectRatio: ImageClipAspectRatio.square,
@@ -194,6 +319,8 @@ void main() {
 
     expect(find.text('Dismiss'), findsOneWidget);
     expect(find.text('Crop'), findsOneWidget);
+    expect(find.text('Mirror H'), findsOneWidget);
+    expect(find.text('Mirror V'), findsOneWidget);
     expect(find.text('Turn'), findsOneWidget);
     expect(find.text('Square'), findsOneWidget);
     expect(find.text('16:9'), findsOneWidget);
@@ -336,6 +463,7 @@ void main() {
 
     controller.resetView();
     await tester.runAsync(controller.rotateRight);
+    await tester.runAsync(controller.flipHorizontal);
     await tester.pump();
 
     final result = await tester.runAsync(controller.crop);
@@ -345,6 +473,7 @@ void main() {
     expect(result!.source.label, 'controller.png');
     expect(result.cropped.bytes, isNotEmpty);
     expect(result.rotationDegrees, 90);
+    expect(result.flippedHorizontally, isTrue);
     expect(tester.takeException(), isNull);
   });
 

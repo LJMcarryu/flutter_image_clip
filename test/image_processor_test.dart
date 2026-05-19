@@ -207,14 +207,78 @@ void main() {
     expect(result.bytes, isNotEmpty);
   });
 
+  test('maps transformed preview crop rectangles back to source pixels', () {
+    const previewRegion = CropRegion(
+      x: 10,
+      y: 20,
+      width: 30,
+      height: 40,
+      cornerRadius: 2,
+    );
+    const transform = ImageClipCropTransform(
+      rotationDegrees: 90,
+      flipHorizontal: true,
+    );
+
+    expect(
+      transform.visualSize(sourceWidth: 100, sourceHeight: 80),
+      const ImageClipDimensions(width: 80, height: 100),
+    );
+
+    final sourceRegion = transform.sourceRegionForPreview(
+      sourceWidth: 100,
+      sourceHeight: 80,
+      previewRegion: previewRegion,
+    );
+
+    expect(sourceRegion.x, 20);
+    expect(sourceRegion.y, 10);
+    expect(sourceRegion.width, 40);
+    expect(sourceRegion.height, 30);
+    expect(sourceRegion.cornerRadius, 2);
+  });
+
+  test('single rotate and flip operations can export JPEG directly', () async {
+    final processor = ImageProcessor();
+    final source = await processor.decodeBytes(
+      img.encodePng(img.Image(width: 40, height: 30)),
+      label: 'single-step.png',
+    );
+
+    final rotated = await processor.rotateRight(
+      source,
+      outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 82),
+    );
+    final flipped = await processor.flipHorizontal(
+      source,
+      outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 82),
+    );
+    final vertical = await processor
+        .flipVerticalTask(
+          source,
+          outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 82),
+        )
+        .result;
+
+    expect(rotated.format, ImageClipOutputFormat.jpeg);
+    expect(rotated.bytes.sublist(0, 2), <int>[0xFF, 0xD8]);
+    expect(flipped.format, ImageClipOutputFormat.jpeg);
+    expect(flipped.bytes.sublist(0, 2), <int>[0xFF, 0xD8]);
+    expect(vertical.format, ImageClipOutputFormat.jpeg);
+    expect(vertical.bytes.sublist(0, 2), <int>[0xFF, 0xD8]);
+  });
+
   test('tracks current image state in an image clip session', () async {
     final processor = ImageProcessor();
     final sample = await processor.createSample();
     final session = ImageClipSession(image: sample, processor: processor);
 
-    final rotated = await session.rotate();
+    final rotated = await session.rotate(
+      outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 84),
+    );
     expect(rotated.width, 640);
     expect(rotated.height, 960);
+    expect(rotated.format, ImageClipOutputFormat.jpeg);
     expect(session.image, same(rotated));
     expect(session.operationCount, 1);
 

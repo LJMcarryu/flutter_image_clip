@@ -9,6 +9,8 @@ class ImageClipEditorLabels {
     this.saveButton = 'Save',
     this.fitButton = 'Fit',
     this.fillButton = 'Fill',
+    this.flipHorizontalButton = 'Flip H',
+    this.flipVerticalButton = 'Flip V',
     this.rotateButton = 'Rotate',
     this.previewSemanticsLabel = 'Image crop preview',
     this.cropFrameSemanticsLabel = 'Crop frame',
@@ -27,6 +29,7 @@ class ImageClipEditorLabels {
     this.imageRequiredMessage = 'Add an image before cropping',
     this.rotatingStatus = 'Rotating image',
     this.rotationCompleteStatus = 'Rotation complete',
+    this.flipPreviewStatus = 'Flip preview updated',
     this.croppingStatus = 'Cropping image',
     this.cropCompleteStatus = 'Crop complete',
     this.cropResetMessage = 'Crop frame reset',
@@ -51,6 +54,12 @@ class ImageClipEditorLabels {
 
   /// Button label for fill mode.
   final String fillButton;
+
+  /// Button label for horizontal preview flip.
+  final String flipHorizontalButton;
+
+  /// Button label for vertical preview flip.
+  final String flipVerticalButton;
 
   /// Rotate button label.
   final String rotateButton;
@@ -105,6 +114,9 @@ class ImageClipEditorLabels {
 
   /// Status shown after rotation completes.
   final String rotationCompleteStatus;
+
+  /// Status shown after a preview flip changes.
+  final String flipPreviewStatus;
 
   /// Status shown while the final crop is running.
   final String croppingStatus;

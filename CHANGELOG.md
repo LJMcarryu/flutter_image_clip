@@ -1,3 +1,11 @@
+# 0.6.4
+
+- 编辑器旋转和翻转改为预览态更新，保存时再将预览裁剪区域映射回原图并一次性导出，避免交互按钮触发整图重编码。
+- 新增 `ImageClipCropTransform` 和 `ImageClipDimensions`，可复用编辑器的旋转/翻转裁剪坐标映射逻辑。
+- `ImageClipResult` 新增 `previewRegion`、`flippedHorizontally` 和 `flippedVertically` 元数据。
+- `ImageProcessor.rotate`、`rotateRight`、`flipHorizontal`、`flipVertical` 及对应 task API 支持 `outputSettings`，单步旋转/翻转可直接输出 JPEG。
+- `ImageClipSession` 新增异步 `flipHorizontal`、`flipVertical` 及 task API，并为 `rotate` 支持 `outputSettings`。
+
 # 0.6.3
 
 - 新增 HEIC/HEIF header 识别，并在纯 Dart 解码前抛出 `ImageClipUnsupportedFormatException`，提示业务先做平台转码。

@@ -9,6 +9,7 @@ import 'exceptions.dart';
 import 'models.dart';
 import 'pipeline.dart';
 
+export 'crop_transform.dart';
 export 'exceptions.dart';
 export 'models.dart';
 export 'pipeline.dart';
@@ -201,15 +202,24 @@ class ImageProcessor {
   Future<EditedImage> rotate(
     EditedImage source, {
     int degrees = 90,
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
     ImageClipTaskOptions? options,
   }) {
-    return rotateTask(source, degrees: degrees, options: options).result;
+    return rotateTask(
+      source,
+      degrees: degrees,
+      outputSettings: outputSettings,
+      options: options,
+    ).result;
   }
 
   /// Starts rotating [source] clockwise by [degrees].
   ImageClipTask<EditedImage> rotateTask(
     EditedImage source, {
     int degrees = 90,
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
     ImageClipTaskOptions? options,
   }) {
     return processPipelineTask(
@@ -218,6 +228,7 @@ class ImageProcessor {
         steps: <ImageClipPipelineStep>[
           ImageClipPipelineStep.rotate(degrees: degrees),
         ],
+        outputSettings: outputSettings,
         operationLabel: 'Rotate',
       ),
       options: options,
@@ -227,30 +238,51 @@ class ImageProcessor {
   /// Rotates [source] clockwise by 90 degrees.
   Future<EditedImage> rotateRight(
     EditedImage source, {
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
     ImageClipTaskOptions? options,
   }) {
-    return rotate(source, options: options);
+    return rotate(source, outputSettings: outputSettings, options: options);
   }
 
   /// Starts rotating [source] clockwise by 90 degrees.
   ImageClipTask<EditedImage> rotateRightTask(
     EditedImage source, {
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
     ImageClipTaskOptions? options,
   }) {
-    return rotateTask(source, options: options);
+    return rotateTask(source, outputSettings: outputSettings, options: options);
   }
 
   /// Flips [source] around the vertical axis.
   Future<EditedImage> flipHorizontal(
     EditedImage source, {
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
     ImageClipTaskOptions? options,
   }) {
-    return processPipeline(
+    return flipHorizontalTask(
+      source,
+      outputSettings: outputSettings,
+      options: options,
+    ).result;
+  }
+
+  /// Starts flipping [source] around the vertical axis.
+  ImageClipTask<EditedImage> flipHorizontalTask(
+    EditedImage source, {
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
+    ImageClipTaskOptions? options,
+  }) {
+    return processPipelineTask(
       ImageClipPipeline.fromImage(
         source: source,
         steps: const <ImageClipPipelineStep>[
           ImageClipPipelineStep.flipHorizontal(),
         ],
+        outputSettings: outputSettings,
         operationLabel: 'Flip horizontal',
       ),
       options: options,
@@ -260,14 +292,31 @@ class ImageProcessor {
   /// Flips [source] around the horizontal axis.
   Future<EditedImage> flipVertical(
     EditedImage source, {
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
     ImageClipTaskOptions? options,
   }) {
-    return processPipeline(
+    return flipVerticalTask(
+      source,
+      outputSettings: outputSettings,
+      options: options,
+    ).result;
+  }
+
+  /// Starts flipping [source] around the horizontal axis.
+  ImageClipTask<EditedImage> flipVerticalTask(
+    EditedImage source, {
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
+    ImageClipTaskOptions? options,
+  }) {
+    return processPipelineTask(
       ImageClipPipeline.fromImage(
         source: source,
         steps: const <ImageClipPipelineStep>[
           ImageClipPipelineStep.flipVertical(),
         ],
+        outputSettings: outputSettings,
         operationLabel: 'Flip vertical',
       ),
       options: options,

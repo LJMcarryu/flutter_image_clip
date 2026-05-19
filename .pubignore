@@ -16,4 +16,13 @@ macos/
 web/
 windows/
 
+example/.gitignore
+example/README.md
+example/android/
+example/ios/
+example/linux/
+example/macos/
+example/web/
+example/windows/
+
 pubspec.lock

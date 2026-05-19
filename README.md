@@ -75,8 +75,13 @@ final result = await showImageClipEditor(
 
 if (result != null) {
   final croppedBytes = result.cropped.bytes;
+  // 原图坐标：实际用于裁剪 source 的像素区域。
   final region = result.region;
+  // 预览坐标：用户在旋转预览中看到的裁剪区域。
+  final previewRegion = result.previewRegion;
   final rotationDegrees = result.rotationDegrees;
+  final flippedHorizontally = result.flippedHorizontally;
+  final flippedVertically = result.flippedVertically;
 }
 ```
 
@@ -93,7 +98,16 @@ if (result != null) {
     height: 640,
     cornerRadius: 0,
   ),
+  previewRegion: CropRegion(
+    x: 0,
+    y: 120,
+    width: 640,
+    height: 480,
+    cornerRadius: 0,
+  ),
   rotationDegrees: 90,
+  flippedHorizontally: true,
+  flippedVertically: false,
 }
 ```
 
@@ -139,7 +153,9 @@ ImageClipEditor(
 
 await controller.loadImage(bytes, label: 'avatar.jpg');
 controller.resetView();
+// 只更新编辑器预览，不会立即重编码整张图。
 await controller.rotateRight();
+await controller.flipHorizontal();
 
 final result = await controller.crop();
 if (result != null) {
@@ -158,6 +174,8 @@ ImageClipEditor(
   labels: const ImageClipEditorLabels(
     cancelButton: 'Close',
     saveButton: 'Use photo',
+    flipHorizontalButton: 'Flip H',
+    flipVerticalButton: 'Flip V',
     rotateButton: 'Rotate',
     cropCompleteStatus: 'Photo cropped',
   ),
@@ -205,7 +223,11 @@ final cropped = await processor.cropRegion(
   image,
   const CropRegion(x: 20, y: 20, width: 240, height: 240, cornerRadius: 0),
 );
-final rotated = await processor.rotate(cropped, degrees: 90);
+final rotated = await processor.rotate(
+  cropped,
+  degrees: 90,
+  outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 88),
+);
 final adjusted = await processor.adjustColor(
   rotated,
   const ColorAdjustment(brightness: 1.05, contrast: 1.1, saturation: 0.95),
@@ -240,11 +262,27 @@ final source = await processor.decodeBytes(bytes, label: 'input.jpg');
 final session = ImageClipSession(image: source, processor: processor);
 
 await session.rotate();
+await session.flipHorizontal();
 await session.cropRegion(
   const CropRegion(x: 20, y: 20, width: 240, height: 240, cornerRadius: 0),
 );
 final jpeg = await session.exportImage(
   outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 88),
+);
+```
+
+如果业务自己做编辑预览，可以使用 `ImageClipCropTransform` 复用编辑器的坐标映射逻辑：
+
+```dart
+const transform = ImageClipCropTransform(
+  rotationDegrees: 90,
+  flipHorizontal: true,
+);
+
+final sourceRegion = transform.sourceRegionForPreview(
+  sourceWidth: source.width,
+  sourceHeight: source.height,
+  previewRegion: previewRegion,
 );
 ```
 

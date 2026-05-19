@@ -8,7 +8,10 @@ class ImageClipResult {
     required this.cropped,
     required this.region,
     required this.rotationDegrees,
-  });
+    CropRegion? previewRegion,
+    this.flippedHorizontally = false,
+    this.flippedVertically = false,
+  }) : previewRegion = previewRegion ?? region;
 
   /// Source image that was displayed in the editor.
   final EditedImage source;
@@ -19,15 +22,27 @@ class ImageClipResult {
   /// Pixel crop rectangle applied to [source].
   final CropRegion region;
 
-  /// Clockwise rotation applied before the final crop, in degrees.
+  /// Crop rectangle in the rotated preview coordinate space.
+  final CropRegion previewRegion;
+
+  /// Clockwise preview rotation applied to the saved crop, in degrees.
   final int rotationDegrees;
+
+  /// Whether the saved crop was mirrored around its vertical axis.
+  final bool flippedHorizontally;
+
+  /// Whether the saved crop was mirrored around its horizontal axis.
+  final bool flippedVertically;
 
   /// Converts the result metadata and images to isolate-safe maps.
   Map<String, Object?> toMap() => <String, Object?>{
     'source': source.toMap(),
     'cropped': cropped.toMap(),
     'region': region.toMap(),
+    'previewRegion': previewRegion.toMap(),
     'rotationDegrees': rotationDegrees,
+    'flippedHorizontally': flippedHorizontally,
+    'flippedVertically': flippedVertically,
   };
 }
 
@@ -79,6 +94,16 @@ class ImageClipResultPage extends StatelessWidget {
                         _MetricTile(
                           label: labels.rotationDegreesLabel,
                           value: '${result.rotationDegrees}°',
+                          theme: theme,
+                        ),
+                        _MetricTile(
+                          label: labels.flipHorizontalButton,
+                          value: result.flippedHorizontally ? 'yes' : 'no',
+                          theme: theme,
+                        ),
+                        _MetricTile(
+                          label: labels.flipVerticalButton,
+                          value: result.flippedVertically ? 'yes' : 'no',
                           theme: theme,
                         ),
                         _MetricTile(
@@ -308,12 +333,19 @@ class _ResultDataPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final region = result.region;
+    final previewRegion = result.previewRegion;
     final data =
         'rotationDegrees: ${result.rotationDegrees}\n'
         'region.x: ${region.x}\n'
         'region.y: ${region.y}\n'
         'region.width: ${region.width}\n'
         'region.height: ${region.height}\n'
+        'previewRegion.x: ${previewRegion.x}\n'
+        'previewRegion.y: ${previewRegion.y}\n'
+        'previewRegion.width: ${previewRegion.width}\n'
+        'previewRegion.height: ${previewRegion.height}\n'
+        'flippedHorizontally: ${result.flippedHorizontally}\n'
+        'flippedVertically: ${result.flippedVertically}\n'
         'cropped.width: ${result.cropped.width}\n'
         'cropped.height: ${result.cropped.height}\n'
         'cropped.mimeType: ${result.cropped.mimeType}';

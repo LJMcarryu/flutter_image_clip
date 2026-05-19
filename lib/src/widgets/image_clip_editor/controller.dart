@@ -45,9 +45,28 @@ class ImageClipEditorController {
     _requireState()._resetCropView();
   }
 
-  /// Rotates the current image clockwise by 90 degrees.
+  /// Rotates the editor preview clockwise by 90 degrees.
+  ///
+  /// The source image is not re-encoded here. Rotation is applied when the
+  /// current crop is saved.
   Future<void> rotateRight() {
     return _requireState()._rotateRight();
+  }
+
+  /// Flips the editor preview around its vertical axis.
+  ///
+  /// The source image is not re-encoded here. Flip is applied when the current
+  /// crop is saved.
+  Future<void> flipHorizontal() {
+    return _requireState()._flipHorizontalPreview();
+  }
+
+  /// Flips the editor preview around its horizontal axis.
+  ///
+  /// The source image is not re-encoded here. Flip is applied when the current
+  /// crop is saved.
+  Future<void> flipVertical() {
+    return _requireState()._flipVerticalPreview();
   }
 
   /// Runs the current crop operation and returns its result.

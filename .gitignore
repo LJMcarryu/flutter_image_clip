@@ -50,6 +50,16 @@ pubspec.lock
 /web/
 /windows/
 
+# Generated example app platform files are local-only unless explicitly added.
+/example/.gitignore
+/example/README.md
+/example/android/
+/example/ios/
+/example/linux/
+/example/macos/
+/example/web/
+/example/windows/
+
 # Symbolication related
 app.*.symbols
 

@@ -246,8 +246,18 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   late ImageClipAspectRatio _cropAspectRatio;
   late ImageClipScaleMode _cropScaleMode;
   int _rotationDegrees = 0;
+  bool _flipHorizontal = false;
+  bool _flipVertical = false;
 
   double get _cropAspectRatioValue => _cropAspectRatio.value;
+
+  ImageClipCropTransform get _cropTransform {
+    return ImageClipCropTransform(
+      rotationDegrees: _rotationDegrees,
+      flipHorizontal: _flipHorizontal,
+      flipVertical: _flipVertical,
+    );
+  }
 
   ImageClipAspectRatio get _initialAspectRatio {
     return widget.initialAspectRatio ??
@@ -335,6 +345,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
                 status: _status,
                 cropAspectRatio: _cropAspectRatioValue,
                 scaleMode: _cropScaleMode,
+                transform: _cropTransform,
                 labels: widget.labels,
                 theme: widget.theme,
               ),
@@ -347,6 +358,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
               theme: widget.theme,
               canRun: _image != null && !_isBusy,
               onScaleModeToggle: _toggleScaleMode,
+              onFlipHorizontal: _flipHorizontalPreview,
+              onFlipVertical: _flipVerticalPreview,
               onRotate: _rotateRight,
               onAspectRatioChanged: _setCropAspectRatio,
             ),
@@ -365,7 +378,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
         doneLabel: widget.labels.imageLoadedStatus,
         replaceCurrent: true,
         onDone: (_) {
-          _rotationDegrees = 0;
+          _resetPreviewTransform();
         },
       );
     }
@@ -378,7 +391,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     setState(() {
       _image = null;
       _status = widget.labels.waitingForImageStatus;
-      _rotationDegrees = 0;
+      _resetPreviewTransform();
     });
     return Future<void>.value();
   }
@@ -393,7 +406,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       doneLabel: widget.labels.imageLoadedStatus,
       replaceCurrent: true,
       onDone: (_) {
-        _rotationDegrees = 0;
+        _resetPreviewTransform();
       },
     );
   }
@@ -405,7 +418,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       doneLabel: widget.labels.sampleGeneratedStatus,
       replaceCurrent: replaceCurrent,
       onDone: (_) {
-        _rotationDegrees = 0;
+        _resetPreviewTransform();
       },
     );
   }
@@ -420,14 +433,27 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       _image = null;
       _isBusy = false;
       _progressValue = null;
-      _rotationDegrees = 0;
+      _resetPreviewTransform();
       _status = widget.labels.waitingForImageStatus;
     });
   }
 
-  CropRegion? _currentCropRegion({required double cornerRadius}) {
+  CropRegion? _currentPreviewCropRegion({required double cornerRadius}) {
     return _previewKey.currentState?.currentCropRegion(
       cornerRadius: cornerRadius,
+    );
+  }
+
+  CropRegion? _currentCropRegion({required double cornerRadius}) {
+    final source = _image;
+    final previewRegion = _currentPreviewCropRegion(cornerRadius: cornerRadius);
+    if (source == null || previewRegion == null) {
+      return null;
+    }
+    return _cropTransform.sourceRegionForPreview(
+      sourceWidth: source.width,
+      sourceHeight: source.height,
+      previewRegion: previewRegion,
     );
   }
 
@@ -461,18 +487,33 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       _showMessage(widget.labels.imageRequiredMessage);
       return null;
     }
-    final region = _currentCropRegion(cornerRadius: 0);
-    final cropRegion =
+    final region = _currentPreviewCropRegion(cornerRadius: 0);
+    final transform = _cropTransform;
+    final visualSize = transform.visualSize(
+      sourceWidth: source.width,
+      sourceHeight: source.height,
+    );
+    final previewRegion =
         region ??
         CropRegion(
           x: 0,
           y: 0,
-          width: source.width,
-          height: source.height,
+          width: visualSize.width,
+          height: visualSize.height,
           cornerRadius: 0,
         );
+    final sourceRegion = transform.sourceRegionForPreview(
+      sourceWidth: source.width,
+      sourceHeight: source.height,
+      previewRegion: previewRegion,
+    );
 
-    return _saveCropResult(source: source, region: cropRegion);
+    return _saveCropResult(
+      source: source,
+      sourceRegion: sourceRegion,
+      previewRegion: previewRegion,
+      transform: transform,
+    );
   }
 
   Future<void> _rotateRight() {
@@ -484,14 +525,41 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       _showMessage(widget.labels.imageRequiredMessage);
       return Future<void>.value();
     }
-    return _runImageTask(
-      () => _processor.rotateRightTask(source),
-      busyLabel: widget.labels.rotatingStatus,
-      doneLabel: widget.labels.rotationCompleteStatus,
-      onDone: (_) {
-        _rotationDegrees = (_rotationDegrees + 90) % 360;
-      },
-    );
+    setState(() {
+      _rotationDegrees = _cropTransform
+          .copyWith(rotationDegrees: _rotationDegrees + 90)
+          .normalizedRotation;
+      _status = widget.labels.rotationCompleteStatus;
+    });
+    return Future<void>.value();
+  }
+
+  Future<void> _flipHorizontalPreview() {
+    return _updatePreviewFlip(horizontal: true);
+  }
+
+  Future<void> _flipVerticalPreview() {
+    return _updatePreviewFlip(horizontal: false);
+  }
+
+  Future<void> _updatePreviewFlip({required bool horizontal}) {
+    final source = _image;
+    if (source == null) {
+      if (widget.loadSampleOnStart) {
+        return _loadSample();
+      }
+      _showMessage(widget.labels.imageRequiredMessage);
+      return Future<void>.value();
+    }
+    setState(() {
+      if (horizontal) {
+        _flipHorizontal = !_flipHorizontal;
+      } else {
+        _flipVertical = !_flipVertical;
+      }
+      _status = widget.labels.flipPreviewStatus;
+    });
+    return Future<void>.value();
   }
 
   Future<void> _runImageTask(
@@ -552,7 +620,9 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
 
   Future<ImageClipResult?> _saveCropResult({
     required EditedImage source,
-    required CropRegion region,
+    required CropRegion sourceRegion,
+    required CropRegion previewRegion,
+    required ImageClipCropTransform transform,
   }) async {
     if (_isBusy) {
       return null;
@@ -569,10 +639,21 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     });
 
     try {
-      final activeTask = _processor.cropRegionTask(
-        source,
-        region,
-        outputSettings: widget.outputSettings,
+      final steps = <ImageClipPipelineStep>[
+        ImageClipPipelineStep.cropRegion(sourceRegion),
+        if (transform.normalizedRotation != 0)
+          ImageClipPipelineStep.rotate(degrees: transform.normalizedRotation),
+        if (transform.flipHorizontal)
+          const ImageClipPipelineStep.flipHorizontal(),
+        if (transform.flipVertical) const ImageClipPipelineStep.flipVertical(),
+      ];
+      final activeTask = _processor.processPipelineTask(
+        ImageClipPipeline.fromImage(
+          source: source,
+          steps: steps,
+          outputSettings: widget.outputSettings,
+          operationLabel: 'Crop',
+        ),
       );
       _activeTask = activeTask;
       _listenToProgress(activeTask, taskId);
@@ -583,8 +664,11 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       final result = ImageClipResult(
         source: source,
         cropped: cropped,
-        region: region,
-        rotationDegrees: _rotationDegrees,
+        region: sourceRegion,
+        previewRegion: previewRegion,
+        rotationDegrees: transform.normalizedRotation,
+        flippedHorizontally: transform.flipHorizontal,
+        flippedVertically: transform.flipVertical,
       );
       setState(() {
         _isBusy = false;
@@ -665,6 +749,12 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
         ImageClipScaleMode.fit => ImageClipScaleMode.fill,
       };
     });
+  }
+
+  void _resetPreviewTransform() {
+    _rotationDegrees = 0;
+    _flipHorizontal = false;
+    _flipVertical = false;
   }
 
   void _cancelCrop() {

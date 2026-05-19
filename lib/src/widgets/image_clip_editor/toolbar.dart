@@ -81,6 +81,8 @@ class _CropBottomBar extends StatelessWidget {
     required this.theme,
     required this.canRun,
     required this.onScaleModeToggle,
+    required this.onFlipHorizontal,
+    required this.onFlipVertical,
     required this.onRotate,
     required this.onAspectRatioChanged,
   });
@@ -92,6 +94,8 @@ class _CropBottomBar extends StatelessWidget {
   final ImageClipEditorTheme theme;
   final bool canRun;
   final VoidCallback onScaleModeToggle;
+  final VoidCallback onFlipHorizontal;
+  final VoidCallback onFlipVertical;
   final VoidCallback onRotate;
   final ValueChanged<ImageClipAspectRatio> onAspectRatioChanged;
 
@@ -101,7 +105,7 @@ class _CropBottomBar extends StatelessWidget {
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 500;
         final barHeight = compact ? 202.0 : 236.0;
-        final toolGap = compact ? 46.0 : 72.0;
+        final toolGap = compact ? 14.0 : 28.0;
         final modeGap = compact ? 24.0 : 40.0;
 
         return Container(
@@ -134,6 +138,24 @@ class _CropBottomBar extends StatelessWidget {
                           enabled: canRun,
                           compact: compact,
                           onPressed: onScaleModeToggle,
+                        ),
+                        SizedBox(width: toolGap),
+                        _CropToolButton(
+                          icon: Icons.flip,
+                          label: labels.flipHorizontalButton,
+                          theme: theme,
+                          enabled: canRun,
+                          compact: compact,
+                          onPressed: onFlipHorizontal,
+                        ),
+                        SizedBox(width: toolGap),
+                        _CropToolButton(
+                          icon: Icons.flip_to_back_outlined,
+                          label: labels.flipVerticalButton,
+                          theme: theme,
+                          enabled: canRun,
+                          compact: compact,
+                          onPressed: onFlipVertical,
                         ),
                         SizedBox(width: toolGap),
                         _CropToolButton(

@@ -127,19 +127,80 @@ class ImageClipSession {
   /// Rotates the current image clockwise by [degrees].
   Future<EditedImage> rotate({
     int degrees = 90,
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
     ImageClipTaskOptions? options,
   }) {
-    return rotateTask(degrees: degrees, options: options).result;
+    return rotateTask(
+      degrees: degrees,
+      outputSettings: outputSettings,
+      options: options,
+    ).result;
   }
 
   /// Starts rotating the current image clockwise by [degrees].
   ImageClipTask<EditedImage> rotateTask({
     int degrees = 90,
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
     ImageClipTaskOptions? options,
   }) {
     return applyTask(
       <ImageClipPipelineStep>[ImageClipPipelineStep.rotate(degrees: degrees)],
+      outputSettings: outputSettings,
       operationLabel: 'Rotate',
+      options: options,
+    );
+  }
+
+  /// Flips the current image around the vertical axis.
+  Future<EditedImage> flipHorizontal({
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
+    ImageClipTaskOptions? options,
+  }) {
+    return flipHorizontalTask(
+      outputSettings: outputSettings,
+      options: options,
+    ).result;
+  }
+
+  /// Starts flipping the current image around the vertical axis.
+  ImageClipTask<EditedImage> flipHorizontalTask({
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
+    ImageClipTaskOptions? options,
+  }) {
+    return applyTask(
+      const <ImageClipPipelineStep>[ImageClipPipelineStep.flipHorizontal()],
+      outputSettings: outputSettings,
+      operationLabel: 'Flip horizontal',
+      options: options,
+    );
+  }
+
+  /// Flips the current image around the horizontal axis.
+  Future<EditedImage> flipVertical({
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
+    ImageClipTaskOptions? options,
+  }) {
+    return flipVerticalTask(
+      outputSettings: outputSettings,
+      options: options,
+    ).result;
+  }
+
+  /// Starts flipping the current image around the horizontal axis.
+  ImageClipTask<EditedImage> flipVerticalTask({
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
+    ImageClipTaskOptions? options,
+  }) {
+    return applyTask(
+      const <ImageClipPipelineStep>[ImageClipPipelineStep.flipVertical()],
+      outputSettings: outputSettings,
+      operationLabel: 'Flip vertical',
       options: options,
     );
   }
