@@ -69,12 +69,30 @@ class ImageClipPlatformDecodeAdapter extends ImageClipDecodeAdapter {
     } on MissingPluginException {
       return null;
     } on PlatformException catch (error) {
-      throw ImageClipDecodeException(
-        'Platform image decode failed: ${error.message ?? error.code}',
-        cause: error,
-      );
+      throw _platformExceptionFor(error, info);
     }
   }
+}
+
+ImageClipException _platformExceptionFor(
+  PlatformException error,
+  ImageClipImageInfo info,
+) {
+  final message = error.message ?? 'Platform image decode failed';
+  return switch (error.code) {
+    'unsupported_format' => ImageClipUnsupportedFormatException(
+      message,
+      format: info.format.name,
+    ),
+    'invalid_args' => ImageClipPlatformException(message, cause: error),
+    'platform_unavailable' => ImageClipPlatformException(message, cause: error),
+    'encode_failed' => ImageClipDecodeException(message, cause: error),
+    'decode_failed' => ImageClipDecodeException(message, cause: error),
+    _ => ImageClipDecodeException(
+      'Platform image decode failed: $message',
+      cause: error,
+    ),
+  };
 }
 
 int? _intOf(Object? value) {

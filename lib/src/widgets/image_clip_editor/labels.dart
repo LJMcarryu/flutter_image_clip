@@ -4,6 +4,8 @@ part of '../image_clip_editor.dart';
 class ImageClipEditorLabels {
   /// Creates editor labels and status messages.
   const ImageClipEditorLabels({
+    this.editorTitle = 'Position',
+    this.positionHint = 'Pinch to zoom • Drag to reposition',
     this.defaultImageLabel = defaultImageLabelValue,
     this.cancelButton = 'Cancel',
     this.saveButton = 'Save',
@@ -45,6 +47,8 @@ class ImageClipEditorLabels {
 
   /// Simplified Chinese label preset.
   static const zhHans = ImageClipEditorLabels(
+    editorTitle: '位置',
+    positionHint: '双指缩放 • 拖动调整位置',
     defaultImageLabel: '待裁剪图片',
     cancelButton: '取消',
     saveButton: '保存',
@@ -77,6 +81,12 @@ class ImageClipEditorLabels {
     taskCanceledStatus: '处理已取消',
     processingFailedPrefix: '处理失败',
   );
+
+  /// Title shown in the editor top bar.
+  final String editorTitle;
+
+  /// Short hint shown above the crop controls.
+  final String positionHint;
 
   /// Default label attached to incoming image bytes.
   final String defaultImageLabel;

@@ -34,6 +34,10 @@ public class FlutterImageClipPlugin: NSObject, FlutterPlugin {
         "sourceWidth": decoded.sourceWidth,
         "sourceHeight": decoded.sourceHeight,
       ])
+    } catch DecodeError.unsupportedFormat {
+      result(FlutterError(code: "unsupported_format", message: DecodeError.unsupportedFormat.localizedDescription, details: nil))
+    } catch DecodeError.encodingFailed {
+      result(FlutterError(code: "encode_failed", message: DecodeError.encodingFailed.localizedDescription, details: nil))
     } catch {
       result(FlutterError(code: "decode_failed", message: error.localizedDescription, details: nil))
     }

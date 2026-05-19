@@ -157,6 +157,96 @@ void main() {
     expect(decoded.sourceHeight, 120);
   });
 
+  test('maps platform unsupported format errors to typed exceptions', () async {
+    const channel = MethodChannel('flutter_image_clip/decode_unsupported_test');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          throw PlatformException(
+            code: 'unsupported_format',
+            message: 'Unsupported image format',
+          );
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    final processor = ImageProcessor(
+      decodeAdapter: const ImageClipPlatformDecodeAdapter(channel: channel),
+    );
+
+    await expectLater(
+      processor.decodeBytes(
+        Uint8List.fromList(img.encodePng(img.Image(width: 240, height: 120))),
+        label: 'platform.png',
+        decodeSettings: const ImageClipDecodeSettings.preview(
+          targetLongSide: 24,
+        ),
+      ),
+      throwsA(isA<ImageClipUnsupportedFormatException>()),
+    );
+  });
+
+  test('maps platform argument errors to adapter exceptions', () async {
+    const channel = MethodChannel('flutter_image_clip/decode_args_test');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          throw PlatformException(
+            code: 'invalid_args',
+            message: 'Image bytes are required',
+          );
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    final processor = ImageProcessor(
+      decodeAdapter: const ImageClipPlatformDecodeAdapter(channel: channel),
+    );
+
+    await expectLater(
+      processor.decodeBytes(
+        Uint8List.fromList(img.encodePng(img.Image(width: 240, height: 120))),
+        label: 'platform.png',
+        decodeSettings: const ImageClipDecodeSettings.preview(
+          targetLongSide: 24,
+        ),
+      ),
+      throwsA(isA<ImageClipPlatformException>()),
+    );
+  });
+
+  test('maps platform decode failures to decode exceptions', () async {
+    const channel = MethodChannel('flutter_image_clip/decode_failed_test');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          throw PlatformException(
+            code: 'decode_failed',
+            message: 'Unable to decode image',
+          );
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    final processor = ImageProcessor(
+      decodeAdapter: const ImageClipPlatformDecodeAdapter(channel: channel),
+    );
+
+    await expectLater(
+      processor.decodeBytes(
+        Uint8List.fromList(img.encodePng(img.Image(width: 240, height: 120))),
+        label: 'platform.png',
+        decodeSettings: const ImageClipDecodeSettings.preview(
+          targetLongSide: 24,
+        ),
+      ),
+      throwsA(isA<ImageClipDecodeException>()),
+    );
+  });
+
   test('forwards progress from adapter-backed pipeline tasks', () async {
     final adapter = _FixtureDecodeAdapter(
       bytes: Uint8List.fromList(

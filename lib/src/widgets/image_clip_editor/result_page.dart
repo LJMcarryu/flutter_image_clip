@@ -77,7 +77,7 @@ class ImageClipResultPage extends StatelessWidget {
     super.key,
     required this.result,
     this.labels = const ImageClipEditorLabels(),
-    this.theme = const ImageClipEditorTheme.dark(),
+    this.theme = const ImageClipEditorTheme(),
   });
 
   /// Crop result to preview.

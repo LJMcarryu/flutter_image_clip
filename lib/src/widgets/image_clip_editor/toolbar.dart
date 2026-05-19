@@ -3,200 +3,289 @@ part of '../image_clip_editor.dart';
 class _CropTopBar extends StatelessWidget {
   const _CropTopBar({
     required this.isBusy,
-    required this.canSave,
     required this.labels,
     required this.theme,
     required this.onCancel,
-    required this.onSave,
   });
 
   final bool isBusy;
-  final bool canSave;
   final ImageClipEditorLabels labels;
   final ImageClipEditorTheme theme;
   final VoidCallback onCancel;
-  final VoidCallback onSave;
 
   @override
   Widget build(BuildContext context) {
-    final enabledColor = theme.primaryTextColor;
-    final disabledColor = theme.disabledTextColor;
-
     return Container(
-      height: 76,
+      height: theme.topBarHeight,
       decoration: BoxDecoration(
+        color: theme.surfaceColor,
         border: Border(bottom: BorderSide(color: theme.borderColor)),
       ),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          const SizedBox(width: 18),
-          _TextActionButton(
+          Expanded(
+            child: Text(
+              labels.editorTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: theme.primaryTextColor,
+                fontSize: 20,
+                height: 1.4,
+                letterSpacing: 0,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Semantics(
+            button: true,
+            enabled: !isBusy,
             label: labels.cancelButton,
-            color: enabledColor,
-            onPressed: isBusy ? null : onCancel,
+            child: ExcludeSemantics(
+              child: Tooltip(
+                message: labels.cancelButton,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: isBusy ? null : onCancel,
+                  child: SizedBox.square(
+                    key: const ValueKey('image_clip_editor_close_hit_area'),
+                    dimension: 44,
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: SizedBox.square(
+                        key: const ValueKey('image_clip_editor_close_icon'),
+                        dimension: 20,
+                        child: CustomPaint(
+                          painter: _CloseGlyphPainter(
+                            color: isBusy
+                                ? theme.disabledTextColor
+                                : theme.closeIconColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
-          const Spacer(),
-          _TextActionButton(
-            label: labels.saveButton,
-            color: canSave && !isBusy ? enabledColor : disabledColor,
-            onPressed: canSave && !isBusy ? onSave : null,
-          ),
-          const SizedBox(width: 18),
         ],
       ),
     );
   }
 }
 
-class _TextActionButton extends StatelessWidget {
-  const _TextActionButton({
-    required this.label,
-    required this.color,
-    required this.onPressed,
-  });
+class _CloseGlyphPainter extends CustomPainter {
+  const _CloseGlyphPainter({required this.color});
 
-  final String label;
   final Color color;
-  final VoidCallback? onPressed;
 
   @override
-  Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: onPressed,
-      style: TextButton.styleFrom(
-        foregroundColor: color,
-        textStyle: const TextStyle(fontSize: 26, fontWeight: FontWeight.w400),
-      ),
-      child: Text(label),
-    );
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.8
+      ..strokeCap = StrokeCap.square
+      ..style = PaintingStyle.stroke;
+    final left = size.width * 0.2;
+    final right = size.width * 0.8;
+    final top = size.height * 0.2;
+    final bottom = size.height * 0.8;
+    canvas.drawLine(Offset(left, top), Offset(right, bottom), paint);
+    canvas.drawLine(Offset(right, top), Offset(left, bottom), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CloseGlyphPainter oldDelegate) {
+    return oldDelegate.color != color;
   }
 }
 
 class _CropBottomBar extends StatelessWidget {
   const _CropBottomBar({
+    required this.height,
     required this.selectedAspectRatio,
     required this.aspectRatios,
     required this.scaleMode,
     required this.labels,
     required this.theme,
     required this.canRun,
+    required this.canSave,
     required this.onScaleModeToggle,
-    required this.onFlipHorizontal,
-    required this.onFlipVertical,
     required this.onRotate,
     required this.onAspectRatioChanged,
+    required this.onSave,
   });
 
+  final double height;
   final ImageClipAspectRatio selectedAspectRatio;
   final List<ImageClipAspectRatio> aspectRatios;
   final ImageClipScaleMode scaleMode;
   final ImageClipEditorLabels labels;
   final ImageClipEditorTheme theme;
   final bool canRun;
+  final bool canSave;
   final VoidCallback onScaleModeToggle;
-  final VoidCallback onFlipHorizontal;
-  final VoidCallback onFlipVertical;
   final VoidCallback onRotate;
   final ValueChanged<ImageClipAspectRatio> onAspectRatioChanged;
+  final VoidCallback onSave;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 500;
-        final barHeight = compact ? 202.0 : 236.0;
-        final toolGap = compact ? 14.0 : 28.0;
-        final modeGap = compact ? 24.0 : 40.0;
+        final barWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : 375.0;
+        final saveWidth = (barWidth - theme.bottomBarHorizontalPadding * 2)
+            .clamp(0, theme.maxSaveButtonWidth)
+            .toDouble();
 
         return Container(
-          height: barHeight,
+          height: height,
           decoration: BoxDecoration(
-            color: theme.backgroundColor,
+            color: theme.surfaceColor,
             border: Border(top: BorderSide(color: theme.borderColor)),
           ),
-          child: Center(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
+          child: ClipRect(
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
               child: SizedBox(
-                width: constraints.maxWidth.isFinite
-                    ? constraints.maxWidth
-                    : 440,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                width: barWidth,
+                height: theme.bottomBarContentHeight,
+                child: Stack(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _CropToolButton(
-                          icon: scaleMode == ImageClipScaleMode.fill
-                              ? Icons.fit_screen_outlined
-                              : Icons.fullscreen_outlined,
-                          label: scaleMode == ImageClipScaleMode.fill
-                              ? labels.fitButton
-                              : labels.fillButton,
-                          theme: theme,
-                          enabled: canRun,
-                          compact: compact,
-                          onPressed: onScaleModeToggle,
+                    Positioned(
+                      left: theme.bottomBarHorizontalPadding,
+                      right: theme.bottomBarHorizontalPadding,
+                      top: theme.positionHintTop,
+                      child: Text(
+                        labels.positionHint,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: theme.secondaryTextColor,
+                          fontSize: 11,
+                          height: 1.48,
+                          letterSpacing: 0.11,
+                          fontWeight: FontWeight.w400,
                         ),
-                        SizedBox(width: toolGap),
-                        _CropToolButton(
-                          icon: Icons.flip,
-                          label: labels.flipHorizontalButton,
-                          theme: theme,
-                          enabled: canRun,
-                          compact: compact,
-                          onPressed: onFlipHorizontal,
-                        ),
-                        SizedBox(width: toolGap),
-                        _CropToolButton(
-                          icon: Icons.flip_to_back_outlined,
-                          label: labels.flipVerticalButton,
-                          theme: theme,
-                          enabled: canRun,
-                          compact: compact,
-                          onPressed: onFlipVertical,
-                        ),
-                        SizedBox(width: toolGap),
-                        _CropToolButton(
-                          icon: Icons.rotate_90_degrees_cw_outlined,
-                          label: labels.rotateButton,
-                          theme: theme,
-                          enabled: canRun,
-                          compact: compact,
-                          onPressed: onRotate,
-                        ),
-                      ],
+                      ),
                     ),
-                    SizedBox(height: compact ? 18 : 28),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
+                    Positioned(
+                      top: theme.toolRowTop,
+                      left: 0,
+                      right: 0,
+                      height: 48,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          for (
-                            var index = 0;
-                            index < aspectRatios.length;
-                            index++
-                          )
-                            Padding(
-                              padding: EdgeInsets.only(
-                                left: index == 0 ? 0 : modeGap / 2,
-                                right: index == aspectRatios.length - 1
-                                    ? 0
-                                    : modeGap / 2,
-                              ),
-                              child: _AspectRatioChoice(
-                                aspectRatio: aspectRatios[index],
-                                selected:
-                                    selectedAspectRatio == aspectRatios[index],
-                                theme: theme,
-                                enabled: canRun,
-                                compact: compact,
-                                onSelected: onAspectRatioChanged,
+                          _CropToolButton(
+                            icon: scaleMode == ImageClipScaleMode.fill
+                                ? _CropToolIcon.fit
+                                : Icons.fullscreen_outlined,
+                            label: scaleMode == ImageClipScaleMode.fill
+                                ? labels.fitButton
+                                : labels.fillButton,
+                            theme: theme,
+                            enabled: canRun,
+                            onPressed: onScaleModeToggle,
+                          ),
+                          SizedBox(width: theme.toolButtonGap),
+                          _CropToolButton(
+                            icon: _CropToolIcon.rotate,
+                            label: labels.rotateButton,
+                            theme: theme,
+                            enabled: canRun,
+                            onPressed: onRotate,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      top: theme.aspectRatioRowTop,
+                      left: 0,
+                      right: 0,
+                      height: 57,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minWidth: barWidth),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              for (
+                                var index = 0;
+                                index < aspectRatios.length;
+                                index++
+                              )
+                                Padding(
+                                  padding: EdgeInsets.only(
+                                    left: index == 0 ? 0 : theme.aspectRatioGap,
+                                  ),
+                                  child: _AspectRatioChoice(
+                                    aspectRatio: aspectRatios[index],
+                                    selected:
+                                        selectedAspectRatio ==
+                                        aspectRatios[index],
+                                    theme: theme,
+                                    enabled: canRun,
+                                    onSelected: onAspectRatioChanged,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: theme.saveButtonTop,
+                      left: 0,
+                      right: 0,
+                      height: theme.saveButtonHeight,
+                      child: Center(
+                        child: SizedBox(
+                          key: const ValueKey('image_clip_editor_save_action'),
+                          width: saveWidth,
+                          height: theme.saveButtonHeight,
+                          child: Semantics(
+                            button: true,
+                            enabled: canSave,
+                            label: labels.saveButton,
+                            child: ExcludeSemantics(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: canSave ? onSave : null,
+                                child: DecoratedBox(
+                                  decoration: ShapeDecoration(
+                                    color: canSave
+                                        ? theme.accentColor
+                                        : theme.tileColor,
+                                    shape: const StadiumBorder(),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      labels.saveButton,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: canSave
+                                            ? theme.onAccentColor
+                                            : theme.disabledTextColor,
+                                        fontSize: 16,
+                                        height: 1.4,
+                                        letterSpacing: 0,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
-                        ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -210,26 +299,26 @@ class _CropBottomBar extends StatelessWidget {
   }
 }
 
+enum _CropToolIcon { fit, rotate }
+
 class _CropToolButton extends StatelessWidget {
   const _CropToolButton({
     required this.icon,
     required this.label,
     required this.theme,
     required this.enabled,
-    required this.compact,
     required this.onPressed,
   });
 
-  final IconData icon;
+  final Object icon;
   final String label;
   final ImageClipEditorTheme theme;
   final bool enabled;
-  final bool compact;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final color = enabled ? theme.primaryTextColor : theme.disabledTextColor;
+    final color = enabled ? theme.controlTextColor : theme.disabledTextColor;
 
     return Semantics(
       button: true,
@@ -239,20 +328,41 @@ class _CropToolButton extends StatelessWidget {
       label: label,
       child: InkResponse(
         onTap: enabled ? onPressed : null,
-        radius: 44,
+        radius: 32,
         child: SizedBox(
-          width: compact ? 82 : 92,
+          width: 64,
+          height: 48,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: color, size: compact ? 32 : 38),
-              SizedBox(height: compact ? 6 : 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: compact ? 20 : 22,
-                  fontWeight: FontWeight.w400,
+              SizedBox.square(
+                dimension: 22,
+                child: switch (icon) {
+                  _CropToolIcon.fit => CustomPaint(
+                    painter: _FitGlyphPainter(color: color),
+                  ),
+                  _CropToolIcon.rotate => CustomPaint(
+                    painter: _RotateGlyphPainter(color: color),
+                  ),
+                  _ => Icon(icon as IconData, color: color, size: 22),
+                },
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 20,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 14,
+                      height: 20 / 14,
+                      letterSpacing: 0,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -263,13 +373,116 @@ class _CropToolButton extends StatelessWidget {
   }
 }
 
+class _FitGlyphPainter extends CustomPainter {
+  const _FitGlyphPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final sx = size.width / 22;
+    final sy = size.height / 22;
+    canvas.save();
+    canvas.scale(sx, sy);
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.83333
+      ..strokeCap = StrokeCap.square
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    final path = Path()
+      ..moveTo(3, 7.4)
+      ..lineTo(3, 3)
+      ..lineTo(7.4, 3)
+      ..moveTo(3, 3)
+      ..lineTo(8.5, 8.5)
+      ..moveTo(14.6, 3)
+      ..lineTo(19, 3)
+      ..lineTo(19, 7.4)
+      ..moveTo(19, 3)
+      ..lineTo(13.5, 8.5)
+      ..moveTo(3, 14.6)
+      ..lineTo(3, 19)
+      ..lineTo(7.4, 19)
+      ..moveTo(3, 19)
+      ..lineTo(8.5, 13.5)
+      ..moveTo(14.6, 19)
+      ..lineTo(19, 19)
+      ..lineTo(19, 14.6)
+      ..moveTo(19, 19)
+      ..lineTo(13.5, 13.5);
+    canvas.drawPath(path, paint);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _FitGlyphPainter oldDelegate) {
+    return oldDelegate.color != color;
+  }
+}
+
+class _RotateGlyphPainter extends CustomPainter {
+  const _RotateGlyphPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.83333
+      ..strokeCap = StrokeCap.square
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    canvas.save();
+    canvas.translate(size.width * 0.125, size.height * 0.125);
+    canvas.scale(
+      (size.width * 0.7386) / 18.0833,
+      (size.height * 0.75) / 18.3333,
+    );
+    final arc = Path()
+      ..moveTo(17.1667, 9.66667)
+      ..cubicTo(17.1667, 11.2984, 16.9328, 12.3934, 16.0263, 13.7501)
+      ..cubicTo(15.1198, 15.1068, 13.8313, 16.1643, 12.3238, 16.7887)
+      ..cubicTo(10.8163, 17.4131, 9.15752, 17.5765, 7.55718, 17.2581)
+      ..cubicTo(5.95683, 16.9398, 4.48682, 16.1541, 3.33304, 15.0003)
+      ..cubicTo(2.17926, 13.8465, 1.39352, 12.3765, 1.07519, 10.7762)
+      ..cubicTo(0.756864, 9.17582, 0.920242, 7.51702, 1.54466, 6.00953)
+      ..cubicTo(2.16909, 4.50204, 3.22651, 3.21356, 4.58322, 2.30704)
+      ..cubicTo(5.93992, 1.40052, 7.53498, 0.916667, 9.16667, 0.916667)
+      ..cubicTo(11.4767, 0.916667, 13.6858, 1.83333, 15.345, 3.42833)
+      ..lineTo(16.6667, 4.66667);
+    canvas.drawPath(arc, paint);
+    canvas.restore();
+
+    canvas.save();
+    canvas.translate(size.width * 0.6667, size.height * 0.125);
+    canvas.scale(
+      (size.width * 0.2083) / 6.41667,
+      (size.height * 0.2083) / 6.41667,
+    );
+    final arrow = Path()
+      ..moveTo(5.5, 0.916667)
+      ..lineTo(5.5, 5.5)
+      ..lineTo(0.916667, 5.5);
+    canvas.drawPath(arrow, paint);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _RotateGlyphPainter oldDelegate) {
+    return oldDelegate.color != color;
+  }
+}
+
 class _AspectRatioChoice extends StatelessWidget {
   const _AspectRatioChoice({
     required this.aspectRatio,
     required this.selected,
     required this.theme,
     required this.enabled,
-    required this.compact,
     required this.onSelected,
   });
 
@@ -277,16 +490,13 @@ class _AspectRatioChoice extends StatelessWidget {
   final bool selected;
   final ImageClipEditorTheme theme;
   final bool enabled;
-  final bool compact;
   final ValueChanged<ImageClipAspectRatio> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    final color = !enabled
-        ? theme.disabledTextColor
-        : selected
-        ? theme.primaryTextColor
-        : theme.inactiveTextColor;
+    final textColor = enabled
+        ? theme.controlTextColor
+        : theme.disabledTextColor;
 
     return Semantics(
       button: true,
@@ -299,24 +509,34 @@ class _AspectRatioChoice extends StatelessWidget {
         onTap: enabled ? () => onSelected(aspectRatio) : null,
         radius: 48,
         child: SizedBox(
-          width: compact ? 104 : 116,
+          width: 64,
+          height: 57,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               _AspectRatioGlyph(
                 aspectRatio: aspectRatio,
-                color: color,
+                selected: selected,
+                enabled: enabled,
                 theme: theme,
-                compact: compact,
               ),
-              SizedBox(height: compact ? 8 : 12),
-              Text(
-                aspectRatio.label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: color,
-                  fontSize: compact ? 20 : 22,
-                  fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 16.5,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    aspectRatio.label,
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 11,
+                      height: 16.5 / 11,
+                      letterSpacing: 0.0645,
+                      fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -330,20 +550,20 @@ class _AspectRatioChoice extends StatelessWidget {
 class _AspectRatioGlyph extends StatelessWidget {
   const _AspectRatioGlyph({
     required this.aspectRatio,
-    required this.color,
+    required this.selected,
+    required this.enabled,
     required this.theme,
-    required this.compact,
   });
 
   final ImageClipAspectRatio aspectRatio;
-  final Color color;
+  final bool selected;
+  final bool enabled;
   final ImageClipEditorTheme theme;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final maxWidth = compact ? 54.0 : 62.0;
-    final maxHeight = compact ? 42.0 : 48.0;
+    const maxWidth = 28.0;
+    const maxHeight = 28.0;
     final ratio = aspectRatio.value;
     var glyphWidth = maxWidth;
     var glyphHeight = glyphWidth / ratio;
@@ -355,13 +575,23 @@ class _AspectRatioGlyph extends StatelessWidget {
 
     return SizedBox(
       width: 64,
-      height: compact ? 46 : 52,
+      height: 32,
       child: Center(
         child: DecoratedBox(
           decoration: BoxDecoration(
+            color: !enabled
+                ? _imageClipColorWithOpacity(theme.tileColor, 0.5)
+                : selected
+                ? theme.accentSurfaceColor
+                : theme.tileColor,
             border: Border.all(
-              color: color,
+              color: selected && enabled
+                  ? theme.accentColor
+                  : Colors.transparent,
               width: theme.aspectRatioBorderWidth,
+            ),
+            borderRadius: BorderRadius.circular(
+              theme.aspectRatioGlyphBorderRadius,
             ),
           ),
           child: SizedBox(width: size.width, height: size.height),

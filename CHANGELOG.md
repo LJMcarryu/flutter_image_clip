@@ -1,3 +1,21 @@
+# 0.7.0
+
+- Android 集成测试迁移到 `example/integration_test`，避免根包本地 app scaffold 干扰插件编译；CI 会在 example 中创建 Android 工程后运行设备测试。
+- 根包移除 `integration_test` 开发依赖，示例 App 单独声明集成测试依赖。
+- 编辑器不再内置 Inter 字体，默认继承业务 App 字体，减少发布包体积和样式侵入。
+- 根包兼容性声明调整为 Dart `>=3.10.0 <4.0.0`、Flutter `>=3.38.1`，避免 Dart / Flutter 最低版本不一致。
+- CI 主校验、发布校验和 Android 集成测试增加最低 Flutter `3.38.1` 与最新 stable 双版本覆盖。
+- CI 新增 iOS simulator 集成测试，Android/iOS 都会在 example App 中覆盖原生 sampled decode。
+- `ImageClipPlatformDecodeAdapter` 将平台侧错误映射为 `ImageClipUnsupportedFormatException`、`ImageClipPlatformException` 或 `ImageClipDecodeException`。
+- Android 原生 sampled decode 现在保留原图尺寸元数据，预览裁剪坐标可稳定映射回原图。
+- `ImageClipEditorTheme` 新增顶部栏、底部栏、保存按钮和比例选项间距等布局 token，业务可以更完整地对齐设计系统。
+- iOS plugin 新增 `PrivacyInfo.xcprivacy`，声明不采集数据、不追踪用户且不使用 required reason API。
+- 发布包通过 `.pubignore` 收敛内容，排除测试、benchmark、tool 和集成测试 scaffold。
+- 新增接入配方、平台矩阵和可访问性检查清单文档。
+- 公开 API snapshot 改为基于 analyzer 生成完整导出快照，减少 semver 漏检。
+- Android 集成测试增加命令级和用例级超时，并在等待图片处理或裁剪结果超时时给出明确失败原因。
+- README 补充兼容性策略和公开 API 导入约定。
+
 # 0.6.6
 
 - 包结构升级为 Android/iOS Flutter plugin，内置 `ImageClipPlatformDecodeAdapter`，支持平台侧 sampled decode 和 HEIC/HEIF 等格式归一化入口。

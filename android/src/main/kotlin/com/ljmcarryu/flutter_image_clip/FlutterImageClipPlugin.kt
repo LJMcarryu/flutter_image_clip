@@ -53,6 +53,10 @@ class FlutterImageClipPlugin : FlutterPlugin, MethodCallHandler {
                     "sourceHeight" to decoded.sourceHeight
                 )
             )
+        } catch (error: UnsupportedImageFormatException) {
+            result.error("unsupported_format", error.message ?: "Unsupported image format", null)
+        } catch (error: IllegalArgumentException) {
+            result.error("invalid_args", error.message ?: "Invalid decode arguments", null)
         } catch (error: Throwable) {
             result.error("decode_failed", error.message ?: "Unable to decode image", null)
         }
@@ -60,11 +64,12 @@ class FlutterImageClipPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun decodeImage(bytes: ByteArray, targetLongSide: Int?): DecodeResult {
         val orientation = readOrientation(bytes)
+        val sourceSize = readSourceSize(bytes, orientation)
         val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             decodeWithImageDecoder(bytes, targetLongSide)
         } else {
             decodeWithBitmapFactory(bytes, targetLongSide)
-        } ?: throw IllegalArgumentException("Unsupported image format")
+        } ?: throw UnsupportedImageFormatException("Unsupported image format")
 
         val oriented = applyOrientation(bitmap, orientation)
         if (oriented !== bitmap) {
@@ -74,11 +79,30 @@ class FlutterImageClipPlugin : FlutterPlugin, MethodCallHandler {
         val output = ByteArrayOutputStream()
         oriented.compress(Bitmap.CompressFormat.PNG, 100, output)
         val encoded = output.toByteArray()
-        val sourceWidth = oriented.width
-        val sourceHeight = oriented.height
+        val sourceWidth = sourceSize?.first ?: oriented.width
+        val sourceHeight = sourceSize?.second ?: oriented.height
         oriented.recycle()
 
         return DecodeResult(encoded, sourceWidth, sourceHeight)
+    }
+
+    private fun readSourceSize(bytes: ByteArray, orientation: Int): Pair<Int, Int>? {
+        val bounds = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            return null
+        }
+        val swapsAxes = orientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+            orientation == ExifInterface.ORIENTATION_ROTATE_90 ||
+            orientation == ExifInterface.ORIENTATION_TRANSVERSE ||
+            orientation == ExifInterface.ORIENTATION_ROTATE_270
+        return if (swapsAxes) {
+            Pair(bounds.outHeight, bounds.outWidth)
+        } else {
+            Pair(bounds.outWidth, bounds.outHeight)
+        }
     }
 
     private fun decodeWithImageDecoder(bytes: ByteArray, targetLongSide: Int?): Bitmap? {
@@ -173,4 +197,6 @@ class FlutterImageClipPlugin : FlutterPlugin, MethodCallHandler {
         val sourceWidth: Int,
         val sourceHeight: Int
     )
+
+    private class UnsupportedImageFormatException(message: String) : Exception(message)
 }

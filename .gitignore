@@ -53,6 +53,8 @@ pubspec.lock
 /ios/*
 !/ios/Classes/
 !/ios/Classes/**
+!/ios/Resources/
+!/ios/Resources/**
 !/ios/flutter_image_clip.podspec
 /linux/
 /macos/

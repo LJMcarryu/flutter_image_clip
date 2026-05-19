@@ -29,7 +29,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.6.6
+  flutter_image_clip: ^0.7.0
 ```
 
 然后执行：
@@ -46,7 +46,15 @@ dependencies:
     path: /Users/admin/Desktop/demos/flutter_image_clip_demo
 ```
 
+## 文档导航
+
+- [常见接入配方](guides/接入配方.md)：头像、封面、`image_picker`、HEIC、文件路径、大图和异常处理。
+- [平台与 CI 矩阵](guides/平台矩阵.md)：Android/iOS 原生解码能力、设备测试覆盖和发布前校验。
+- [可访问性检查清单](guides/可访问性检查清单.md)：VoiceOver、TalkBack、大字体、键盘和对比度验收项。
+
 ## 使用裁剪 UI
+
+默认编辑器采用移动端底部操作布局：顶部为 `Position` 标题和关闭按钮，中间为图片定位预览区，底部包含 Fit / Fill 切换、Rotate、比例选项和保存按钮。默认比例选项展示为 `3:4`、`4:3` 等比例文本。比例支持自定义：通过 `aspectRatios` 传入任意 `ImageClipAspectRatio(label, width, height)`，`label` 只负责 UI 文案，实际裁剪比例由 `width / height` 决定。需要固定主裁剪预览区高度时，可以设置 `cropAreaHeight`；不设置时继续自适应填满剩余空间。
 
 ```dart
 import 'package:flutter_image_clip/flutter_image_clip.dart';
@@ -61,6 +69,8 @@ final result = await showImageClipEditor(
     ImageClipAspectRatio.portrait,
     ImageClipAspectRatio.landscape,
     ImageClipAspectRatio.widescreen,
+    ImageClipAspectRatio.ratio16x10,
+    ImageClipAspectRatio.ratio10x16,
   ],
   outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 88),
   previewDecodeSettings: const ImageClipDecodeSettings.preview(
@@ -74,6 +84,7 @@ final result = await showImageClipEditor(
   theme: ImageClipEditorTheme.fromColorScheme(
     Theme.of(context).colorScheme,
   ),
+  cropAreaHeight: 456,
   onProgress: (progress) {
     debugPrint('${progress.stage.name}: ${progress.fraction}');
   },
@@ -131,9 +142,12 @@ ImageClipEditor(
   aspectRatios: const [
     ImageClipAspectRatio.square,
     ImageClipAspectRatio.widescreen,
+    ImageClipAspectRatio.ratio16x10,
+    ImageClipAspectRatio.ratio10x16,
     ImageClipAspectRatio(label: 'Banner', width: 3, height: 1),
   ],
   outputSettings: const ImageClipOutputSettings.png(),
+  cropAreaHeight: 420,
   previewDecodeSettings: const ImageClipDecodeSettings.preview(
     targetLongSide: 1280,
   ),
@@ -183,30 +197,43 @@ controller.cancelTask();
 ```dart
 ImageClipEditor(
   labels: const ImageClipEditorLabels(
+    editorTitle: 'Position',
+    positionHint: 'Pinch to zoom • Drag to reposition',
     cancelButton: 'Close',
     saveButton: 'Use photo',
-    flipHorizontalButton: 'Flip H',
-    flipVerticalButton: 'Flip V',
+    fitButton: 'Fit',
+    fillButton: 'Fill',
     rotateButton: 'Rotate',
     cropCompleteStatus: 'Photo cropped',
   ),
 )
 ```
 
+`flipHorizontalButton` 和 `flipVerticalButton` 仍会用于结果页元数据；默认编辑器工具栏不再展示翻转按钮，业务可以通过 `ImageClipEditorController.flipHorizontal()` 和 `ImageClipEditorController.flipVertical()` 主动触发。
+
+顶部左侧标题通过 `ImageClipEditorLabels.editorTitle` 传入，底部提示文案通过 `ImageClipEditorLabels.positionHint` 传入；`showImageClipEditor` 和嵌入式 `ImageClipEditor` 两种入口都会使用同一套 `labels` 配置。
+
 ## 自定义主题
 
 ```dart
 ImageClipEditor(
   theme: const ImageClipEditorTheme(
-    backgroundColor: Color(0xFF111827),
-    surfaceColor: Color(0xFF1F2937),
-    primaryTextColor: Color(0xFFF9FAFB),
-    secondaryTextColor: Color(0xFFCBD5E1),
-    cropBorderColor: Color(0xFFF59E0B),
-    cropGridColor: Color(0x99F59E0B),
+    backgroundColor: Color(0xFFFFFFFF),
+    previewBackgroundColor: Color(0xFFF8F9FA),
+    surfaceColor: Color(0xFFFFFFFF),
+    imageBackgroundColor: Color(0xFFF8F9FA),
+    primaryTextColor: Color(0xFF05120D),
+    secondaryTextColor: Color(0xFF6A7282),
+    accentColor: Color(0xFF10B062),
+    accentSurfaceColor: Color(0xFFD6F1E1),
+    onAccentColor: Color(0xFFFFFFFF),
+    cropShadeColor: Color(0x80000000),
+    cropBorderColor: Color(0xFFFFFFFF),
   ),
 )
 ```
+
+如果需要旧版深色视觉，可以使用 `const ImageClipEditorTheme.dark()` 作为起点再覆盖 token。
 
 也可以从业务 App 的 `ColorScheme` 生成：
 
@@ -214,6 +241,23 @@ ImageClipEditor(
 ImageClipEditor(
   theme: ImageClipEditorTheme.fromColorScheme(
     Theme.of(context).colorScheme,
+  ),
+)
+```
+
+工具栏高度、保存按钮尺寸和比例选项间距也可以通过同一个 theme 调整，便于业务 App 对齐自己的设计系统：
+
+```dart
+ImageClipEditor(
+  theme: const ImageClipEditorTheme(
+    topBarHeight: 60,
+    bottomBarHeight: 320,
+    compactBottomBarHeight: 200,
+    bottomBarContentHeight: 320,
+    maxSaveButtonWidth: 280,
+    saveButtonHeight: 44,
+    toolButtonGap: 36,
+    aspectRatioGap: 18,
   ),
 )
 ```
@@ -375,8 +419,12 @@ class NativeDecodeAdapter extends ImageClipDecodeAdapter {
   const NativeDecodeAdapter();
 
   @override
-  bool supports(ImageClipImageInfo info) {
-    return !info.canDecodeWithDart || info.hasDimensions;
+  bool supportsDecode(
+    ImageClipImageInfo info,
+    ImageClipDecodeSettings settings,
+  ) {
+    return settings.usePlatformAdapter &&
+        (!info.canDecodeWithDart || info.hasDimensions);
   }
 
   @override
@@ -398,6 +446,8 @@ class NativeDecodeAdapter extends ImageClipDecodeAdapter {
   }
 }
 ```
+
+平台侧会把常见失败映射为 Dart typed exception：不支持的格式抛出 `ImageClipUnsupportedFormatException`，参数或通道前置错误抛出 `ImageClipPlatformException`，原生解码或编码失败抛出 `ImageClipDecodeException`。
 
 ## 性能基准
 
@@ -440,19 +490,27 @@ try {
 const ImageClipProcessingSettings.unrestricted()
 ```
 
+## 兼容性策略
+
+业务侧应从 `package:flutter_image_clip/flutter_image_clip.dart` 导入公开 API，避免直接依赖 `src/` 下的内部实现。项目使用 `tool/check_api_snapshot.dart` 检查完整公开 API 快照；发布破坏性变更时提升主版本号，新增能力提升次版本号，纯修复提升 patch 版本，并在 `CHANGELOG.md` 中给出迁移说明。
+
+根包兼容性声明为 Dart `>=3.10.0 <4.0.0`、Flutter `>=3.38.1`。CI 同时覆盖最低支持版本和最新 stable，避免示例 App 或工具链升级后虚标兼容范围。编辑器默认继承业务 App 字体，不随库打包自定义字体，避免增加包体积或覆盖业务品牌风格。
+
 ## 本地开发
 
 ```sh
 flutter pub get
-dart format lib test example
+dart format lib test benchmark tool example/lib example/integration_test
 flutter analyze
 flutter test
-flutter test integration_test
 dart run tool/check_api_snapshot.dart
 dart run benchmark/image_processor_benchmark.dart --check benchmark/baseline.json
 dart doc --output doc/api
-flutter pub publish --dry-run
-flutter run -t example/lib/main.dart
+dart pub publish --dry-run
+cd example
+flutter pub get
+flutter test integration_test
+flutter run
 ```
 
 ## 许可证

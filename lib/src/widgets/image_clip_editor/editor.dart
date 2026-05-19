@@ -1,6 +1,9 @@
 part of '../image_clip_editor.dart';
 
 /// Opens a full-screen image crop editor and returns an [ImageClipResult].
+///
+/// Set [cropAreaHeight] to pin the main crop preview area to a fixed height.
+/// When omitted, the preview keeps the default adaptive height.
 Future<ImageClipResult?> showImageClipEditor(
   BuildContext context, {
   Uint8List? imageBytes,
@@ -10,14 +13,15 @@ Future<ImageClipResult?> showImageClipEditor(
       ImageClipCropOrientation.portrait,
   ImageClipAspectRatio? initialAspectRatio,
   List<ImageClipAspectRatio> aspectRatios = ImageClipAspectRatio.defaults,
-  ImageClipScaleMode initialScaleMode = ImageClipScaleMode.fill,
+  ImageClipScaleMode initialScaleMode = ImageClipScaleMode.fit,
   ImageClipOutputSettings outputSettings = const ImageClipOutputSettings.png(),
   ImageClipDecodeSettings previewDecodeSettings =
       const ImageClipDecodeSettings(),
   ImageClipProcessingSettings processingSettings =
       const ImageClipProcessingSettings(),
   ImageClipEditorLabels labels = const ImageClipEditorLabels(),
-  ImageClipEditorTheme theme = const ImageClipEditorTheme.dark(),
+  ImageClipEditorTheme theme = const ImageClipEditorTheme(),
+  double? cropAreaHeight,
   bool loadSampleOnStart = true,
   bool useRootNavigator = false,
   RouteSettings? routeSettings,
@@ -40,6 +44,7 @@ Future<ImageClipResult?> showImageClipEditor(
           processingSettings: processingSettings,
           labels: labels,
           theme: theme,
+          cropAreaHeight: cropAreaHeight,
           loadSampleOnStart: loadSampleOnStart,
           closeOnCancel: true,
           closeOnSave: true,
@@ -71,22 +76,18 @@ class ImageClipAspectRatio {
        assert(height > 0);
 
   /// Square 1:1 crop preset.
-  static const square = ImageClipAspectRatio(
-    label: 'Square',
-    width: 1,
-    height: 1,
-  );
+  static const square = ImageClipAspectRatio(label: '1:1', width: 1, height: 1);
 
   /// Portrait 3:4 crop preset.
   static const portrait = ImageClipAspectRatio(
-    label: 'Portrait',
+    label: '3:4',
     width: 3,
     height: 4,
   );
 
   /// Landscape 4:3 crop preset.
   static const landscape = ImageClipAspectRatio(
-    label: 'Landscape',
+    label: '4:3',
     width: 4,
     height: 3,
   );
@@ -96,6 +97,20 @@ class ImageClipAspectRatio {
     label: '16:9',
     width: 16,
     height: 9,
+  );
+
+  /// Landscape 16:10 crop preset.
+  static const ratio16x10 = ImageClipAspectRatio(
+    label: '16:10',
+    width: 16,
+    height: 10,
+  );
+
+  /// Portrait 10:16 crop preset.
+  static const ratio10x16 = ImageClipAspectRatio(
+    label: '10:16',
+    width: 10,
+    height: 16,
   );
 
   /// Default presets shown by the editor.
@@ -156,12 +171,13 @@ class ImageClipEditor extends StatefulWidget {
     this.initialOrientation = ImageClipCropOrientation.portrait,
     this.initialAspectRatio,
     this.aspectRatios = ImageClipAspectRatio.defaults,
-    this.initialScaleMode = ImageClipScaleMode.fill,
+    this.initialScaleMode = ImageClipScaleMode.fit,
     this.outputSettings = const ImageClipOutputSettings.png(),
     this.previewDecodeSettings = const ImageClipDecodeSettings(),
     this.processingSettings = const ImageClipProcessingSettings(),
     this.labels = const ImageClipEditorLabels(),
-    this.theme = const ImageClipEditorTheme.dark(),
+    this.theme = const ImageClipEditorTheme(),
+    this.cropAreaHeight,
     this.loadSampleOnStart = true,
     this.closeOnCancel = false,
     this.closeOnSave = false,
@@ -169,7 +185,7 @@ class ImageClipEditor extends StatefulWidget {
     this.onCancel,
     this.onProgress,
     this.onResult,
-  });
+  }) : assert(cropAreaHeight == null || cropAreaHeight > 0);
 
   /// Optional controller used to drive this editor from parent widgets.
   final ImageClipEditorController? controller;
@@ -216,6 +232,13 @@ class ImageClipEditor extends StatefulWidget {
 
   /// Visual tokens used by the editor.
   final ImageClipEditorTheme theme;
+
+  /// Fixed height for the main crop preview area.
+  ///
+  /// When null, the preview area fills the remaining vertical space above the
+  /// bottom toolbar. When set, the value is clamped at layout time so the bottom
+  /// toolbar keeps a usable minimum height on short screens.
+  final double? cropAreaHeight;
 
   /// Whether to generate a sample image when [initialImageBytes] is null.
   final bool loadSampleOnStart;
@@ -332,24 +355,20 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     return Scaffold(
       backgroundColor: widget.theme.backgroundColor,
       body: SafeArea(
-        child: Column(
-          children: [
-            _CropTopBar(
-              isBusy: _isBusy,
-              canSave: _image != null,
-              labels: widget.labels,
-              theme: widget.theme,
-              onCancel: _cancelCrop,
-              onSave: _applyCrop,
-            ),
-            if (_isBusy)
-              LinearProgressIndicator(
-                value: _progressValue,
-                minHeight: 2,
-                color: widget.theme.progressColor,
-                backgroundColor: widget.theme.borderColor,
-              ),
-            Expanded(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final busyHeight = _isBusy ? 2.0 : 0.0;
+            final cropAreaHeight = _cropAreaHeightFor(
+              constraints.maxHeight,
+              busyHeight: busyHeight,
+            );
+            final bottomBarHeight = _bottomBarHeightFor(
+              constraints.maxHeight,
+              busyHeight: busyHeight,
+              cropAreaHeight: cropAreaHeight,
+            );
+            final preview = KeyedSubtree(
+              key: const ValueKey('image_clip_editor_crop_area'),
               child: _PreviewPanel(
                 key: _previewKey,
                 image: _image,
@@ -361,24 +380,99 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
                 labels: widget.labels,
                 theme: widget.theme,
               ),
-            ),
-            _CropBottomBar(
-              selectedAspectRatio: _cropAspectRatio,
-              aspectRatios: _aspectRatioChoices,
-              scaleMode: _cropScaleMode,
-              labels: widget.labels,
-              theme: widget.theme,
-              canRun: _image != null && !_isBusy,
-              onScaleModeToggle: _toggleScaleMode,
-              onFlipHorizontal: _flipHorizontalPreview,
-              onFlipVertical: _flipVerticalPreview,
-              onRotate: _rotateRight,
-              onAspectRatioChanged: _setCropAspectRatio,
-            ),
-          ],
+            );
+
+            return Column(
+              children: [
+                _CropTopBar(
+                  isBusy: _isBusy,
+                  labels: widget.labels,
+                  theme: widget.theme,
+                  onCancel: _cancelCrop,
+                ),
+                if (_isBusy)
+                  LinearProgressIndicator(
+                    value: _progressValue,
+                    minHeight: busyHeight,
+                    color: widget.theme.progressColor,
+                    backgroundColor: widget.theme.borderColor,
+                  ),
+                if (cropAreaHeight == null)
+                  Expanded(child: preview)
+                else
+                  SizedBox(height: cropAreaHeight, child: preview),
+                _CropBottomBar(
+                  height: bottomBarHeight,
+                  selectedAspectRatio: _cropAspectRatio,
+                  aspectRatios: _aspectRatioChoices,
+                  scaleMode: _cropScaleMode,
+                  labels: widget.labels,
+                  theme: widget.theme,
+                  canRun: _image != null && !_isBusy,
+                  canSave: _image != null && !_isBusy,
+                  onScaleModeToggle: _toggleScaleMode,
+                  onRotate: _rotateRight,
+                  onAspectRatioChanged: _setCropAspectRatio,
+                  onSave: _applyCrop,
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
+  }
+
+  double? _cropAreaHeightFor(
+    double availableHeight, {
+    required double busyHeight,
+  }) {
+    final requestedHeight = widget.cropAreaHeight;
+    if (requestedHeight == null || !availableHeight.isFinite) {
+      return requestedHeight;
+    }
+
+    final topBarHeight = widget.theme.topBarHeight;
+    final compactBottomBarHeight = widget.theme.compactBottomBarHeight;
+    final maxHeight =
+        availableHeight - topBarHeight - busyHeight - compactBottomBarHeight;
+    if (maxHeight <= 0) {
+      return 0;
+    }
+    return requestedHeight.clamp(0, maxHeight).toDouble();
+  }
+
+  double _bottomBarHeightFor(
+    double availableHeight, {
+    required double busyHeight,
+    double? cropAreaHeight,
+  }) {
+    final topBarHeight = widget.theme.topBarHeight;
+    final targetBottomBarHeight = widget.theme.bottomBarHeight;
+    final compactBottomBarHeight = widget.theme.compactBottomBarHeight;
+
+    if (cropAreaHeight != null && availableHeight.isFinite) {
+      final height =
+          availableHeight - topBarHeight - busyHeight - cropAreaHeight;
+      return height.clamp(0, double.infinity).toDouble();
+    }
+
+    if (!availableHeight.isFinite) {
+      return targetBottomBarHeight;
+    }
+
+    final usableHeight = availableHeight - topBarHeight - busyHeight;
+    if (usableHeight <= compactBottomBarHeight) {
+      return usableHeight.clamp(0, targetBottomBarHeight).toDouble();
+    }
+
+    final minPreviewHeight = (availableHeight * 0.32)
+        .clamp(112, targetBottomBarHeight)
+        .toDouble();
+    final adaptiveHeight = usableHeight - minPreviewHeight;
+    return adaptiveHeight
+        .clamp(compactBottomBarHeight, targetBottomBarHeight)
+        .toDouble();
   }
 
   Future<void> _loadInitialImage() {

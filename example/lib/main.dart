@@ -1,6 +1,22 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_image_clip/flutter_image_clip.dart';
 import 'package:image_picker/image_picker.dart';
+
+const _demoAspectRatios = <ImageClipAspectRatio>[
+  ImageClipAspectRatio.square,
+  ImageClipAspectRatio.portrait,
+  ImageClipAspectRatio.landscape,
+  ImageClipAspectRatio.widescreen,
+  ImageClipAspectRatio.ratio16x10,
+  ImageClipAspectRatio.ratio10x16,
+];
+const _demoOutputSettings = ImageClipOutputSettings.jpeg(jpegQuality: 88);
+const _demoLabels = ImageClipEditorLabels(
+  positionHint: 'Pinch to zoom • Drag to reposition',
+  saveButton: 'Save',
+);
 
 void main() {
   runApp(const ImageClipExampleApp());
@@ -41,6 +57,8 @@ class _ImageClipExampleHomeState extends State<ImageClipExampleHome> {
   final _processor = const ImageProcessor();
   final _picker = ImagePicker();
 
+  Uint8List? _pickedImageBytes;
+  String _pickedImageLabel = '';
   ImageClipImageInfo? _inputInfo;
   ImageClipResult? _result;
   ImageClipTaskProgress? _progress;
@@ -48,30 +66,8 @@ class _ImageClipExampleHomeState extends State<ImageClipExampleHome> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final editorTheme = ImageClipEditorTheme.fromColorScheme(colorScheme);
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Image Clip Lab'),
-        actions: [
-          IconButton(
-            onPressed: _pickFromGallery,
-            icon: const Icon(Icons.photo_library_outlined),
-            tooltip: 'Gallery',
-          ),
-          IconButton(
-            onPressed: _loadSample,
-            icon: const Icon(Icons.image_search_outlined),
-            tooltip: 'Sample',
-          ),
-          IconButton(
-            onPressed: _controller.isBusy ? _cancelTask : null,
-            icon: const Icon(Icons.stop_circle_outlined),
-            tooltip: 'Cancel task',
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Image Clip Lab')),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -80,22 +76,20 @@ class _ImageClipExampleHomeState extends State<ImageClipExampleHome> {
               result: _result,
               progress: _progress,
               status: _status,
+              canCancel: _controller.isBusy,
+              onPickFromGallery: _pickFromGallery,
+              onLoadSample: _loadSample,
+              onOpenFullscreen: _openFullscreenEditor,
+              onCancelTask: _cancelTask,
             );
             final editor = ImageClipEditor(
               controller: _controller,
+              cropAreaHeight: 800,
               loadSampleOnStart: true,
               showResultPage: false,
-              aspectRatios: const <ImageClipAspectRatio>[
-                ImageClipAspectRatio.square,
-                ImageClipAspectRatio.portrait,
-                ImageClipAspectRatio.landscape,
-                ImageClipAspectRatio.widescreen,
-              ],
-              outputSettings: const ImageClipOutputSettings.jpeg(
-                jpegQuality: 88,
-              ),
-              theme: editorTheme,
-              labels: const ImageClipEditorLabels(saveButton: 'Export'),
+              aspectRatios: _demoAspectRatios,
+              outputSettings: _demoOutputSettings,
+              labels: _demoLabels,
               onProgress: (progress) {
                 setState(() {
                   _progress = progress;
@@ -106,7 +100,7 @@ class _ImageClipExampleHomeState extends State<ImageClipExampleHome> {
                 setState(() {
                   _result = result;
                   _progress = null;
-                  _status = 'Exported ${result.cropped.dimensionsLabel}';
+                  _status = 'Saved ${result.cropped.dimensionsLabel}';
                 });
               },
             );
@@ -145,6 +139,8 @@ class _ImageClipExampleHomeState extends State<ImageClipExampleHome> {
       final bytes = await picked.readAsBytes();
       final info = _processor.probeBytes(bytes);
       setState(() {
+        _pickedImageBytes = bytes;
+        _pickedImageLabel = picked.name;
         _inputInfo = info;
         _result = null;
         _progress = null;
@@ -166,6 +162,8 @@ class _ImageClipExampleHomeState extends State<ImageClipExampleHome> {
   Future<void> _loadSample() async {
     try {
       setState(() {
+        _pickedImageBytes = null;
+        _pickedImageLabel = '';
         _result = null;
         _progress = null;
         _status = 'Loading sample';
@@ -187,6 +185,58 @@ class _ImageClipExampleHomeState extends State<ImageClipExampleHome> {
         _status = image == null
             ? 'Ready'
             : 'Loaded ${image.dimensionsLabel} sample';
+      });
+    } catch (error) {
+      _showError(error);
+    }
+  }
+
+  Future<void> _openFullscreenEditor() async {
+    try {
+      setState(() {
+        _progress = null;
+        _status = 'Opening fullscreen editor';
+      });
+
+      final result = await showImageClipEditor(
+        context,
+        imageBytes: _pickedImageBytes,
+        imageLabel: _pickedImageLabel,
+        aspectRatios: _demoAspectRatios,
+        outputSettings: _demoOutputSettings,
+        cropAreaHeight: 400,
+        labels: _demoLabels,
+        onProgress: (progress) {
+          if (!mounted) {
+            return;
+          }
+          setState(() {
+            _progress = progress;
+            _status = progress.message;
+          });
+        },
+      );
+
+      if (!mounted) {
+        return;
+      }
+      if (result == null) {
+        setState(() {
+          _progress = null;
+          _status = 'Fullscreen editor closed';
+        });
+        return;
+      }
+
+      setState(() {
+        _inputInfo = ImageClipImageInfo(
+          format: _encodedFormatFor(result.source.format),
+          width: result.source.sourceWidth,
+          height: result.source.sourceHeight,
+        );
+        _result = result;
+        _progress = null;
+        _status = 'Fullscreen saved ${result.cropped.dimensionsLabel}';
       });
     } catch (error) {
       _showError(error);
@@ -217,18 +267,35 @@ class _ImageClipExampleHomeState extends State<ImageClipExampleHome> {
   }
 }
 
+ImageClipEncodedFormat _encodedFormatFor(ImageClipOutputFormat format) {
+  return switch (format) {
+    ImageClipOutputFormat.png => ImageClipEncodedFormat.png,
+    ImageClipOutputFormat.jpeg => ImageClipEncodedFormat.jpeg,
+  };
+}
+
 class _ExampleSummary extends StatelessWidget {
   const _ExampleSummary({
     required this.inputInfo,
     required this.result,
     required this.progress,
     required this.status,
+    required this.canCancel,
+    required this.onPickFromGallery,
+    required this.onLoadSample,
+    required this.onOpenFullscreen,
+    required this.onCancelTask,
   });
 
   final ImageClipImageInfo? inputInfo;
   final ImageClipResult? result;
   final ImageClipTaskProgress? progress;
   final String status;
+  final bool canCancel;
+  final VoidCallback onPickFromGallery;
+  final VoidCallback onLoadSample;
+  final VoidCallback onOpenFullscreen;
+  final VoidCallback onCancelTask;
 
   @override
   Widget build(BuildContext context) {
@@ -255,6 +322,33 @@ class _ExampleSummary extends StatelessWidget {
             if (progress != null)
               LinearProgressIndicator(value: progress!.fraction),
             if (progress != null) const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                FilledButton.icon(
+                  onPressed: onOpenFullscreen,
+                  icon: const Icon(Icons.open_in_full),
+                  label: const Text('Open Fullscreen'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: onPickFromGallery,
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: const Text('Gallery'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: onLoadSample,
+                  icon: const Icon(Icons.image_search_outlined),
+                  label: const Text('Sample'),
+                ),
+                IconButton.outlined(
+                  onPressed: canCancel ? onCancelTask : null,
+                  icon: const Icon(Icons.stop_circle_outlined),
+                  tooltip: 'Cancel task',
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 10,
               runSpacing: 10,

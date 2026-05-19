@@ -24,6 +24,12 @@ class ImageClipDecodeException extends ImageClipException {
   const ImageClipDecodeException(super.message, {super.cause});
 }
 
+/// Thrown when the native platform decode adapter fails before decoding starts.
+class ImageClipPlatformException extends ImageClipException {
+  /// Creates a platform adapter exception.
+  const ImageClipPlatformException(super.message, {super.cause});
+}
+
 /// Thrown when the input format is recognized but not supported.
 class ImageClipUnsupportedFormatException extends ImageClipException {
   /// Creates an unsupported format exception.

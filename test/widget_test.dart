@@ -7,6 +7,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 
 void main() {
+  test('supports custom aspect ratios and the 16:10 / 10:16 presets', () {
+    const custom = ImageClipAspectRatio(label: '21:9', width: 21, height: 9);
+
+    expect(custom.value, closeTo(21 / 9, 0.0001));
+    expect(ImageClipAspectRatio.ratio16x10.label, '16:10');
+    expect(ImageClipAspectRatio.ratio16x10.value, closeTo(1.6, 0.0001));
+    expect(ImageClipAspectRatio.ratio10x16.label, '10:16');
+    expect(ImageClipAspectRatio.ratio10x16.value, closeTo(0.625, 0.0001));
+  });
+
   Future<void> pumpUntilSampleLoads(WidgetTester tester) async {
     for (var i = 0; i < 40 && find.byType(Image).evaluate().isEmpty; i++) {
       await tester.runAsync(() async {
@@ -65,14 +75,14 @@ void main() {
   testWidgets('shows reference cropper controls', (tester) async {
     await pumpClippingApp(tester);
 
-    expect(find.text('Cancel'), findsOneWidget);
+    expect(find.text('Position'), findsOneWidget);
+    expect(find.byTooltip('Cancel'), findsOneWidget);
+    expect(find.text('Pinch to zoom • Drag to reposition'), findsOneWidget);
     expect(find.text('Save'), findsOneWidget);
-    expect(find.text('Fit'), findsOneWidget);
-    expect(find.text('Flip H'), findsOneWidget);
-    expect(find.text('Flip V'), findsOneWidget);
+    expect(find.text('Fill'), findsOneWidget);
     expect(find.text('Rotate'), findsOneWidget);
-    expect(find.text('Portrait'), findsOneWidget);
-    expect(find.text('Landscape'), findsOneWidget);
+    expect(find.text('3:4'), findsOneWidget);
+    expect(find.text('4:3'), findsOneWidget);
     expect(find.byType(Image), findsWidgets);
     expect(tester.takeException(), isNull);
   });
@@ -86,12 +96,11 @@ void main() {
 
       expect(find.bySemanticsLabel('Image crop preview'), findsOneWidget);
       expect(find.bySemanticsLabel('Crop frame'), findsOneWidget);
-      expect(find.bySemanticsLabel('Fit'), findsOneWidget);
-      expect(find.bySemanticsLabel('Flip H'), findsOneWidget);
-      expect(find.bySemanticsLabel('Flip V'), findsOneWidget);
+      expect(find.bySemanticsLabel('Cancel'), findsOneWidget);
+      expect(find.bySemanticsLabel('Fill'), findsOneWidget);
       expect(find.bySemanticsLabel('Rotate'), findsOneWidget);
-      expect(find.bySemanticsLabel('Portrait'), findsOneWidget);
-      expect(find.bySemanticsLabel('Landscape'), findsOneWidget);
+      expect(find.bySemanticsLabel('3:4'), findsOneWidget);
+      expect(find.bySemanticsLabel('4:3'), findsOneWidget);
       expect(tester.takeException(), isNull);
     } finally {
       semantics.dispose();
@@ -108,11 +117,12 @@ void main() {
         editor: const ImageClipEditor(labels: ImageClipEditorLabels.zhHans),
       );
 
-      expect(find.text('取消'), findsOneWidget);
+      expect(find.text('位置'), findsOneWidget);
+      expect(find.text('双指缩放 • 拖动调整位置'), findsOneWidget);
+      expect(find.byTooltip('取消'), findsOneWidget);
       expect(find.text('保存'), findsOneWidget);
       expect(find.bySemanticsLabel('图片裁剪预览'), findsOneWidget);
       expect(find.bySemanticsLabel('裁剪框'), findsOneWidget);
-      expect(find.bySemanticsLabel('水平翻转'), findsOneWidget);
       expect(tester.takeException(), isNull);
     } finally {
       semantics.dispose();
@@ -136,7 +146,122 @@ void main() {
     );
   });
 
-  testWidgets('loaded sample supports drag, pinch, rotate, fit and save', (
+  testWidgets('matches Figma default mobile chrome metrics', (tester) async {
+    await pumpClippingApp(
+      tester,
+      size: const Size(375, 812),
+      editor: ImageClipEditor(
+        initialImageBytes: _pngBytes(375, 456),
+        initialImageLabel: 'figma-layout.png',
+        loadSampleOnStart: false,
+      ),
+    );
+    await pumpUntilIdle(tester);
+
+    final titleRect = tester.getRect(find.text('Position'));
+    final closeHitRect = tester.getRect(
+      find.byKey(const ValueKey('image_clip_editor_close_hit_area')),
+    );
+    final closeIconRect = tester.getRect(
+      find.byKey(const ValueKey('image_clip_editor_close_icon')),
+    );
+    final saveRect = tester.getRect(
+      find.byKey(const ValueKey('image_clip_editor_save_action')),
+    );
+    final fillRect = tester.getRect(find.text('Fill'));
+    final rotateRect = tester.getRect(find.text('Rotate'));
+
+    expect(titleRect.left, 16);
+    expect(titleRect.top, closeTo(14, 1));
+    expect(closeHitRect.left, 315);
+    expect(closeHitRect.top, closeTo(6, 0.5));
+    expect(closeHitRect.size, const Size(44, 44));
+    expect(closeIconRect.left, 339);
+    expect(closeIconRect.top, closeTo(18, 0.5));
+    expect(closeIconRect.size, const Size(20, 20));
+    expect(saveRect, const Rect.fromLTWH(16, 724, 343, 48));
+    expect(fillRect.center.dx, closeTo(131, 1));
+    expect(rotateRect.center.dx, closeTo(243, 1));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('can configure crop area height', (tester) async {
+    await pumpClippingApp(
+      tester,
+      size: const Size(375, 812),
+      editor: ImageClipEditor(
+        cropAreaHeight: 420,
+        initialImageBytes: _pngBytes(375, 456),
+        initialImageLabel: 'custom-height.png',
+        loadSampleOnStart: false,
+      ),
+    );
+    await pumpUntilIdle(tester);
+
+    final cropAreaRect = tester.getRect(
+      find.byKey(const ValueKey('image_clip_editor_crop_area')),
+    );
+    final saveRect = tester.getRect(
+      find.byKey(const ValueKey('image_clip_editor_save_action')),
+    );
+
+    expect(cropAreaRect, const Rect.fromLTWH(0, 56, 375, 420));
+    expect(saveRect, const Rect.fromLTWH(16, 688, 343, 48));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('clamps configured crop area height on compact screens', (
+    tester,
+  ) async {
+    await pumpClippingApp(
+      tester,
+      size: const Size(375, 390),
+      editor: ImageClipEditor(
+        cropAreaHeight: 420,
+        initialImageBytes: _pngBytes(375, 456),
+        initialImageLabel: 'compact-height.png',
+        loadSampleOnStart: false,
+      ),
+    );
+    await pumpUntilIdle(tester);
+
+    final cropAreaRect = tester.getRect(
+      find.byKey(const ValueKey('image_clip_editor_crop_area')),
+    );
+    final saveRect = tester.getRect(
+      find.byKey(const ValueKey('image_clip_editor_save_action')),
+    );
+
+    expect(cropAreaRect, const Rect.fromLTWH(0, 56, 375, 154));
+    expect(saveRect.top, 422);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('fit mode centers the image inside the crop frame', (
+    tester,
+  ) async {
+    await pumpClippingApp(
+      tester,
+      size: const Size(375, 812),
+      editor: ImageClipEditor(
+        initialImageBytes: _pngBytes(160, 120),
+        initialImageLabel: 'fit-centered.png',
+        loadSampleOnStart: false,
+      ),
+    );
+    await pumpUntilIdle(tester);
+
+    final imageRect = tester.getRect(find.byType(Image).first);
+    final cropFrameRect = tester.getRect(
+      find.byKey(const ValueKey('image_clip_editor_crop_frame')),
+    );
+
+    expect(imageRect.center.dx, closeTo(cropFrameRect.center.dx, 0.01));
+    expect(imageRect.center.dy, closeTo(cropFrameRect.center.dy, 0.01));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('loaded sample supports drag, pinch, rotate, fill and save', (
     tester,
   ) async {
     await pumpClippingApp(tester);
@@ -148,20 +273,12 @@ void main() {
     await pinchImage(tester);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('Fit'));
+    await tester.tap(find.text('Fill'));
     await tester.pump(const Duration(milliseconds: 100));
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.text('Rotate'));
     await pumpUntilIdle(tester);
-    expect(tester.takeException(), isNull);
-
-    await tester.tap(find.text('Flip H'));
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(tester.takeException(), isNull);
-
-    await tester.tap(find.text('Flip V'));
-    await tester.pump(const Duration(milliseconds: 100));
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.text('Save'));
@@ -200,10 +317,12 @@ void main() {
     tester,
   ) async {
     var progressEvents = 0;
+    final controller = ImageClipEditorController();
 
     await pumpClippingApp(
       tester,
       editor: ImageClipEditor(
+        controller: controller,
         initialImageBytes: _pngBytes(120, 80),
         initialImageLabel: 'instant-flip.png',
         loadSampleOnStart: false,
@@ -215,9 +334,9 @@ void main() {
     await pumpUntilIdle(tester);
     final eventsAfterLoad = progressEvents;
 
-    await tester.tap(find.text('Flip H'));
+    await tester.runAsync(controller.flipHorizontal);
     await tester.pump();
-    await tester.tap(find.text('Flip V'));
+    await tester.runAsync(controller.flipVertical);
     await tester.pump();
 
     expect(find.byType(LinearProgressIndicator), findsNothing);
@@ -225,31 +344,38 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('fit button toggles between fit and fill modes', (tester) async {
+  testWidgets('scale button toggles between fit and fill modes', (
+    tester,
+  ) async {
     await pumpClippingApp(tester);
 
-    expect(find.text('Fit'), findsOneWidget);
-    expect(find.text('Fill'), findsNothing);
-
-    await tester.tap(find.text('Fit'));
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('Fit'), findsNothing);
     expect(find.text('Fill'), findsOneWidget);
-    expect(tester.takeException(), isNull);
+    expect(find.text('Fit'), findsNothing);
 
     await tester.tap(find.text('Fill'));
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Fit'), findsOneWidget);
     expect(find.text('Fill'), findsNothing);
     expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Fit'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Fill'), findsOneWidget);
+    expect(find.text('Fit'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('save opens result page with crop metadata', (tester) async {
-    await pumpClippingApp(tester);
+    final controller = ImageClipEditorController();
+
+    await pumpClippingApp(
+      tester,
+      editor: ImageClipEditor(controller: controller),
+    );
 
     await tester.tap(find.text('Rotate'));
     await pumpUntilIdle(tester);
-    await tester.tap(find.text('Flip H'));
+    await tester.runAsync(controller.flipHorizontal);
     await tester.pump();
     await tester.tap(find.text('Save'));
     await pumpUntilIdle(tester);
@@ -286,7 +412,7 @@ void main() {
 
       await tester.tap(find.text('Rotate'));
       await tester.pump();
-      await tester.tap(find.text('Flip H'));
+      await tester.runAsync(controller.flipHorizontal);
       await tester.pump();
 
       final result = await tester.runAsync(controller.crop);
@@ -325,7 +451,11 @@ void main() {
       editor: const ImageClipEditor(
         labels: ImageClipEditorLabels(
           cancelButton: 'Dismiss',
-          saveButton: 'Crop',
+          saveButton: 'Use photo',
+          editorTitle: 'Arrange',
+          positionHint: 'Move the image into place',
+          fitButton: 'Contain',
+          fillButton: 'Cover',
           flipHorizontalButton: 'Mirror H',
           flipVerticalButton: 'Mirror V',
           rotateButton: 'Turn',
@@ -334,17 +464,26 @@ void main() {
         aspectRatios: <ImageClipAspectRatio>[
           ImageClipAspectRatio.square,
           ImageClipAspectRatio.widescreen,
+          ImageClipAspectRatio.ratio16x10,
+          ImageClipAspectRatio.ratio10x16,
         ],
       ),
     );
 
-    expect(find.text('Dismiss'), findsOneWidget);
-    expect(find.text('Crop'), findsOneWidget);
-    expect(find.text('Mirror H'), findsOneWidget);
-    expect(find.text('Mirror V'), findsOneWidget);
+    expect(find.text('Arrange'), findsOneWidget);
+    expect(find.byTooltip('Dismiss'), findsOneWidget);
+    expect(find.text('Use photo'), findsOneWidget);
+    expect(find.text('Move the image into place'), findsOneWidget);
+    expect(find.text('Cover'), findsOneWidget);
     expect(find.text('Turn'), findsOneWidget);
-    expect(find.text('Square'), findsOneWidget);
+    expect(find.text('1:1'), findsOneWidget);
     expect(find.text('16:9'), findsOneWidget);
+    expect(find.text('16:10'), findsOneWidget);
+    expect(find.text('10:16'), findsOneWidget);
+
+    await tester.tap(find.text('Cover'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Contain'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -365,15 +504,84 @@ void main() {
     );
 
     final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
-    final cancel = tester.widget<TextButton>(find.byType(TextButton).first);
+    final title = tester.widget<Text>(find.text('Position'));
 
     expect(scaffold.backgroundColor, background);
-    expect(
-      cancel.style?.foregroundColor?.resolve(<WidgetState>{}),
-      primaryText,
-    );
+    expect(title.style?.color, primaryText);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('uses requested default editor theme colors', (tester) async {
+    const theme = ImageClipEditorTheme();
+
+    expect(theme.cropBorderColor, const Color(0xFFFFFFFF));
+    expect(theme.cropShadeColor, const Color(0x80000000));
+    expect(theme.previewBackgroundColor, const Color(0xFFF8F9FA));
+    expect(theme.imageBackgroundColor, const Color(0xFFF8F9FA));
+    expect(theme.surfaceColor, const Color(0xFFFFFFFF));
+    expect(theme.topBarHeight, 56);
+    expect(theme.bottomBarHeight, 300);
+    expect(theme.compactBottomBarHeight, 180);
+    expect(theme.saveButtonHeight, 48);
+  });
+
+  test('copies editor theme layout tokens', () {
+    const theme = ImageClipEditorTheme(
+      topBarHeight: 64,
+      bottomBarHeight: 320,
+      compactBottomBarHeight: 196,
+      bottomBarContentHeight: 336,
+      bottomBarHorizontalPadding: 20,
+      maxSaveButtonWidth: 300,
+      saveButtonHeight: 52,
+      saveButtonTop: 224,
+      positionHintTop: 18,
+      toolRowTop: 56,
+      toolButtonGap: 36,
+      aspectRatioRowTop: 128,
+      aspectRatioGap: 18,
+      aspectRatioGlyphBorderRadius: 4,
+    );
+
+    final copied = theme.copyWith(
+      topBarHeight: 60,
+      saveButtonHeight: 44,
+      aspectRatioGap: 20,
+    );
+
+    expect(copied.topBarHeight, 60);
+    expect(copied.bottomBarHeight, 320);
+    expect(copied.compactBottomBarHeight, 196);
+    expect(copied.bottomBarContentHeight, 336);
+    expect(copied.bottomBarHorizontalPadding, 20);
+    expect(copied.maxSaveButtonWidth, 300);
+    expect(copied.saveButtonHeight, 44);
+    expect(copied.saveButtonTop, 224);
+    expect(copied.positionHintTop, 18);
+    expect(copied.toolRowTop, 56);
+    expect(copied.toolButtonGap, 36);
+    expect(copied.aspectRatioRowTop, 128);
+    expect(copied.aspectRatioGap, 20);
+    expect(copied.aspectRatioGlyphBorderRadius, 4);
+  });
+
+  testWidgets(
+    'light color scheme theme preserves default editor chrome colors',
+    (tester) async {
+      final theme = ImageClipEditorTheme.fromColorScheme(
+        ColorScheme.fromSeed(
+          seedColor: const Color(0xFF006D77),
+          brightness: Brightness.light,
+        ),
+      );
+
+      expect(theme.cropBorderColor, const Color(0xFFFFFFFF));
+      expect(theme.cropShadeColor, const Color(0x80000000));
+      expect(theme.previewBackgroundColor, const Color(0xFFF8F9FA));
+      expect(theme.imageBackgroundColor, const Color(0xFFF8F9FA));
+      expect(theme.surfaceColor, const Color(0xFFFFFFFF));
+    },
+  );
 
   testWidgets('save can return JPEG output', (tester) async {
     ImageClipResult? result;
@@ -410,7 +618,16 @@ void main() {
           builder: (context) {
             return TextButton(
               onPressed: () async {
-                result = await showImageClipEditor(context);
+                result = await showImageClipEditor(
+                  context,
+                  labels: const ImageClipEditorLabels(
+                    editorTitle: 'Arrange',
+                    positionHint: 'Move the image into place',
+                    saveButton: 'Use photo',
+                    fillButton: 'Cover',
+                    rotateButton: 'Turn',
+                  ),
+                );
               },
               child: const Text('open editor'),
             );
@@ -421,7 +638,12 @@ void main() {
 
     await tester.tap(find.text('open editor'));
     await pumpUntilSampleLoads(tester);
-    await tester.tap(find.text('Save'));
+    expect(find.text('Arrange'), findsOneWidget);
+    expect(find.text('Move the image into place'), findsOneWidget);
+    expect(find.text('Cover'), findsOneWidget);
+    expect(find.text('Turn'), findsOneWidget);
+    expect(find.text('Use photo'), findsOneWidget);
+    await tester.tap(find.text('Use photo'));
     await pumpUntilIdle(tester);
     await tester.pumpAndSettle();
 
@@ -432,16 +654,14 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('portrait and landscape crop modes switch without crashing', (
-    tester,
-  ) async {
+  testWidgets('ratio presets switch without crashing', (tester) async {
     await pumpClippingApp(tester);
 
-    await tester.tap(find.text('Landscape'));
+    await tester.tap(find.text('4:3'));
     await tester.pump(const Duration(milliseconds: 100));
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('Portrait'));
+    await tester.tap(find.text('3:4'));
     await tester.pump(const Duration(milliseconds: 100));
     expect(tester.takeException(), isNull);
   });

@@ -9,6 +9,10 @@ coverage/
 doc/
 docs/
 
+test/
+benchmark/
+tool/
+
 android/*
 !android/build.gradle
 !android/src/
@@ -19,6 +23,8 @@ android/*
 ios/*
 !ios/Classes/
 !ios/Classes/**
+!ios/Resources/
+!ios/Resources/**
 !ios/flutter_image_clip.podspec
 linux/
 macos/
@@ -27,6 +33,7 @@ windows/
 
 example/.gitignore
 example/README.md
+example/integration_test/
 example/android/
 example/ios/
 example/linux/
