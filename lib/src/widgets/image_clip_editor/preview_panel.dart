@@ -8,6 +8,7 @@ class _PreviewPanel extends StatefulWidget {
     required this.status,
     required this.cropAspectRatio,
     required this.scaleMode,
+    required this.labels,
     required this.theme,
   });
 
@@ -16,6 +17,7 @@ class _PreviewPanel extends StatefulWidget {
   final String status;
   final double cropAspectRatio;
   final ImageClipScaleMode scaleMode;
+  final ImageClipEditorLabels labels;
   final ImageClipEditorTheme theme;
 
   @override
@@ -96,71 +98,82 @@ class _PreviewPanelState extends State<_PreviewPanel> {
         final layout = _layoutFor(constraints.biggest, image);
         _rememberLayout(layout, image);
 
-        return Listener(
-          onPointerSignal: _handlePointerSignal,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onScaleStart: (details) {
-              _startScale = _scale;
-              _startOffset = _offset;
-              _startLocalFocalPoint = details.localFocalPoint;
-            },
-            onScaleUpdate: (details) {
-              final focalImagePoint =
-                  (_startLocalFocalPoint -
-                      layout.baseRect.topLeft -
-                      _startOffset) /
-                  _startScale;
-              final nextScale = (_startScale * details.scale)
-                  .clamp(layout.minScaleFor(widget.scaleMode), _maxScale)
-                  .toDouble();
-              final nextOffset =
-                  details.localFocalPoint -
-                  layout.baseRect.topLeft -
-                  focalImagePoint * nextScale;
+        return Semantics(
+          label: widget.labels.previewSemanticsLabel,
+          value: '${image.label}, ${image.dimensionsLabel}, ${widget.status}',
+          image: true,
+          child: Listener(
+            onPointerSignal: _handlePointerSignal,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onScaleStart: (details) {
+                _startScale = _scale;
+                _startOffset = _offset;
+                _startLocalFocalPoint = details.localFocalPoint;
+              },
+              onScaleUpdate: (details) {
+                final focalImagePoint =
+                    (_startLocalFocalPoint -
+                        layout.baseRect.topLeft -
+                        _startOffset) /
+                    _startScale;
+                final nextScale = (_startScale * details.scale)
+                    .clamp(layout.minScaleFor(widget.scaleMode), _maxScale)
+                    .toDouble();
+                final nextOffset =
+                    details.localFocalPoint -
+                    layout.baseRect.topLeft -
+                    focalImagePoint * nextScale;
 
-              setState(() {
-                _scale = nextScale;
-                _offset = _clampOffset(
-                  nextOffset,
-                  layout,
-                  nextScale,
-                  widget.scaleMode,
-                );
-              });
-            },
-            onDoubleTap: _resetGestureCrop,
-            child: ClipRect(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Positioned(
-                    left: layout.baseRect.left + _offset.dx,
-                    top: layout.baseRect.top + _offset.dy,
-                    width: layout.baseRect.width * _scale,
-                    height: layout.baseRect.height * _scale,
-                    child: Image.memory(
-                      image.bytes,
-                      fit: BoxFit.fill,
-                      gaplessPlayback: true,
-                      filterQuality: FilterQuality.high,
+                setState(() {
+                  _scale = nextScale;
+                  _offset = _clampOffset(
+                    nextOffset,
+                    layout,
+                    nextScale,
+                    widget.scaleMode,
+                  );
+                });
+              },
+              onDoubleTap: _resetGestureCrop,
+              child: ClipRect(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Positioned(
+                      left: layout.baseRect.left + _offset.dx,
+                      top: layout.baseRect.top + _offset.dy,
+                      width: layout.baseRect.width * _scale,
+                      height: layout.baseRect.height * _scale,
+                      child: Image.memory(
+                        image.bytes,
+                        fit: BoxFit.fill,
+                        gaplessPlayback: true,
+                        filterQuality: FilterQuality.high,
+                      ),
                     ),
-                  ),
-                  _CropShade(rect: layout.cropRect, theme: widget.theme),
-                  Positioned.fromRect(
-                    rect: layout.cropRect,
-                    child: IgnorePointer(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: widget.theme.cropBorderColor,
-                            width: widget.theme.cropBorderWidth,
+                    _CropShade(rect: layout.cropRect, theme: widget.theme),
+                    Positioned.fromRect(
+                      rect: layout.cropRect,
+                      child: IgnorePointer(
+                        child: Semantics(
+                          label: widget.labels.cropFrameSemanticsLabel,
+                          value:
+                              '${layout.cropRect.width.round()} x '
+                              '${layout.cropRect.height.round()}',
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: widget.theme.cropBorderColor,
+                                width: widget.theme.cropBorderWidth,
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

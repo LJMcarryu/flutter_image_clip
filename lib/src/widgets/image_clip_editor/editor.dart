@@ -335,6 +335,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
                 status: _status,
                 cropAspectRatio: _cropAspectRatioValue,
                 scaleMode: _cropScaleMode,
+                labels: widget.labels,
                 theme: widget.theme,
               ),
             ),

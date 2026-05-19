@@ -1,3 +1,10 @@
+# 0.6.3
+
+- 新增 HEIC/HEIF header 识别，并在纯 Dart 解码前抛出 `ImageClipUnsupportedFormatException`，提示业务先做平台转码。
+- 新增 `ImageClipDecodedSession`，支持在内存中保留已解码像素，连续处理时避免中间步骤反复 decode/encode。
+- 为编辑器预览、裁剪框、工具按钮和比例选项补充 Semantics，提升 TalkBack/VoiceOver 可访问性。
+- 新增默认编辑器 golden 测试，覆盖核心裁剪 UI 的视觉回归。
+
 # 0.6.2
 
 - 新增 `ImageClipSession`，用于在连续编辑流程中持有当前图片状态，并支持 session 级任务取消。

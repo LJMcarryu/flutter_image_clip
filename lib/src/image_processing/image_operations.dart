@@ -2,6 +2,7 @@ part of 'image_processor.dart';
 
 img.Image _decode(Uint8List bytes, ImageClipProcessingSettings settings) {
   final info = _probeEncodedImage(bytes);
+  _checkFormatSupport(info);
   _checkProbedInputPixelLimit(info, settings);
 
   img.Image? decoded;
@@ -19,6 +20,17 @@ img.Image _decode(Uint8List bytes, ImageClipProcessingSettings settings) {
   final oriented = img.bakeOrientation(decoded);
   _checkInputPixelLimit(oriented, settings);
   return oriented.convert(numChannels: 4);
+}
+
+void _checkFormatSupport(ImageClipImageInfo info) {
+  if (info.canDecodeWithDart) {
+    return;
+  }
+  throw ImageClipUnsupportedFormatException(
+    '${info.format.name.toUpperCase()} images require platform conversion '
+    'before they can be processed by the pure Dart decoder',
+    format: info.format.name,
+  );
 }
 
 void _checkProbedInputPixelLimit(

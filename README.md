@@ -13,9 +13,10 @@
 - 文案配置：通过 `ImageClipEditorLabels` 覆盖按钮、状态、结果页文案，默认使用英文。
 - 输出格式：裁剪结果可输出 PNG 或 JPEG，并可配置 JPEG quality。
 - 图像处理：解码、中心裁剪、区域裁剪、旋转、翻转、缩放、调色、PNG/JPEG 导出。
-- 输入探测：可在完整解码前识别 PNG、JPEG、GIF、WebP 的格式和尺寸，用于移动端大图保护。
+- 输入探测：可在完整解码前识别 PNG、JPEG、GIF、WebP、HEIC、HEIF，用于移动端大图保护和格式提示。
 - 批处理 pipeline：多步图像操作可合并为一次后台任务，减少重复编解码。
 - 编辑会话：通过 `ImageClipSession` 持有连续编辑状态，减少业务层手动传递中间结果。
+- 解码会话：通过 `ImageClipDecodedSession` 保留已解码像素，适合后台 isolate 或小图连续处理。
 - 可取消任务：通过 `ImageClipTask` 监听进度、取消任务或设置超时。
 - 处理任务通过后台 isolate 执行，并使用 `TransferableTypedData` 传输大字节数组，降低 UI isolate 压力。
 
@@ -25,7 +26,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.6.2
+  flutter_image_clip: ^0.6.3
 ```
 
 然后执行：
@@ -195,6 +196,9 @@ final processor = ImageProcessor();
 
 final info = processor.probeBytes(bytes);
 debugPrint('${info.format.name} ${info.dimensionsLabel}');
+if (!info.canDecodeWithDart) {
+  // HEIC/HEIF should be converted by the platform picker or native layer first.
+}
 
 final image = await processor.decodeBytes(bytes, label: 'input.jpg');
 final cropped = await processor.cropRegion(
@@ -240,6 +244,19 @@ await session.cropRegion(
   const CropRegion(x: 20, y: 20, width: 240, height: 240, cornerRadius: 0),
 );
 final jpeg = await session.exportImage(
+  outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 88),
+);
+```
+
+如果连续处理已经运行在后台 isolate 中，或图片较小，可以使用 decoded session 避免中间结果重复编码：
+
+```dart
+final session = ImageClipDecodedSession.decode(bytes, label: 'input.jpg');
+session.rotate();
+session.cropRegion(
+  const CropRegion(x: 20, y: 20, width: 240, height: 240, cornerRadius: 0),
+);
+final jpeg = session.exportImage(
   outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 88),
 );
 ```

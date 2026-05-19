@@ -75,6 +75,42 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('exposes crop controls to accessibility services', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      await pumpClippingApp(tester);
+
+      expect(find.bySemanticsLabel('Image crop preview'), findsOneWidget);
+      expect(find.bySemanticsLabel('Crop frame'), findsOneWidget);
+      expect(find.bySemanticsLabel('Fit'), findsOneWidget);
+      expect(find.bySemanticsLabel('Rotate'), findsOneWidget);
+      expect(find.bySemanticsLabel('Portrait'), findsOneWidget);
+      expect(find.bySemanticsLabel('Landscape'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    } finally {
+      semantics.dispose();
+    }
+  });
+
+  testWidgets('matches the default editor golden', (tester) async {
+    await pumpClippingApp(
+      tester,
+      size: const Size(390, 844),
+      editor: ImageClipEditor(
+        initialImageBytes: _pngBytes(160, 120),
+        initialImageLabel: 'golden.png',
+        loadSampleOnStart: false,
+      ),
+    );
+
+    await expectLater(
+      find.byType(ImageClipEditor),
+      matchesGoldenFile('goldens/image_clip_editor_default.png'),
+    );
+  });
+
   testWidgets('loaded sample supports drag, pinch, rotate, fit and save', (
     tester,
   ) async {

@@ -391,6 +391,11 @@ ImageClipImageInfo _probeEncodedImage(Uint8List bytes) {
     return _probeWebP(bytes);
   }
 
+  final isoFormat = _probeIsoBaseMediaImage(bytes);
+  if (isoFormat != null) {
+    return ImageClipImageInfo(format: isoFormat);
+  }
+
   return const ImageClipImageInfo(format: ImageClipEncodedFormat.unknown);
 }
 
@@ -505,6 +510,38 @@ bool _isWebP(Uint8List bytes) {
       _matchesAscii(bytes, 8, 'WEBP');
 }
 
+ImageClipEncodedFormat? _probeIsoBaseMediaImage(Uint8List bytes) {
+  if (bytes.length < 16 || !_matchesAscii(bytes, 4, 'ftyp')) {
+    return null;
+  }
+  final brands = <String>{_asciiOf(bytes, 8, 4)};
+  for (var offset = 16; offset + 4 <= bytes.length; offset += 4) {
+    brands.add(_asciiOf(bytes, offset, 4));
+  }
+  const heicBrands = <String>{
+    'heic',
+    'heix',
+    'hevc',
+    'hevx',
+    'heim',
+    'heis',
+    'hevm',
+    'hevs',
+  };
+  if (brands.any(heicBrands.contains)) {
+    return ImageClipEncodedFormat.heic;
+  }
+  const avifBrands = <String>{'avif', 'avis'};
+  if (brands.any(avifBrands.contains)) {
+    return null;
+  }
+  const heifBrands = <String>{'heif', 'mif1', 'msf1'};
+  if (brands.any(heifBrands.contains)) {
+    return ImageClipEncodedFormat.heif;
+  }
+  return null;
+}
+
 bool _matchesAscii(Uint8List bytes, int offset, String value) {
   if (offset < 0 || offset + value.length > bytes.length) {
     return false;
@@ -515,6 +552,13 @@ bool _matchesAscii(Uint8List bytes, int offset, String value) {
     }
   }
   return true;
+}
+
+String _asciiOf(Uint8List bytes, int offset, int length) {
+  if (offset < 0 || offset + length > bytes.length) {
+    return '';
+  }
+  return String.fromCharCodes(bytes.sublist(offset, offset + length));
 }
 
 bool _isJpegSofMarker(int marker) {

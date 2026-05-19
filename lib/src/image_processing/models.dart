@@ -25,6 +25,12 @@ enum ImageClipEncodedFormat {
   /// WebP input bytes.
   webp,
 
+  /// HEIC input bytes.
+  heic,
+
+  /// HEIF input bytes.
+  heif,
+
   /// The input header is not recognized.
   unknown,
 }
@@ -49,6 +55,18 @@ class ImageClipImageInfo {
 
   /// Whether both [width] and [height] are available.
   bool get hasDimensions => width != null && height != null;
+
+  /// Whether the pure Dart decoder can handle this format directly.
+  bool get canDecodeWithDart {
+    return switch (format) {
+      ImageClipEncodedFormat.png ||
+      ImageClipEncodedFormat.jpeg ||
+      ImageClipEncodedFormat.gif ||
+      ImageClipEncodedFormat.webp ||
+      ImageClipEncodedFormat.unknown => true,
+      ImageClipEncodedFormat.heic || ImageClipEncodedFormat.heif => false,
+    };
+  }
 
   /// Pixel count when dimensions are available.
   int? get pixelCount {

@@ -209,25 +209,32 @@ class _CropToolButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = enabled ? theme.primaryTextColor : theme.disabledTextColor;
 
-    return InkResponse(
-      onTap: enabled ? onPressed : null,
-      radius: 44,
-      child: SizedBox(
-        width: compact ? 82 : 92,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: compact ? 32 : 38),
-            SizedBox(height: compact ? 6 : 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: compact ? 20 : 22,
-                fontWeight: FontWeight.w400,
+    return Semantics(
+      button: true,
+      container: true,
+      excludeSemantics: true,
+      enabled: enabled,
+      label: label,
+      child: InkResponse(
+        onTap: enabled ? onPressed : null,
+        radius: 44,
+        child: SizedBox(
+          width: compact ? 82 : 92,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: compact ? 32 : 38),
+              SizedBox(height: compact ? 6 : 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: compact ? 20 : 22,
+                  fontWeight: FontWeight.w400,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -259,31 +266,39 @@ class _AspectRatioChoice extends StatelessWidget {
         ? theme.primaryTextColor
         : theme.inactiveTextColor;
 
-    return InkResponse(
-      onTap: enabled ? () => onSelected(aspectRatio) : null,
-      radius: 48,
-      child: SizedBox(
-        width: compact ? 104 : 116,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _AspectRatioGlyph(
-              aspectRatio: aspectRatio,
-              color: color,
-              theme: theme,
-              compact: compact,
-            ),
-            SizedBox(height: compact ? 8 : 12),
-            Text(
-              aspectRatio.label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
+    return Semantics(
+      button: true,
+      container: true,
+      excludeSemantics: true,
+      enabled: enabled,
+      selected: selected,
+      label: aspectRatio.label,
+      child: InkResponse(
+        onTap: enabled ? () => onSelected(aspectRatio) : null,
+        radius: 48,
+        child: SizedBox(
+          width: compact ? 104 : 116,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _AspectRatioGlyph(
+                aspectRatio: aspectRatio,
                 color: color,
-                fontSize: compact ? 20 : 22,
-                fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
+                theme: theme,
+                compact: compact,
               ),
-            ),
-          ],
+              SizedBox(height: compact ? 8 : 12),
+              Text(
+                aspectRatio.label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: color,
+                  fontSize: compact ? 20 : 22,
+                  fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

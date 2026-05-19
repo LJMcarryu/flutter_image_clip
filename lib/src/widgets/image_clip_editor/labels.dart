@@ -10,6 +10,8 @@ class ImageClipEditorLabels {
     this.fitButton = 'Fit',
     this.fillButton = 'Fill',
     this.rotateButton = 'Rotate',
+    this.previewSemanticsLabel = 'Image crop preview',
+    this.cropFrameSemanticsLabel = 'Crop frame',
     this.resultTitle = 'Crop result',
     this.cropDetailsTitle = 'Crop details',
     this.rotationDegreesLabel = 'Rotation',
@@ -52,6 +54,12 @@ class ImageClipEditorLabels {
 
   /// Rotate button label.
   final String rotateButton;
+
+  /// Semantics label for the interactive crop preview.
+  final String previewSemanticsLabel;
+
+  /// Semantics label for the crop frame overlay.
+  final String cropFrameSemanticsLabel;
 
   /// Result page title.
   final String resultTitle;

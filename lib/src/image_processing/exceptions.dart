@@ -24,6 +24,18 @@ class ImageClipDecodeException extends ImageClipException {
   const ImageClipDecodeException(super.message, {super.cause});
 }
 
+/// Thrown when the input format is recognized but not supported.
+class ImageClipUnsupportedFormatException extends ImageClipException {
+  /// Creates an unsupported format exception.
+  const ImageClipUnsupportedFormatException(
+    super.message, {
+    required this.format,
+  });
+
+  /// Unsupported encoded format that was detected.
+  final String format;
+}
+
 /// Thrown when an image processing operation fails.
 class ImageClipProcessingException extends ImageClipException {
   /// Creates a processing exception.

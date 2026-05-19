@@ -193,3 +193,134 @@ class ImageClipSession {
     return task.cancel();
   }
 }
+
+/// Synchronous session that keeps decoded pixels in memory between operations.
+///
+/// Use this when repeated edits are already running off the UI isolate, or when
+/// the image is small enough for synchronous processing. Unlike
+/// [ImageClipSession], this class avoids re-decoding and re-encoding between
+/// intermediate steps; encoding only happens when [exportImage] is called.
+class ImageClipDecodedSession {
+  ImageClipDecodedSession._({
+    required img.Image image,
+    required this.label,
+    required this.processingSettings,
+  }) : _image = image;
+
+  /// Decodes [bytes] and creates a session that stores decoded pixels.
+  factory ImageClipDecodedSession.decode(
+    Uint8List bytes, {
+    required String label,
+    ImageClipProcessingSettings processingSettings =
+        const ImageClipProcessingSettings(),
+  }) {
+    return ImageClipDecodedSession._(
+      image: _decode(bytes, processingSettings),
+      label: label,
+      processingSettings: processingSettings,
+    );
+  }
+
+  /// Creates a decoded session from an existing encoded [source].
+  factory ImageClipDecodedSession.fromEditedImage(
+    EditedImage source, {
+    ImageClipProcessingSettings processingSettings =
+        const ImageClipProcessingSettings(),
+  }) {
+    return ImageClipDecodedSession.decode(
+      source.bytes,
+      label: source.label,
+      processingSettings: processingSettings,
+    );
+  }
+
+  img.Image _image;
+  int _operationCount = 0;
+
+  /// Human-readable label preserved in exported results.
+  final String label;
+
+  /// Guardrails used for decode and export.
+  final ImageClipProcessingSettings processingSettings;
+
+  /// Current decoded width in pixels.
+  int get width => _image.width;
+
+  /// Current decoded height in pixels.
+  int get height => _image.height;
+
+  /// Number of successful in-memory operations applied to this session.
+  int get operationCount => _operationCount;
+
+  /// Applies [steps] to the decoded image without encoding intermediate output.
+  void apply(List<ImageClipPipelineStep> steps) {
+    for (final step in steps) {
+      _image = _applyPipelineStep(
+        _image,
+        Map<Object?, Object?>.from(step.toMap()),
+      );
+      _operationCount++;
+    }
+  }
+
+  /// Crops the decoded image to [region].
+  void cropRegion(CropRegion region) {
+    apply(<ImageClipPipelineStep>[ImageClipPipelineStep.cropRegion(region)]);
+  }
+
+  /// Rotates the decoded image clockwise by [degrees].
+  void rotate({int degrees = 90}) {
+    apply(<ImageClipPipelineStep>[
+      ImageClipPipelineStep.rotate(degrees: degrees),
+    ]);
+  }
+
+  /// Flips the decoded image around the vertical axis.
+  void flipHorizontal() {
+    apply(const <ImageClipPipelineStep>[
+      ImageClipPipelineStep.flipHorizontal(),
+    ]);
+  }
+
+  /// Flips the decoded image around the horizontal axis.
+  void flipVertical() {
+    apply(const <ImageClipPipelineStep>[ImageClipPipelineStep.flipVertical()]);
+  }
+
+  /// Resizes the decoded image so its longest side is [maxSide].
+  void resizeLongSide(int maxSide) {
+    apply(<ImageClipPipelineStep>[
+      ImageClipPipelineStep.resizeLongSide(maxSide),
+    ]);
+  }
+
+  /// Applies brightness, contrast, and saturation to the decoded image.
+  void adjustColor(ColorAdjustment adjustment) {
+    apply(<ImageClipPipelineStep>[
+      ImageClipPipelineStep.adjustColor(adjustment),
+    ]);
+  }
+
+  /// Encodes the current decoded image to an [EditedImage].
+  EditedImage exportImage({
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
+    String? operationLabel,
+  }) {
+    final stopwatch = Stopwatch()..start();
+    final outputImage = _prepareOutputImage(_image, processingSettings);
+    final bytes = _encodeImage(outputImage, outputSettings);
+    stopwatch.stop();
+    return EditedImage(
+      bytes: bytes,
+      width: outputImage.width,
+      height: outputImage.height,
+      label: label,
+      operation:
+          operationLabel ??
+          'Export ${outputSettings.format.name.toUpperCase()}',
+      elapsedMs: stopwatch.elapsedMilliseconds,
+      format: outputSettings.format,
+    );
+  }
+}

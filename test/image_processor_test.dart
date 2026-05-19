@@ -141,9 +141,22 @@ void main() {
     expect(webp.width, 1024);
     expect(webp.height, 768);
 
+    final heic = processor.probeBytes(_heicHeader());
+    expect(heic.format, ImageClipEncodedFormat.heic);
+    expect(heic.canDecodeWithDart, isFalse);
+
     final unknown = processor.probeBytes(Uint8List.fromList(<int>[1, 2, 3]));
     expect(unknown.format, ImageClipEncodedFormat.unknown);
     expect(unknown.hasDimensions, isFalse);
+  });
+
+  test('throws a typed exception for HEIC bytes', () {
+    final processor = ImageProcessor();
+
+    expect(
+      processor.decodeBytes(_heicHeader(), label: 'photo.heic'),
+      throwsA(isA<ImageClipUnsupportedFormatException>()),
+    );
   });
 
   test('runs multiple image operations as a single pipeline', () async {
@@ -234,6 +247,33 @@ void main() {
     expect(session.isBusy, isFalse);
     expect(session.image.label, 'session.png');
     expect(session.operationCount, 0);
+  });
+
+  test('keeps decoded pixels between decoded session operations', () {
+    final source = img.Image(width: 80, height: 60);
+    final session = ImageClipDecodedSession.decode(
+      Uint8List.fromList(img.encodePng(source)),
+      label: 'decoded.png',
+    );
+
+    session.rotate();
+    expect(session.width, 60);
+    expect(session.height, 80);
+
+    session.cropRegion(
+      const CropRegion(x: 4, y: 6, width: 30, height: 40, cornerRadius: 0),
+    );
+    expect(session.width, 30);
+    expect(session.height, 40);
+    expect(session.operationCount, 2);
+
+    final exported = session.exportImage(
+      outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 80),
+    );
+    expect(exported.width, 30);
+    expect(exported.height, 40);
+    expect(exported.format, ImageClipOutputFormat.jpeg);
+    expect(exported.bytes.sublist(0, 2), <int>[0xFF, 0xD8]);
   });
 
   test('emits progress events for pipeline tasks', () async {
@@ -412,6 +452,23 @@ Uint8List _webpVp8xHeader({required int width, required int height}) {
   _writeUint24le(bytes, 24, width - 1);
   _writeUint24le(bytes, 27, height - 1);
   return bytes;
+}
+
+Uint8List _heicHeader() {
+  return Uint8List.fromList(<int>[
+    0x00,
+    0x00,
+    0x00,
+    0x18,
+    ...'ftyp'.codeUnits,
+    ...'heic'.codeUnits,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    ...'mif1'.codeUnits,
+    ...'heic'.codeUnits,
+  ]);
 }
 
 void _writeUint32be(Uint8List bytes, int offset, int value) {

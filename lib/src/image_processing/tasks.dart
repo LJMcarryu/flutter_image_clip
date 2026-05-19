@@ -316,6 +316,13 @@ Map<String, Object?> _exceptionToMap(Object error) {
   if (error is ImageClipDecodeException) {
     return <String, Object?>{'kind': 'decode', 'message': error.message};
   }
+  if (error is ImageClipUnsupportedFormatException) {
+    return <String, Object?>{
+      'kind': 'unsupportedFormat',
+      'message': error.message,
+      'format': error.format,
+    };
+  }
   if (error is ImageClipProcessingException) {
     return <String, Object?>{'kind': 'processing', 'message': error.message};
   }
@@ -333,6 +340,10 @@ Object _exceptionFromMap(Map<Object?, Object?> map) {
     ),
     'invalidCrop' => ImageClipInvalidCropRegionException(message),
     'decode' => ImageClipDecodeException(message),
+    'unsupportedFormat' => ImageClipUnsupportedFormatException(
+      message,
+      format: (map['format'] as String?) ?? 'unknown',
+    ),
     _ => ImageClipProcessingException(message),
   };
 }
