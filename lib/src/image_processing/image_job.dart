@@ -100,11 +100,12 @@ _PipelineJobResult _runPipeline(
   final bytes = pipeline['bytes'] == null
       ? null
       : _bytesFromIsolateMessage(pipeline['bytes']);
+  final inputPath = pipeline['inputPath'] as String?;
   final label =
       (pipeline['label'] as String?) ??
       (source == null ? 'Image' : source['label']! as String);
 
-  if (source == null && bytes == null) {
+  if (source == null && bytes == null && inputPath == null) {
     throw const ImageClipProcessingException(
       'Image pipeline requires source image bytes',
     );
@@ -121,10 +122,10 @@ _PipelineJobResult _runPipeline(
     ),
   );
 
-  var image = _decode(
-    source == null ? bytes! : _bytesFromIsolateMessage(source['bytes']),
-    processingSettings,
-  );
+  final sourceBytes = source == null
+      ? bytes ?? File(inputPath!).readAsBytesSync()
+      : _bytesFromIsolateMessage(source['bytes']);
+  var image = _decode(sourceBytes, processingSettings);
   final sourceWidth = _intOf(pipeline['sourceWidth'], fallback: image.width);
   final sourceHeight = _intOf(pipeline['sourceHeight'], fallback: image.height);
   image = _applyDecodeSettings(image, decodeSettings);

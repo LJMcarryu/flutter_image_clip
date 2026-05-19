@@ -1,0 +1,47 @@
+name: Release checks
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-release:
+    name: Validate tagged package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Check formatting
+        run: dart format --set-exit-if-changed lib test benchmark integration_test tool
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Check public API snapshot
+        run: dart run tool/check_api_snapshot.dart
+
+      - name: Check benchmark baseline
+        run: dart run benchmark/image_processor_benchmark.dart --check benchmark/baseline.json
+
+      - name: Build API docs
+        run: dart doc --output doc/api
+
+      - name: Validate package
+        run: dart pub publish --dry-run

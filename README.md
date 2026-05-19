@@ -15,7 +15,8 @@
 - 图像处理：解码、中心裁剪、区域裁剪、旋转、翻转、缩放、调色、PNG/JPEG 导出。
 - 输入探测：可在完整解码前识别 PNG、JPEG、GIF、WebP、HEIC、HEIF，用于移动端大图保护和格式提示。
 - 预览解码：通过 `ImageClipDecodeSettings.preview` 为编辑器或业务预览生成小图，同时保留原图尺寸元数据。
-- 原生解码适配：通过 `ImageClipDecodeAdapter` 接入 HEIC/HEIF 转码或平台 sampled decode。
+- 原生解码适配：内置 `ImageClipPlatformDecodeAdapter`，也可通过 `ImageClipDecodeAdapter` 接入自定义 HEIC/HEIF 转码或平台 sampled decode。
+- 文件链路：支持 `decodeFile`、`processFile` 和 `writeImageToFile`，本地文件输入会在后台 isolate 内读取。
 - 批处理 pipeline：多步图像操作可合并为一次后台任务，减少重复编解码。
 - 编辑会话：通过 `ImageClipSession` 持有连续编辑状态，减少业务层手动传递中间结果。
 - 解码会话：通过 `ImageClipDecodedSession` 保留已解码像素，适合后台 isolate 或小图连续处理。
@@ -28,7 +29,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.6.5
+  flutter_image_clip: ^0.6.6
 ```
 
 然后执行：
@@ -252,6 +253,22 @@ final png = await processor.exportPng(adjusted);
 final jpeg = await processor.exportJpeg(adjusted, quality: 88);
 ```
 
+处理本地相册文件时可以直接走文件路径，避免业务层先把大图读成 `Uint8List`：
+
+```dart
+final result = await processor.processFile(
+  '/path/to/camera.jpg',
+  steps: const [
+    ImageClipPipelineStep.cropRegion(
+      CropRegion(x: 120, y: 80, width: 1200, height: 900, cornerRadius: 0),
+    ),
+  ],
+  outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 88),
+);
+
+await processor.writeImageToFile(result, '/path/to/cropped.jpg');
+```
+
 多步处理建议使用 pipeline，这样会在一次后台任务里完成 decode、transform 和 encode：
 
 ```dart
@@ -343,7 +360,15 @@ final result = await task.result;
 
 ## 原生解码适配
 
-`ImageClipDecodeAdapter` 用来在进入 Dart 图像管线前接入平台能力，例如 HEIC/HEIF 转码、大图 sampled decode 或厂商相册返回格式归一化。纯 Dart fallback 会在完整解码后再缩放预览；如果需要真正减少大图解码内存，应在 adapter 内按 `ImageClipDecodeSettings.targetLongSide` 做平台侧采样。
+`ImageClipPlatformDecodeAdapter` 会调用库内置的 Android/iOS 原生实现，在进入 Dart 图像管线前执行 HEIC/HEIF 转码或大图 sampled decode：
+
+```dart
+final processor = ImageProcessor(
+  decodeAdapter: const ImageClipPlatformDecodeAdapter(),
+);
+```
+
+如果业务需要接入自有相册 SDK 或图片服务，也可以实现 `ImageClipDecodeAdapter`：
 
 ```dart
 class NativeDecodeAdapter extends ImageClipDecodeAdapter {
@@ -372,10 +397,6 @@ class NativeDecodeAdapter extends ImageClipDecodeAdapter {
     );
   }
 }
-
-final processor = ImageProcessor(
-  decodeAdapter: const NativeDecodeAdapter(),
-);
 ```
 
 ## 性能基准
@@ -384,9 +405,10 @@ final processor = ImageProcessor(
 dart run benchmark/image_processor_benchmark.dart
 dart run benchmark/image_processor_benchmark.dart --json
 dart run benchmark/image_processor_benchmark.dart --check benchmark/baseline.json
+dart run tool/check_api_snapshot.dart
 ```
 
-基准脚本会输出解码、旋转裁剪导出 JPEG、大图 downscale 的平均耗时、中位耗时、输出尺寸和字节数。`--check` 会按 `benchmark/baseline.json` 检查中位耗时和输出字节数，适合放进 CI 防止性能回退。
+基准脚本会输出解码、旋转裁剪导出 JPEG、大图 downscale、JPEG 预览解码和文件路径裁剪导出的平均耗时、中位耗时、输出尺寸和字节数。`--check` 会按 `benchmark/baseline.json` 检查中位耗时和输出字节数，适合放进 CI 防止性能回退。`tool/check_api_snapshot.dart` 会检查核心公共 API 片段，避免无意破坏 semver。
 
 ## 大图保护与异常处理
 
@@ -425,6 +447,8 @@ flutter pub get
 dart format lib test example
 flutter analyze
 flutter test
+flutter test integration_test
+dart run tool/check_api_snapshot.dart
 dart run benchmark/image_processor_benchmark.dart --check benchmark/baseline.json
 dart doc --output doc/api
 flutter pub publish --dry-run

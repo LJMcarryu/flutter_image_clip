@@ -8,6 +8,7 @@ import '../image_processing/image_processor.dart';
 
 part 'image_clip_editor/controller.dart';
 part 'image_clip_editor/editor.dart';
+part 'image_clip_editor/editor_save.dart';
 part 'image_clip_editor/labels.dart';
 part 'image_clip_editor/painters.dart';
 part 'image_clip_editor/preview_panel.dart';

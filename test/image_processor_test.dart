@@ -1,6 +1,7 @@
 import 'dart:async';
-import 'dart:typed_data';
+import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_image_clip/flutter_image_clip.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
@@ -121,6 +122,39 @@ void main() {
     expect(decoded.sourceWidth, 640);
     expect(decoded.sourceHeight, 360);
     expect(decoded.isPreviewSized, isTrue);
+  });
+
+  test('normalizes image bytes through the platform decode adapter', () async {
+    const channel = MethodChannel('flutter_image_clip/decode_test');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          expect(call.method, 'decode');
+          return <String, Object?>{
+            'bytes': Uint8List.fromList(
+              img.encodePng(img.Image(width: 24, height: 12)),
+            ),
+            'sourceWidth': 240,
+            'sourceHeight': 120,
+          };
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    final processor = ImageProcessor(
+      decodeAdapter: const ImageClipPlatformDecodeAdapter(channel: channel),
+    );
+    final decoded = await processor.decodeBytes(
+      Uint8List.fromList(img.encodePng(img.Image(width: 240, height: 120))),
+      label: 'platform.png',
+      decodeSettings: const ImageClipDecodeSettings.preview(targetLongSide: 24),
+    );
+
+    expect(decoded.width, 24);
+    expect(decoded.height, 12);
+    expect(decoded.sourceWidth, 240);
+    expect(decoded.sourceHeight, 120);
   });
 
   test('forwards progress from adapter-backed pipeline tasks', () async {
@@ -259,6 +293,43 @@ void main() {
     expect(result.height, 160);
     expect(result.format, ImageClipOutputFormat.jpeg);
     expect(result.bytes.sublist(0, 2), <int>[0xFF, 0xD8]);
+  });
+
+  test('processes image files inside the worker isolate', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'flutter_image_clip_test_',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final input = File('${tempDir.path}/source.png');
+    await input.writeAsBytes(
+      img.encodePng(img.Image(width: 160, height: 120)),
+      flush: true,
+    );
+
+    final processor = ImageProcessor();
+    final result = await processor.processFile(
+      input.path,
+      steps: const <ImageClipPipelineStep>[
+        ImageClipPipelineStep.cropRegion(
+          CropRegion(x: 10, y: 10, width: 80, height: 60, cornerRadius: 0),
+        ),
+      ],
+      outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 82),
+    );
+    final output = await processor.writeImageToFile(
+      result,
+      '${tempDir.path}/result.${result.fileExtension}',
+    );
+
+    expect(result.label, 'source.png');
+    expect(result.width, 80);
+    expect(result.height, 60);
+    expect(result.format, ImageClipOutputFormat.jpeg);
+    expect(await output.length(), result.bytes.length);
   });
 
   test('processes existing EditedImage values through a pipeline', () async {

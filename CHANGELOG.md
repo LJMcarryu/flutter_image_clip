@@ -1,3 +1,14 @@
+# 0.6.6
+
+- 包结构升级为 Android/iOS Flutter plugin，内置 `ImageClipPlatformDecodeAdapter`，支持平台侧 sampled decode 和 HEIC/HEIF 等格式归一化入口。
+- `ImageProcessor` 新增 `probeFile`、`decodeFile`、`processFile`、`writeImageToFile`，文件输入会在后台 isolate 内读取，减少 UI isolate 上的大图字节复制。
+- 新增 Android emulator `integration_test`，覆盖加载、预览缩略图、旋转、翻转、保存和中文文案流程。
+- benchmark 增加 JPEG 预览解码和文件路径裁剪导出样本，并纳入基准门禁。
+- 新增 `tool/check_api_snapshot.dart` 和 `tool/api_snapshot.json`，CI 会检查核心公共 API 片段。
+- 编辑器保存链路拆到 `editor_save.dart`，降低 `editor.dart` 维护压力。
+- `ImageClipEditorLabels` 新增 `english` 和 `zhHans` 预设，并补充中文语义测试。
+- 新增 tag 触发的 release 校验 workflow，发布前重复执行格式、分析、测试、benchmark、API 文档和 pub dry-run。
+
 # 0.6.5
 
 - 新增 `ImageClipDecodeSettings`，支持预览解码目标长边配置，并在 `EditedImage` 中保留 `sourceWidth`、`sourceHeight` 原图尺寸元数据。

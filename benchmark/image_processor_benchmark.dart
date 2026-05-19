@@ -11,36 +11,82 @@ Future<void> main(List<String> args) async {
   final processor = ImageProcessor();
   final smallPng = _pngBytes(640, 480);
   final largePng = _pngBytes(2400, 1600);
+  final cameraJpeg = _jpegBytes(2560, 1920);
+  final tempDir = await Directory.systemTemp.createTemp(
+    'flutter_image_clip_benchmark_',
+  );
+  final cameraFile = File('${tempDir.path}/camera.jpg')
+    ..writeAsBytesSync(cameraJpeg, flush: true);
 
-  final results = <_BenchmarkResult>[
-    await _measure(
-      'decode png 640x480',
-      () => processor.decodeBytes(smallPng, label: 'small.png'),
-    ),
-    await _measure(
-      'rotate crop export jpeg',
-      () => processor.processBytes(
-        smallPng,
-        label: 'pipeline.png',
-        steps: const <ImageClipPipelineStep>[
-          ImageClipPipelineStep.rotate(),
-          ImageClipPipelineStep.cropRegion(
-            CropRegion(x: 40, y: 40, width: 360, height: 260, cornerRadius: 0),
-          ),
-        ],
-        outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 86),
+  late final List<_BenchmarkResult> results;
+  try {
+    results = <_BenchmarkResult>[
+      await _measure(
+        'decode png 640x480',
+        () => processor.decodeBytes(smallPng, label: 'small.png'),
       ),
-    ),
-    await _measure(
-      'downscale png 2400x1600',
-      () => ImageProcessor(
-        processingSettings: const ImageClipProcessingSettings(
-          maxOutputPixels: 1000000,
+      await _measure(
+        'rotate crop export jpeg',
+        () => processor.processBytes(
+          smallPng,
+          label: 'pipeline.png',
+          steps: const <ImageClipPipelineStep>[
+            ImageClipPipelineStep.rotate(),
+            ImageClipPipelineStep.cropRegion(
+              CropRegion(
+                x: 40,
+                y: 40,
+                width: 360,
+                height: 260,
+                cornerRadius: 0,
+              ),
+            ),
+          ],
+          outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 86),
         ),
-      ).decodeBytes(largePng, label: 'large.png'),
-      iterations: 3,
-    ),
-  ];
+      ),
+      await _measure(
+        'downscale png 2400x1600',
+        () => ImageProcessor(
+          processingSettings: const ImageClipProcessingSettings(
+            maxOutputPixels: 1000000,
+          ),
+        ).decodeBytes(largePng, label: 'large.png'),
+        iterations: 3,
+      ),
+      await _measure(
+        'preview decode jpeg 2560x1920',
+        () => processor.decodePreviewBytes(
+          cameraJpeg,
+          label: 'camera.jpg',
+          targetLongSide: 1280,
+        ),
+        iterations: 3,
+      ),
+      await _measure(
+        'file crop export jpeg',
+        () => processor.processFile(
+          cameraFile.path,
+          steps: const <ImageClipPipelineStep>[
+            ImageClipPipelineStep.cropRegion(
+              CropRegion(
+                x: 160,
+                y: 120,
+                width: 1280,
+                height: 960,
+                cornerRadius: 0,
+              ),
+            ),
+            ImageClipPipelineStep.resizeLongSide(720),
+          ],
+          outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 84),
+        ),
+        iterations: 3,
+      ),
+    ];
+  } finally {
+    await tempDir.delete(recursive: true);
+  }
 
   if (args.contains('--json')) {
     _printJsonResults(results);
@@ -95,6 +141,24 @@ Uint8List _pngBytes(int width, int height) {
     }
   }
   return Uint8List.fromList(img.encodePng(image, level: 6));
+}
+
+Uint8List _jpegBytes(int width, int height) {
+  final image = img.Image(width: width, height: height, numChannels: 3);
+  for (var y = 0; y < height; y++) {
+    for (var x = 0; x < width; x++) {
+      final vignette =
+          ((x - width / 2).abs() + (y - height / 2).abs()) / (width + height);
+      image.setPixelRgb(
+        x,
+        y,
+        (32 + x * 180 / width + vignette * 40).round().clamp(0, 255),
+        (48 + y * 170 / height).round().clamp(0, 255),
+        (96 + (x + y) * 90 / (width + height)).round().clamp(0, 255),
+      );
+    }
+  }
+  return Uint8List.fromList(img.encodeJpg(image, quality: 88));
 }
 
 void _printTableResults(List<_BenchmarkResult> results) {

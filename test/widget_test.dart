@@ -98,6 +98,27 @@ void main() {
     }
   });
 
+  testWidgets('supports Simplified Chinese labels and semantics', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      await pumpClippingApp(
+        tester,
+        editor: const ImageClipEditor(labels: ImageClipEditorLabels.zhHans),
+      );
+
+      expect(find.text('取消'), findsOneWidget);
+      expect(find.text('保存'), findsOneWidget);
+      expect(find.bySemanticsLabel('图片裁剪预览'), findsOneWidget);
+      expect(find.bySemanticsLabel('裁剪框'), findsOneWidget);
+      expect(find.bySemanticsLabel('水平翻转'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    } finally {
+      semantics.dispose();
+    }
+  });
+
   testWidgets('matches the default editor golden', (tester) async {
     await pumpClippingApp(
       tester,

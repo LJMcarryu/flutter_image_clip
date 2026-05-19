@@ -33,6 +33,18 @@ abstract class ImageClipDecodeAdapter {
   /// Whether this adapter should be asked to normalize [info].
   bool supports(ImageClipImageInfo info) => !info.canDecodeWithDart;
 
+  /// Whether this adapter should normalize [info] for [settings].
+  ///
+  /// Existing adapters can continue overriding [supports]. Implementations that
+  /// need decode settings, such as sampled preview decoders, can override this
+  /// method instead.
+  bool supportsDecode(
+    ImageClipImageInfo info,
+    ImageClipDecodeSettings settings,
+  ) {
+    return supports(info);
+  }
+
   /// Returns normalized bytes for [bytes], or null to use the Dart fallback.
   Future<ImageClipDecodeAdapterResult?> decode(
     Uint8List bytes, {

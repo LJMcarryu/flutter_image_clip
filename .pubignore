@@ -9,8 +9,17 @@ coverage/
 doc/
 docs/
 
-android/
-ios/
+android/*
+!android/build.gradle
+!android/src/
+!android/src/main/
+!android/src/main/AndroidManifest.xml
+!android/src/main/kotlin/
+!android/src/main/kotlin/**
+ios/*
+!ios/Classes/
+!ios/Classes/**
+!ios/flutter_image_clip.podspec
 linux/
 macos/
 web/

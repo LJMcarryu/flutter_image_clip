@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:isolate';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -120,6 +121,42 @@ class ImageProcessor {
     );
   }
 
+  /// Reads lightweight format and dimension metadata from an image file.
+  Future<ImageClipImageInfo> probeFile(String path) async {
+    return probeBytes(await File(path).readAsBytes());
+  }
+
+  /// Decodes an image file in a background isolate.
+  Future<EditedImage> decodeFile(
+    String path, {
+    String? label,
+    ImageClipDecodeSettings decodeSettings = const ImageClipDecodeSettings(),
+    ImageClipTaskOptions? options,
+  }) {
+    return decodeFileTask(
+      path,
+      label: label,
+      decodeSettings: decodeSettings,
+      options: options,
+    ).result;
+  }
+
+  /// Starts decoding an image file as a cancelable background task.
+  ImageClipTask<EditedImage> decodeFileTask(
+    String path, {
+    String? label,
+    ImageClipDecodeSettings decodeSettings = const ImageClipDecodeSettings(),
+    ImageClipTaskOptions? options,
+  }) {
+    return processFileTask(
+      path,
+      label: label,
+      decodeSettings: decodeSettings,
+      operationLabel: 'Decode',
+      options: options,
+    );
+  }
+
   /// Runs [pipeline] as a single background image job.
   ///
   /// Unlike chaining single-operation methods, a pipeline decodes the source
@@ -186,6 +223,62 @@ class ImageProcessor {
       operationLabel: operationLabel,
     );
     return processPipelineTask(pipeline, options: options);
+  }
+
+  /// Decodes an image file, applies [steps], and encodes the final result.
+  Future<EditedImage> processFile(
+    String path, {
+    String? label,
+    List<ImageClipPipelineStep> steps = const <ImageClipPipelineStep>[],
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
+    ImageClipDecodeSettings decodeSettings = const ImageClipDecodeSettings(),
+    String? operationLabel,
+    ImageClipTaskOptions? options,
+  }) {
+    return processFileTask(
+      path,
+      label: label,
+      steps: steps,
+      outputSettings: outputSettings,
+      decodeSettings: decodeSettings,
+      operationLabel: operationLabel,
+      options: options,
+    ).result;
+  }
+
+  /// Starts a file-backed processing task.
+  ///
+  /// The source file is read inside the worker isolate, avoiding an additional
+  /// source-byte copy on the UI isolate for large local gallery files.
+  ImageClipTask<EditedImage> processFileTask(
+    String path, {
+    String? label,
+    List<ImageClipPipelineStep> steps = const <ImageClipPipelineStep>[],
+    ImageClipOutputSettings outputSettings =
+        const ImageClipOutputSettings.png(),
+    ImageClipDecodeSettings decodeSettings = const ImageClipDecodeSettings(),
+    String? operationLabel,
+    ImageClipTaskOptions? options,
+  }) {
+    return processPipelineTask(
+      ImageClipPipeline.decodeFile(
+        path: path,
+        label: label ?? _fileLabel(path),
+        steps: steps,
+        outputSettings: outputSettings,
+        decodeSettings: decodeSettings,
+        operationLabel: operationLabel,
+      ),
+      options: options,
+    );
+  }
+
+  /// Writes [image] bytes to [path], creating parent directories if needed.
+  Future<File> writeImageToFile(EditedImage image, String path) async {
+    final file = File(path);
+    await file.parent.create(recursive: true);
+    return file.writeAsBytes(image.bytes, flush: true);
   }
 
   ImageClipTask<EditedImage> _processBytesPipelineTask(
@@ -264,7 +357,7 @@ class ImageProcessor {
       return pipeline;
     }
     final info = probeBytes(bytes);
-    if (!adapter.supports(info)) {
+    if (!adapter.supportsDecode(info, pipeline.decodeSettings)) {
       return pipeline;
     }
     final result = await adapter.decode(
@@ -555,6 +648,12 @@ class ImageProcessor {
     };
     return ImageClipTask._start(payload, options: options);
   }
+}
+
+String _fileLabel(String path) {
+  final normalized = path.replaceAll('\\', '/');
+  final index = normalized.lastIndexOf('/');
+  return index < 0 ? normalized : normalized.substring(index + 1);
 }
 
 ImageClipImageInfo _probeEncodedImage(Uint8List bytes) {

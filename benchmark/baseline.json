@@ -14,6 +14,16 @@
       "case": "downscale png 2400x1600",
       "maxMedianMs": 1500,
       "maxOutputBytes": 22000
+    },
+    {
+      "case": "preview decode jpeg 2560x1920",
+      "maxMedianMs": 1800,
+      "maxOutputBytes": 300000
+    },
+    {
+      "case": "file crop export jpeg",
+      "maxMedianMs": 1800,
+      "maxOutputBytes": 50000
     }
   ]
 }

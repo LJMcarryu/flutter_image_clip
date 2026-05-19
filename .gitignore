@@ -41,10 +41,19 @@ pubspec.lock
 # Reference material used during the demo build; not part of the package.
 /docs/
 
-# The package is pure Dart/Flutter UI code; generated app platform folders are
-# kept locally for demos but are not part of the package repository.
-/android/
-/ios/
+# Generated app platform folders are kept locally for demos. Only plugin
+# sources required by the package are tracked.
+/android/*
+!/android/build.gradle
+!/android/src/
+!/android/src/main/
+!/android/src/main/AndroidManifest.xml
+!/android/src/main/kotlin/
+!/android/src/main/kotlin/**
+/ios/*
+!/ios/Classes/
+!/ios/Classes/**
+!/ios/flutter_image_clip.podspec
 /linux/
 /macos/
 /web/

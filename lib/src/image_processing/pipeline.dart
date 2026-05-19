@@ -9,6 +9,7 @@ import 'models.dart';
 class ImageClipPipeline {
   const ImageClipPipeline._({
     this.bytes,
+    this.inputPath,
     this.source,
     required this.label,
     required this.steps,
@@ -29,7 +30,22 @@ class ImageClipPipeline {
     this.sourceWidth,
     this.sourceHeight,
     this.operationLabel,
-  }) : source = null;
+  }) : inputPath = null,
+       source = null;
+
+  /// Creates a pipeline from a local image file path.
+  const ImageClipPipeline.decodeFile({
+    required String path,
+    required this.label,
+    this.steps = const <ImageClipPipelineStep>[],
+    this.outputSettings = const ImageClipOutputSettings.png(),
+    this.decodeSettings = const ImageClipDecodeSettings(),
+    this.sourceWidth,
+    this.sourceHeight,
+    this.operationLabel,
+  }) : bytes = null,
+       inputPath = path,
+       source = null;
 
   /// Creates a pipeline from an existing [EditedImage].
   ImageClipPipeline.fromImage({
@@ -40,6 +56,7 @@ class ImageClipPipeline {
     String? operationLabel,
   }) : this._(
          source: source,
+         inputPath: null,
          label: source.label,
          steps: steps,
          outputSettings: outputSettings,
@@ -51,6 +68,9 @@ class ImageClipPipeline {
 
   /// Encoded source bytes when the pipeline starts from raw input bytes.
   final Uint8List? bytes;
+
+  /// Local file path when the pipeline starts from a file.
+  final String? inputPath;
 
   /// Existing processed source image when the pipeline starts from [EditedImage].
   final EditedImage? source;
@@ -79,6 +99,7 @@ class ImageClipPipeline {
   /// Converts this pipeline to the map used by the background processor.
   Map<String, Object?> toMap() => <String, Object?>{
     'bytes': bytes,
+    'inputPath': inputPath,
     'source': source?.toMap(),
     'label': label,
     'steps': <Map<String, Object?>>[for (final step in steps) step.toMap()],

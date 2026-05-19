@@ -40,6 +40,44 @@ class ImageClipEditorLabels {
   /// Default image label used when no label is supplied.
   static const defaultImageLabelValue = 'Image to crop';
 
+  /// English label preset.
+  static const english = ImageClipEditorLabels();
+
+  /// Simplified Chinese label preset.
+  static const zhHans = ImageClipEditorLabels(
+    defaultImageLabel: '待裁剪图片',
+    cancelButton: '取消',
+    saveButton: '保存',
+    fitButton: '适应',
+    fillButton: '填充',
+    flipHorizontalButton: '水平翻转',
+    flipVerticalButton: '垂直翻转',
+    rotateButton: '旋转',
+    previewSemanticsLabel: '图片裁剪预览',
+    cropFrameSemanticsLabel: '裁剪框',
+    resultTitle: '裁剪结果',
+    cropDetailsTitle: '裁剪详情',
+    rotationDegreesLabel: '旋转角度',
+    sourceSizeLabel: '原图尺寸',
+    resultDataTitle: '结果数据',
+    backTooltip: '返回',
+    initialStatus: '选择图片开始裁剪',
+    loadingImageStatus: '正在加载图片',
+    imageLoadedStatus: '图片已加载',
+    waitingForImageStatus: '等待图片',
+    generatingSampleStatus: '正在生成示例图片',
+    sampleGeneratedStatus: '示例图片已就绪',
+    imageRequiredMessage: '请先添加图片再裁剪',
+    rotatingStatus: '正在旋转图片',
+    rotationCompleteStatus: '旋转完成',
+    flipPreviewStatus: '翻转预览已更新',
+    croppingStatus: '正在裁剪图片',
+    cropCompleteStatus: '裁剪完成',
+    cropResetMessage: '裁剪框已重置',
+    taskCanceledStatus: '处理已取消',
+    processingFailedPrefix: '处理失败',
+  );
+
   /// Default label attached to incoming image bytes.
   final String defaultImageLabel;
 
