@@ -110,6 +110,17 @@ img.Image _prepareOutputImage(
   );
 }
 
+img.Image _applyDecodeSettings(
+  img.Image image,
+  ImageClipDecodeSettings settings,
+) {
+  final targetLongSide = settings.targetLongSide;
+  if (targetLongSide == null) {
+    return image;
+  }
+  return _resizeLongSideUnchecked(image, targetLongSide);
+}
+
 int _pixelCount(img.Image image) => image.width * image.height;
 
 Uint8List _encodeImage(img.Image image, ImageClipOutputSettings settings) {
@@ -184,8 +195,13 @@ img.Image _cropRegion(
 
 img.Image _resizeLongSide(img.Image source, int maxSide) {
   final safeMaxSide = maxSide.clamp(128, 4096).toInt();
+  return _resizeLongSideUnchecked(source, safeMaxSide);
+}
+
+img.Image _resizeLongSideUnchecked(img.Image source, int maxSide) {
+  final safeMaxSide = math.max(1, maxSide);
   final currentLongSide = math.max(source.width, source.height);
-  if (currentLongSide == safeMaxSide) {
+  if (currentLongSide <= safeMaxSide) {
     return img.Image.from(source);
   }
 

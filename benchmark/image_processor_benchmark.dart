@@ -7,6 +7,7 @@ import 'package:flutter_image_clip/image_processing/image_processor.dart';
 import 'package:image/image.dart' as img;
 
 Future<void> main(List<String> args) async {
+  final checkPath = _valueAfter(args, '--check');
   final processor = ImageProcessor();
   final smallPng = _pngBytes(640, 480);
   final largePng = _pngBytes(2400, 1600);
@@ -43,6 +44,10 @@ Future<void> main(List<String> args) async {
 
   if (args.contains('--json')) {
     _printJsonResults(results);
+    return;
+  }
+  if (checkPath != null) {
+    _checkBaseline(results, File(checkPath));
     return;
   }
   _printTableResults(results);
@@ -113,6 +118,53 @@ void _printJsonResults(List<_BenchmarkResult> results) {
   );
 }
 
+String? _valueAfter(List<String> args, String name) {
+  final index = args.indexOf(name);
+  if (index < 0 || index + 1 >= args.length) {
+    return null;
+  }
+  return args[index + 1];
+}
+
+void _checkBaseline(List<_BenchmarkResult> results, File file) {
+  final json = jsonDecode(file.readAsStringSync()) as Map<String, Object?>;
+  final entries = (json['results']! as List<Object?>)
+      .cast<Map<String, Object?>>();
+  final limits = <String, _BenchmarkLimit>{
+    for (final entry in entries)
+      entry['case']! as String: _BenchmarkLimit.fromJson(entry),
+  };
+  final failures = <String>[];
+  for (final result in results) {
+    final limit = limits[result.name];
+    if (limit == null) {
+      failures.add('${result.name}: missing baseline');
+      continue;
+    }
+    if (result.medianMs > limit.maxMedianMs) {
+      failures.add(
+        '${result.name}: median ${result.medianMs} ms > '
+        '${limit.maxMedianMs} ms',
+      );
+    }
+    if (result.outputBytes > limit.maxOutputBytes) {
+      failures.add(
+        '${result.name}: output ${result.outputBytes} bytes > '
+        '${limit.maxOutputBytes} bytes',
+      );
+    }
+  }
+  if (failures.isNotEmpty) {
+    stderr.writeln('Benchmark regression detected:');
+    for (final failure in failures) {
+      stderr.writeln('- $failure');
+    }
+    exitCode = 1;
+    return;
+  }
+  stdout.writeln('Benchmark baseline check passed.');
+}
+
 class _BenchmarkResult {
   const _BenchmarkResult({
     required this.name,
@@ -135,4 +187,21 @@ class _BenchmarkResult {
     'outputBytes': outputBytes,
     'outputSize': outputSize,
   };
+}
+
+class _BenchmarkLimit {
+  const _BenchmarkLimit({
+    required this.maxMedianMs,
+    required this.maxOutputBytes,
+  });
+
+  factory _BenchmarkLimit.fromJson(Map<String, Object?> json) {
+    return _BenchmarkLimit(
+      maxMedianMs: json['maxMedianMs']! as int,
+      maxOutputBytes: json['maxOutputBytes']! as int,
+    );
+  }
+
+  final int maxMedianMs;
+  final int maxOutputBytes;
 }

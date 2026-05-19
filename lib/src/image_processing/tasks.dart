@@ -110,7 +110,8 @@ class ImageClipTask<T> {
   ImageClipTask._start(
     Map<String, Object?> request, {
     ImageClipTaskOptions? options,
-  }) : _options = options ?? const ImageClipTaskOptions() {
+  }) : _options = options ?? const ImageClipTaskOptions(),
+       _onCancel = null {
     _startTimeoutTimer();
     _emitProgress(
       const ImageClipTaskProgress(
@@ -123,11 +124,13 @@ class ImageClipTask<T> {
     unawaited(_spawn(request));
   }
 
-  ImageClipTask._manual(this._options) {
+  ImageClipTask._manual(this._options, {void Function()? onCancel})
+    : _onCancel = onCancel {
     _startTimeoutTimer();
   }
 
   final ImageClipTaskOptions _options;
+  final void Function()? _onCancel;
   final _resultCompleter = Completer<T>();
   final _progressController =
       StreamController<ImageClipTaskProgress>.broadcast();
@@ -233,6 +236,11 @@ class ImageClipTask<T> {
       return false;
     }
     _isCanceled = true;
+    try {
+      _onCancel?.call();
+    } catch (_) {
+      // Cancellation must still complete the task even if custom cleanup fails.
+    }
     _isolate?.kill(priority: Isolate.immediate);
     _completeError(error);
     return true;

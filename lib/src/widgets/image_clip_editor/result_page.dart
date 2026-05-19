@@ -44,6 +44,30 @@ class ImageClipResult {
     'flippedHorizontally': flippedHorizontally,
     'flippedVertically': flippedVertically,
   };
+
+  /// Creates a result from [toMap] output.
+  static ImageClipResult fromMap(Map<String, Object?> map) {
+    final region = CropRegion.fromMap(
+      Map<Object?, Object?>.from(map['region']! as Map),
+    );
+    return ImageClipResult(
+      source: EditedImage.fromMap(
+        Map<String, Object?>.from(map['source']! as Map),
+      ),
+      cropped: EditedImage.fromMap(
+        Map<String, Object?>.from(map['cropped']! as Map),
+      ),
+      region: region,
+      previewRegion: map['previewRegion'] == null
+          ? region
+          : CropRegion.fromMap(
+              Map<Object?, Object?>.from(map['previewRegion']! as Map),
+            ),
+      rotationDegrees: _intOf(map['rotationDegrees'], fallback: 0),
+      flippedHorizontally: _boolOf(map['flippedHorizontally'], fallback: false),
+      flippedVertically: _boolOf(map['flippedVertically'], fallback: false),
+    );
+  }
 }
 
 /// Displays the cropped image and crop metadata after saving.
@@ -382,4 +406,18 @@ class _ResultDataPreview extends StatelessWidget {
       ),
     );
   }
+}
+
+int _intOf(Object? value, {required int fallback}) {
+  if (value is num) {
+    return value.round();
+  }
+  return fallback;
+}
+
+bool _boolOf(Object? value, {required bool fallback}) {
+  if (value is bool) {
+    return value;
+  }
+  return fallback;
 }

@@ -5,11 +5,13 @@ import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
 
+import 'decode_adapter.dart';
 import 'exceptions.dart';
 import 'models.dart';
 import 'pipeline.dart';
 
 export 'crop_transform.dart';
+export 'decode_adapter.dart';
 export 'exceptions.dart';
 export 'models.dart';
 export 'pipeline.dart';
@@ -25,10 +27,14 @@ class ImageProcessor {
   /// Creates an image processor.
   const ImageProcessor({
     this.processingSettings = const ImageClipProcessingSettings(),
+    this.decodeAdapter,
   });
 
   /// Runtime guardrails used for decode and output processing.
   final ImageClipProcessingSettings processingSettings;
+
+  /// Optional platform adapter used before Dart decoding starts.
+  final ImageClipDecodeAdapter? decodeAdapter;
 
   /// Reads lightweight format and dimension metadata from encoded [bytes].
   ///
@@ -55,22 +61,60 @@ class ImageProcessor {
   Future<EditedImage> decodeBytes(
     Uint8List bytes, {
     required String label,
+    ImageClipDecodeSettings decodeSettings = const ImageClipDecodeSettings(),
     ImageClipTaskOptions? options,
   }) {
-    return decodeBytesTask(bytes, label: label, options: options).result;
+    return decodeBytesTask(
+      bytes,
+      label: label,
+      decodeSettings: decodeSettings,
+      options: options,
+    ).result;
   }
 
   /// Starts decoding encoded image [bytes] as a cancelable task.
   ImageClipTask<EditedImage> decodeBytesTask(
     Uint8List bytes, {
     required String label,
+    ImageClipDecodeSettings decodeSettings = const ImageClipDecodeSettings(),
     ImageClipTaskOptions? options,
   }) {
-    return processPipelineTask(
-      ImageClipPipeline.decode(
-        bytes: bytes,
-        label: label,
-        operationLabel: 'Decode',
+    return processBytesTask(
+      bytes,
+      label: label,
+      decodeSettings: decodeSettings,
+      operationLabel: 'Decode',
+      options: options,
+    );
+  }
+
+  /// Decodes [bytes] into a preview image constrained by [targetLongSide].
+  Future<EditedImage> decodePreviewBytes(
+    Uint8List bytes, {
+    required String label,
+    required int targetLongSide,
+    ImageClipTaskOptions? options,
+  }) {
+    return decodePreviewBytesTask(
+      bytes,
+      label: label,
+      targetLongSide: targetLongSide,
+      options: options,
+    ).result;
+  }
+
+  /// Starts decoding [bytes] into a preview image constrained by [targetLongSide].
+  ImageClipTask<EditedImage> decodePreviewBytesTask(
+    Uint8List bytes, {
+    required String label,
+    required int targetLongSide,
+    ImageClipTaskOptions? options,
+  }) {
+    return decodeBytesTask(
+      bytes,
+      label: label,
+      decodeSettings: ImageClipDecodeSettings.preview(
+        targetLongSide: targetLongSide,
       ),
       options: options,
     );
@@ -92,10 +136,12 @@ class ImageProcessor {
     ImageClipPipeline pipeline, {
     ImageClipTaskOptions? options,
   }) {
-    return _start(<String, Object?>{
-      'kind': 'pipeline',
-      'pipeline': pipeline.toMap(),
-    }, options: options);
+    if (pipeline.bytes != null &&
+        decodeAdapter != null &&
+        pipeline.decodeSettings.usePlatformAdapter) {
+      return _processBytesPipelineTask(pipeline, options: options);
+    }
+    return _runPipelineTask(pipeline, options: options);
   }
 
   /// Decodes [bytes], applies [steps], and encodes the final result.
@@ -105,6 +151,7 @@ class ImageProcessor {
     List<ImageClipPipelineStep> steps = const <ImageClipPipelineStep>[],
     ImageClipOutputSettings outputSettings =
         const ImageClipOutputSettings.png(),
+    ImageClipDecodeSettings decodeSettings = const ImageClipDecodeSettings(),
     String? operationLabel,
     ImageClipTaskOptions? options,
   }) {
@@ -113,6 +160,7 @@ class ImageProcessor {
       label: label,
       steps: steps,
       outputSettings: outputSettings,
+      decodeSettings: decodeSettings,
       operationLabel: operationLabel,
       options: options,
     ).result;
@@ -125,18 +173,118 @@ class ImageProcessor {
     List<ImageClipPipelineStep> steps = const <ImageClipPipelineStep>[],
     ImageClipOutputSettings outputSettings =
         const ImageClipOutputSettings.png(),
+    ImageClipDecodeSettings decodeSettings = const ImageClipDecodeSettings(),
     String? operationLabel,
     ImageClipTaskOptions? options,
   }) {
-    return processPipelineTask(
-      ImageClipPipeline.decode(
-        bytes: bytes,
-        label: label,
-        steps: steps,
-        outputSettings: outputSettings,
-        operationLabel: operationLabel,
+    final pipeline = ImageClipPipeline.decode(
+      bytes: bytes,
+      label: label,
+      steps: steps,
+      outputSettings: outputSettings,
+      decodeSettings: decodeSettings,
+      operationLabel: operationLabel,
+    );
+    return processPipelineTask(pipeline, options: options);
+  }
+
+  ImageClipTask<EditedImage> _processBytesPipelineTask(
+    ImageClipPipeline pipeline, {
+    ImageClipTaskOptions? options,
+  }) {
+    final bytes = pipeline.bytes;
+    if (bytes == null ||
+        decodeAdapter == null ||
+        !pipeline.decodeSettings.usePlatformAdapter) {
+      return processPipelineTask(pipeline, options: options);
+    }
+
+    final effectiveOptions = options ?? const ImageClipTaskOptions();
+    late final ImageClipTask<EditedImage> task;
+    ImageClipTask<EditedImage>? pipelineTask;
+    StreamSubscription<ImageClipTaskProgress>? progressSubscription;
+
+    Future<EditedImage> run() async {
+      task._emitProgress(
+        const ImageClipTaskProgress(
+          stage: ImageClipTaskProgressStage.decoding,
+          completedSteps: 0,
+          totalSteps: 0,
+          message: 'Normalizing image',
+        ),
+      );
+      final normalized = await _normalizedPipeline(pipeline);
+      if (task.isCanceled) {
+        throw const ImageClipTaskCanceledException();
+      }
+      pipelineTask = _runPipelineTask(normalized);
+      progressSubscription = pipelineTask!.progress.listen(task._emitProgress);
+      return pipelineTask!.result;
+    }
+
+    task = ImageClipTask<EditedImage>._manual(
+      effectiveOptions,
+      onCancel: () {
+        pipelineTask?.cancel();
+        unawaited(progressSubscription?.cancel());
+      },
+    );
+    task._emitProgress(
+      const ImageClipTaskProgress(
+        stage: ImageClipTaskProgressStage.queued,
+        completedSteps: 0,
+        totalSteps: 0,
+        message: 'Queued',
       ),
-      options: options,
+    );
+    task._bindFuture(
+      Future<EditedImage>(
+        run,
+      ).whenComplete(() => progressSubscription?.cancel()),
+    );
+    return task;
+  }
+
+  ImageClipTask<EditedImage> _runPipelineTask(
+    ImageClipPipeline pipeline, {
+    ImageClipTaskOptions? options,
+  }) {
+    return _start(<String, Object?>{
+      'kind': 'pipeline',
+      'pipeline': pipeline.toMap(),
+    }, options: options);
+  }
+
+  Future<ImageClipPipeline> _normalizedPipeline(
+    ImageClipPipeline pipeline,
+  ) async {
+    final adapter = decodeAdapter;
+    final bytes = pipeline.bytes;
+    if (adapter == null || bytes == null) {
+      return pipeline;
+    }
+    final info = probeBytes(bytes);
+    if (!adapter.supports(info)) {
+      return pipeline;
+    }
+    final result = await adapter.decode(
+      bytes,
+      info: info,
+      label: pipeline.label,
+      settings: pipeline.decodeSettings,
+    );
+    if (result == null) {
+      return pipeline;
+    }
+    return ImageClipPipeline.decode(
+      bytes: result.bytes,
+      label: pipeline.label,
+      steps: pipeline.steps,
+      outputSettings: pipeline.outputSettings,
+      decodeSettings: pipeline.decodeSettings,
+      sourceWidth: result.sourceWidth,
+      sourceHeight: result.sourceHeight,
+      operationLabel: pipeline.operationLabel,
     );
   }
 

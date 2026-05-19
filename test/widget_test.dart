@@ -434,6 +434,28 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('lays out with large text in landscape', (tester) async {
+    await pumpClippingApp(
+      tester,
+      size: const Size(844, 390),
+      editor: MediaQuery(
+        data: const MediaQueryData(
+          size: Size(844, 390),
+          textScaler: TextScaler.linear(1.6),
+        ),
+        child: const ImageClipEditor(
+          labels: ImageClipEditorLabels(
+            flipHorizontalButton: 'Flip horizontally',
+            flipVerticalButton: 'Flip vertically',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(Image), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('controller can load, reset, rotate and crop an image', (
     tester,
   ) async {
@@ -474,6 +496,44 @@ void main() {
     expect(result.cropped.bytes, isNotEmpty);
     expect(result.rotationDegrees, 90);
     expect(result.flippedHorizontally, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('preview decode saves from original source dimensions', (
+    tester,
+  ) async {
+    final controller = ImageClipEditorController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: controller,
+          initialImageBytes: _pngBytes(400, 200),
+          initialImageLabel: 'preview-source.png',
+          previewDecodeSettings: const ImageClipDecodeSettings.preview(
+            targetLongSide: 100,
+          ),
+          loadSampleOnStart: false,
+          showResultPage: false,
+        ),
+      ),
+    );
+    await pumpUntilIdle(tester);
+
+    expect(controller.image?.width, 100);
+    expect(controller.image?.height, 50);
+    expect(controller.image?.sourceWidth, 400);
+    expect(controller.image?.sourceHeight, 200);
+
+    final result = await tester.runAsync(controller.crop);
+    await tester.pump();
+
+    expect(result, isNotNull);
+    expect(result!.source.isPreviewSized, isTrue);
+    expect(result.region.width, greaterThan(result.previewRegion.width));
+    expect(result.region.height, greaterThan(result.previewRegion.height));
+    expect(result.cropped.width, result.region.width);
+    expect(result.cropped.height, result.region.height);
     expect(tester.takeException(), isNull);
   });
 
@@ -581,6 +641,7 @@ class _DelayedDecodeProcessor extends ImageProcessor {
   ImageClipTask<EditedImage> decodeBytesTask(
     Uint8List bytes, {
     required String label,
+    ImageClipDecodeSettings decodeSettings = const ImageClipDecodeSettings(),
     ImageClipTaskOptions? options,
   }) {
     final completer = Completer<EditedImage>();

@@ -84,6 +84,83 @@ void main() {
     }
   });
 
+  test('decodes preview images with source dimensions preserved', () async {
+    final processor = ImageProcessor();
+
+    final preview = await processor.decodePreviewBytes(
+      img.encodePng(img.Image(width: 800, height: 400)),
+      label: 'preview.png',
+      targetLongSide: 200,
+    );
+
+    expect(preview.width, 200);
+    expect(preview.height, 100);
+    expect(preview.sourceWidth, 800);
+    expect(preview.sourceHeight, 400);
+    expect(preview.isPreviewSized, isTrue);
+  });
+
+  test('normalizes image bytes through a decode adapter', () async {
+    final adapter = _FixtureDecodeAdapter(
+      bytes: Uint8List.fromList(
+        img.encodePng(img.Image(width: 32, height: 18)),
+      ),
+      sourceWidth: 640,
+      sourceHeight: 360,
+    );
+    final processor = ImageProcessor(decodeAdapter: adapter);
+
+    final decoded = await processor.decodeBytes(
+      Uint8List.fromList(<int>[1, 2, 3, 4]),
+      label: 'native.heic',
+    );
+
+    expect(adapter.callCount, 1);
+    expect(decoded.width, 32);
+    expect(decoded.height, 18);
+    expect(decoded.sourceWidth, 640);
+    expect(decoded.sourceHeight, 360);
+    expect(decoded.isPreviewSized, isTrue);
+  });
+
+  test('forwards progress from adapter-backed pipeline tasks', () async {
+    final adapter = _FixtureDecodeAdapter(
+      bytes: Uint8List.fromList(
+        img.encodePng(img.Image(width: 80, height: 60)),
+      ),
+      sourceWidth: 800,
+      sourceHeight: 600,
+    );
+    final processor = ImageProcessor(decodeAdapter: adapter);
+    final task = processor.processBytesTask(
+      Uint8List.fromList(<int>[1, 2, 3, 4]),
+      label: 'native.heic',
+      steps: const <ImageClipPipelineStep>[
+        ImageClipPipelineStep.rotate(),
+        ImageClipPipelineStep.cropRegion(
+          CropRegion(x: 0, y: 0, width: 40, height: 60, cornerRadius: 0),
+        ),
+      ],
+    );
+    final progressEvents = <ImageClipTaskProgress>[];
+    final subscription = task.progress.listen(progressEvents.add);
+
+    final result = await task.result;
+    await subscription.cancel();
+
+    expect(result.bytes, isNotEmpty);
+    expect(adapter.callCount, 1);
+    expect(
+      progressEvents.map((event) => event.stage),
+      containsAll(<ImageClipTaskProgressStage>[
+        ImageClipTaskProgressStage.decoding,
+        ImageClipTaskProgressStage.processing,
+        ImageClipTaskProgressStage.encoding,
+        ImageClipTaskProgressStage.completed,
+      ]),
+    );
+  });
+
   test('preserves transparent PNG pixels through decode and crop', () async {
     final processor = ImageProcessor();
     final decoded = await processor.decodeBytes(
@@ -236,6 +313,32 @@ void main() {
     expect(sourceRegion.width, 40);
     expect(sourceRegion.height, 30);
     expect(sourceRegion.cornerRadius, 2);
+  });
+
+  test('crop regions and settings support stable map/copy helpers', () {
+    const region = CropRegion(
+      x: 4,
+      y: 8,
+      width: 20,
+      height: 30,
+      cornerRadius: 2,
+    );
+    final restored = CropRegion.fromMap(region.toMap());
+
+    expect(restored, region);
+    expect(region.copyWith(width: 24).width, 24);
+    expect(
+      const ImageClipOutputSettings.jpeg(
+        jpegQuality: 80,
+      ).copyWith(jpegQuality: 88),
+      const ImageClipOutputSettings.jpeg(jpegQuality: 88),
+    );
+    expect(
+      const ImageClipDecodeSettings.preview(
+        targetLongSide: 512,
+      ).copyWith(clearTargetLongSide: true).targetLongSide,
+      isNull,
+    );
   });
 
   test('single rotate and flip operations can export JPEG directly', () async {
@@ -584,6 +687,38 @@ class _DelayedPipelineProcessor extends ImageProcessor {
         () => _editedImage('late.png', width: 20, height: 20),
       ),
       options: options,
+    );
+  }
+}
+
+class _FixtureDecodeAdapter extends ImageClipDecodeAdapter {
+  _FixtureDecodeAdapter({
+    required this.bytes,
+    required this.sourceWidth,
+    required this.sourceHeight,
+  });
+
+  final Uint8List bytes;
+  final int sourceWidth;
+  final int sourceHeight;
+
+  int callCount = 0;
+
+  @override
+  bool supports(ImageClipImageInfo info) => true;
+
+  @override
+  Future<ImageClipDecodeAdapterResult?> decode(
+    Uint8List bytes, {
+    required ImageClipImageInfo info,
+    required String label,
+    required ImageClipDecodeSettings settings,
+  }) async {
+    callCount++;
+    return ImageClipDecodeAdapterResult(
+      bytes: this.bytes,
+      sourceWidth: sourceWidth,
+      sourceHeight: sourceHeight,
     );
   }
 }

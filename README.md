@@ -14,6 +14,8 @@
 - 输出格式：裁剪结果可输出 PNG 或 JPEG，并可配置 JPEG quality。
 - 图像处理：解码、中心裁剪、区域裁剪、旋转、翻转、缩放、调色、PNG/JPEG 导出。
 - 输入探测：可在完整解码前识别 PNG、JPEG、GIF、WebP、HEIC、HEIF，用于移动端大图保护和格式提示。
+- 预览解码：通过 `ImageClipDecodeSettings.preview` 为编辑器或业务预览生成小图，同时保留原图尺寸元数据。
+- 原生解码适配：通过 `ImageClipDecodeAdapter` 接入 HEIC/HEIF 转码或平台 sampled decode。
 - 批处理 pipeline：多步图像操作可合并为一次后台任务，减少重复编解码。
 - 编辑会话：通过 `ImageClipSession` 持有连续编辑状态，减少业务层手动传递中间结果。
 - 解码会话：通过 `ImageClipDecodedSession` 保留已解码像素，适合后台 isolate 或小图连续处理。
@@ -26,7 +28,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.6.3
+  flutter_image_clip: ^0.6.5
 ```
 
 然后执行：
@@ -60,6 +62,9 @@ final result = await showImageClipEditor(
     ImageClipAspectRatio.widescreen,
   ],
   outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 88),
+  previewDecodeSettings: const ImageClipDecodeSettings.preview(
+    targetLongSide: 1600,
+  ),
   processingSettings: const ImageClipProcessingSettings(
     maxInputPixels: 48000000,
     maxOutputPixels: 16000000,
@@ -128,12 +133,17 @@ ImageClipEditor(
     ImageClipAspectRatio(label: 'Banner', width: 3, height: 1),
   ],
   outputSettings: const ImageClipOutputSettings.png(),
+  previewDecodeSettings: const ImageClipDecodeSettings.preview(
+    targetLongSide: 1280,
+  ),
   showResultPage: false,
   onResult: (result) {
     final croppedBytes = result.cropped.bytes;
   },
 )
 ```
+
+`previewDecodeSettings` 只约束编辑器交互预览。只要编辑器还持有原始输入 bytes，保存时会把预览裁剪框映射回原图坐标，并从原图导出最终结果。
 
 ## 使用控制器
 
@@ -219,6 +229,12 @@ if (!info.canDecodeWithDart) {
 }
 
 final image = await processor.decodeBytes(bytes, label: 'input.jpg');
+final preview = await processor.decodePreviewBytes(
+  bytes,
+  label: 'input.jpg',
+  targetLongSide: 1080,
+);
+debugPrint('${preview.dimensionsLabel} from ${preview.sourceWidth}x${preview.sourceHeight}');
 final cropped = await processor.cropRegion(
   image,
   const CropRegion(x: 20, y: 20, width: 240, height: 240, cornerRadius: 0),
@@ -325,14 +341,52 @@ final result = await task.result;
 
 `decodeBytes` 和后续裁剪/旋转处理会自动烘焙 EXIF orientation，手机拍摄的旋转照片会按视觉方向进入裁剪流程。
 
+## 原生解码适配
+
+`ImageClipDecodeAdapter` 用来在进入 Dart 图像管线前接入平台能力，例如 HEIC/HEIF 转码、大图 sampled decode 或厂商相册返回格式归一化。纯 Dart fallback 会在完整解码后再缩放预览；如果需要真正减少大图解码内存，应在 adapter 内按 `ImageClipDecodeSettings.targetLongSide` 做平台侧采样。
+
+```dart
+class NativeDecodeAdapter extends ImageClipDecodeAdapter {
+  const NativeDecodeAdapter();
+
+  @override
+  bool supports(ImageClipImageInfo info) {
+    return !info.canDecodeWithDart || info.hasDimensions;
+  }
+
+  @override
+  Future<ImageClipDecodeAdapterResult?> decode(
+    Uint8List bytes, {
+    required ImageClipImageInfo info,
+    required String label,
+    required ImageClipDecodeSettings settings,
+  }) async {
+    final normalizedBytes = await normalizeOnPlatform(
+      bytes,
+      targetLongSide: settings.targetLongSide,
+    );
+    return ImageClipDecodeAdapterResult(
+      bytes: normalizedBytes.bytes,
+      sourceWidth: normalizedBytes.sourceWidth,
+      sourceHeight: normalizedBytes.sourceHeight,
+    );
+  }
+}
+
+final processor = ImageProcessor(
+  decodeAdapter: const NativeDecodeAdapter(),
+);
+```
+
 ## 性能基准
 
 ```sh
 dart run benchmark/image_processor_benchmark.dart
 dart run benchmark/image_processor_benchmark.dart --json
+dart run benchmark/image_processor_benchmark.dart --check benchmark/baseline.json
 ```
 
-基准脚本会输出解码、旋转裁剪导出 JPEG、大图 downscale 的平均耗时、中位耗时、输出尺寸和字节数。
+基准脚本会输出解码、旋转裁剪导出 JPEG、大图 downscale 的平均耗时、中位耗时、输出尺寸和字节数。`--check` 会按 `benchmark/baseline.json` 检查中位耗时和输出字节数，适合放进 CI 防止性能回退。
 
 ## 大图保护与异常处理
 
@@ -371,6 +425,7 @@ flutter pub get
 dart format lib test example
 flutter analyze
 flutter test
+dart run benchmark/image_processor_benchmark.dart --check benchmark/baseline.json
 dart doc --output doc/api
 flutter pub publish --dry-run
 flutter run -t example/lib/main.dart

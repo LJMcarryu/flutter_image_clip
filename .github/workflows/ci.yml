@@ -35,6 +35,9 @@ jobs:
       - name: Test
         run: flutter test
 
+      - name: Check benchmark baseline
+        run: dart run benchmark/image_processor_benchmark.dart --check benchmark/baseline.json
+
       - name: Build API docs
         run: dart doc --output doc/api
 
@@ -52,3 +55,35 @@ jobs:
       - name: Analyze example
         working-directory: example
         run: flutter analyze
+
+      - name: Create Android example project
+        working-directory: example
+        run: flutter create --platforms=android --project-name flutter_image_clip_example .
+
+      - name: Build Android example
+        working-directory: example
+        run: flutter build apk --debug
+
+  ios-example:
+    name: iOS example build
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Create iOS example project
+        working-directory: example
+        run: flutter create --platforms=ios --project-name flutter_image_clip_example .
+
+      - name: Build iOS example
+        working-directory: example
+        run: flutter build ios --debug --no-codesign

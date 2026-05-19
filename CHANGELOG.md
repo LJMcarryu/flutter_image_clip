@@ -1,3 +1,13 @@
+# 0.6.5
+
+- 新增 `ImageClipDecodeSettings`，支持预览解码目标长边配置，并在 `EditedImage` 中保留 `sourceWidth`、`sourceHeight` 原图尺寸元数据。
+- `ImageProcessor` 新增 `decodePreviewBytes` / `decodePreviewBytesTask`，并支持通过 `ImageClipDecodeAdapter` 在 Dart 解码前接入平台转码或 sampled decode。
+- `ImageClipEditor` 新增 `previewDecodeSettings`，交互预览可使用小图，保存时会把裁剪区域映射回原图并从原始 bytes 导出。
+- `ImageClipResult`、`CropRegion` 和核心设置模型补充 map/copy/equality 能力，方便业务持久化、测试和 API 稳定性约束。
+- benchmark 新增 `--check benchmark/baseline.json` 回归门禁，CI 会检查固定样本的耗时和输出大小。
+- CI 新增 Android debug APK 构建和 iOS debug no-codesign 构建，覆盖真实移动端工程生成与构建链路。
+- 补充预览缩略图原图导出、大字体横屏布局、decode adapter 和模型稳定性测试。
+
 # 0.6.4
 
 - 编辑器旋转和翻转改为预览态更新，保存时再将预览裁剪区域映射回原图并一次性导出，避免交互按钮触发整图重编码。

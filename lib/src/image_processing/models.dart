@@ -95,6 +95,17 @@ class ImageClipImageInfo {
         'dimensions: $dimensionsLabel'
         ')';
   }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ImageClipImageInfo &&
+        other.format == format &&
+        other.width == width &&
+        other.height == height;
+  }
+
+  @override
+  int get hashCode => Object.hash(format, width, height);
 }
 
 /// Runtime guardrails for decoding and writing image pixels.
@@ -144,6 +155,104 @@ class ImageClipProcessingSettings {
       autoDownscale: _boolOf(map['autoDownscale'], fallback: true),
     );
   }
+
+  /// Returns a copy with selected values replaced.
+  ImageClipProcessingSettings copyWith({
+    int? maxInputPixels,
+    int? maxOutputPixels,
+    bool? autoDownscale,
+    bool clearMaxInputPixels = false,
+    bool clearMaxOutputPixels = false,
+  }) {
+    return ImageClipProcessingSettings(
+      maxInputPixels: clearMaxInputPixels
+          ? null
+          : maxInputPixels ?? this.maxInputPixels,
+      maxOutputPixels: clearMaxOutputPixels
+          ? null
+          : maxOutputPixels ?? this.maxOutputPixels,
+      autoDownscale: autoDownscale ?? this.autoDownscale,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ImageClipProcessingSettings &&
+        other.maxInputPixels == maxInputPixels &&
+        other.maxOutputPixels == maxOutputPixels &&
+        other.autoDownscale == autoDownscale;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(maxInputPixels, maxOutputPixels, autoDownscale);
+}
+
+/// Decode-time options used before the normal processing pipeline runs.
+class ImageClipDecodeSettings {
+  /// Creates decode settings.
+  const ImageClipDecodeSettings({
+    this.targetLongSide,
+    this.usePlatformAdapter = true,
+  }) : assert(targetLongSide == null || targetLongSide > 0);
+
+  /// Creates settings for a preview image constrained by its longest side.
+  const ImageClipDecodeSettings.preview({required int targetLongSide})
+    : this(targetLongSide: targetLongSide);
+
+  /// Maximum decoded long side before later pipeline steps run.
+  ///
+  /// This is useful for preview or thumbnail decode paths. The pure Dart
+  /// fallback still decodes the full image first and then resizes; a platform
+  /// adapter can use this value for true sampled decode.
+  final int? targetLongSide;
+
+  /// Whether [ImageProcessor.decodeAdapter] may normalize bytes before Dart decode.
+  final bool usePlatformAdapter;
+
+  /// Whether these settings request a preview-sized decode.
+  bool get hasTargetSize => targetLongSide != null;
+
+  /// Converts these settings to the map used by the background processor.
+  Map<String, Object?> toMap() => <String, Object?>{
+    'targetLongSide': targetLongSide,
+    'usePlatformAdapter': usePlatformAdapter,
+  };
+
+  /// Creates settings from the map used by the background processor.
+  static ImageClipDecodeSettings fromMap(Map<Object?, Object?>? map) {
+    if (map == null) {
+      return const ImageClipDecodeSettings();
+    }
+    return ImageClipDecodeSettings(
+      targetLongSide: _nullableIntOf(map['targetLongSide']),
+      usePlatformAdapter: _boolOf(map['usePlatformAdapter'], fallback: true),
+    );
+  }
+
+  /// Returns a copy with selected values replaced.
+  ImageClipDecodeSettings copyWith({
+    int? targetLongSide,
+    bool? usePlatformAdapter,
+    bool clearTargetLongSide = false,
+  }) {
+    return ImageClipDecodeSettings(
+      targetLongSide: clearTargetLongSide
+          ? null
+          : targetLongSide ?? this.targetLongSide,
+      usePlatformAdapter: usePlatformAdapter ?? this.usePlatformAdapter,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ImageClipDecodeSettings &&
+        other.targetLongSide == targetLongSide &&
+        other.usePlatformAdapter == usePlatformAdapter;
+  }
+
+  @override
+  int get hashCode => Object.hash(targetLongSide, usePlatformAdapter);
 }
 
 /// Encoding options used when an image operation writes output bytes.
@@ -204,6 +313,30 @@ class ImageClipOutputSettings {
       pngLevel: _intOf(map['pngLevel'], fallback: 6),
     );
   }
+
+  /// Returns a copy with selected values replaced.
+  ImageClipOutputSettings copyWith({
+    ImageClipOutputFormat? format,
+    int? jpegQuality,
+    int? pngLevel,
+  }) {
+    return ImageClipOutputSettings(
+      format: format ?? this.format,
+      jpegQuality: jpegQuality ?? this.jpegQuality,
+      pngLevel: pngLevel ?? this.pngLevel,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ImageClipOutputSettings &&
+        other.format == format &&
+        other.jpegQuality == jpegQuality &&
+        other.pngLevel == pngLevel;
+  }
+
+  @override
+  int get hashCode => Object.hash(format, jpegQuality, pngLevel);
 }
 
 /// Describes an image generated or transformed by the image processing APIs.
@@ -217,7 +350,10 @@ class EditedImage {
     required this.operation,
     required this.elapsedMs,
     this.format = ImageClipOutputFormat.png,
-  });
+    int? sourceWidth,
+    int? sourceHeight,
+  }) : sourceWidth = sourceWidth ?? width,
+       sourceHeight = sourceHeight ?? height;
 
   /// Encoded bytes for the image.
   final Uint8List bytes;
@@ -239,6 +375,15 @@ class EditedImage {
 
   /// Encoded output format for [bytes].
   final ImageClipOutputFormat format;
+
+  /// Source decoded width before optional decode-time preview resizing.
+  final int sourceWidth;
+
+  /// Source decoded height before optional decode-time preview resizing.
+  final int sourceHeight;
+
+  /// Whether this image is smaller than its decoded source dimensions.
+  bool get isPreviewSized => sourceWidth != width || sourceHeight != height;
 
   /// MIME type for [format].
   String get mimeType => switch (format) {
@@ -267,6 +412,8 @@ class EditedImage {
     'operation': operation,
     'elapsedMs': elapsedMs,
     'format': format.name,
+    'sourceWidth': sourceWidth,
+    'sourceHeight': sourceHeight,
   };
 
   /// Creates an [EditedImage] from the isolate-safe map returned by [toMap].
@@ -279,6 +426,36 @@ class EditedImage {
       operation: map['operation']! as String,
       elapsedMs: map['elapsedMs']! as int,
       format: _formatFromName(map['format'] as String?),
+      sourceWidth: _intOf(map['sourceWidth'], fallback: map['width']! as int),
+      sourceHeight: _intOf(
+        map['sourceHeight'],
+        fallback: map['height']! as int,
+      ),
+    );
+  }
+
+  /// Returns a copy with selected values replaced.
+  EditedImage copyWith({
+    Uint8List? bytes,
+    int? width,
+    int? height,
+    String? label,
+    String? operation,
+    int? elapsedMs,
+    ImageClipOutputFormat? format,
+    int? sourceWidth,
+    int? sourceHeight,
+  }) {
+    return EditedImage(
+      bytes: bytes ?? this.bytes,
+      width: width ?? this.width,
+      height: height ?? this.height,
+      label: label ?? this.label,
+      operation: operation ?? this.operation,
+      elapsedMs: elapsedMs ?? this.elapsedMs,
+      format: format ?? this.format,
+      sourceWidth: sourceWidth ?? this.sourceWidth,
+      sourceHeight: sourceHeight ?? this.sourceHeight,
     );
   }
 }
@@ -343,6 +520,47 @@ class CropRegion {
     'height': height,
     'cornerRadius': cornerRadius,
   };
+
+  /// Creates a crop region from a map.
+  static CropRegion fromMap(Map<Object?, Object?> map) {
+    return CropRegion(
+      x: _intOf(map['x'], fallback: 0),
+      y: _intOf(map['y'], fallback: 0),
+      width: _intOf(map['width'], fallback: 1),
+      height: _intOf(map['height'], fallback: 1),
+      cornerRadius: _doubleOf(map['cornerRadius'], fallback: 0),
+    );
+  }
+
+  /// Returns a copy with selected values replaced.
+  CropRegion copyWith({
+    int? x,
+    int? y,
+    int? width,
+    int? height,
+    double? cornerRadius,
+  }) {
+    return CropRegion(
+      x: x ?? this.x,
+      y: y ?? this.y,
+      width: width ?? this.width,
+      height: height ?? this.height,
+      cornerRadius: cornerRadius ?? this.cornerRadius,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is CropRegion &&
+        other.x == x &&
+        other.y == y &&
+        other.width == width &&
+        other.height == height &&
+        other.cornerRadius == cornerRadius;
+  }
+
+  @override
+  int get hashCode => Object.hash(x, y, width, height, cornerRadius);
 }
 
 /// Multipliers used by color adjustment operations.
@@ -392,6 +610,13 @@ int? _nullableIntOf(Object? value) {
     return value.round();
   }
   return null;
+}
+
+double _doubleOf(Object? value, {required double fallback}) {
+  if (value is num) {
+    return value.toDouble();
+  }
+  return fallback;
 }
 
 bool _boolOf(Object? value, {required bool fallback}) {

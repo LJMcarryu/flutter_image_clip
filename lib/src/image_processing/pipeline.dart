@@ -13,6 +13,9 @@ class ImageClipPipeline {
     required this.label,
     required this.steps,
     required this.outputSettings,
+    required this.decodeSettings,
+    this.sourceWidth,
+    this.sourceHeight,
     this.operationLabel,
   });
 
@@ -22,6 +25,9 @@ class ImageClipPipeline {
     required this.label,
     this.steps = const <ImageClipPipelineStep>[],
     this.outputSettings = const ImageClipOutputSettings.png(),
+    this.decodeSettings = const ImageClipDecodeSettings(),
+    this.sourceWidth,
+    this.sourceHeight,
     this.operationLabel,
   }) : source = null;
 
@@ -37,6 +43,9 @@ class ImageClipPipeline {
          label: source.label,
          steps: steps,
          outputSettings: outputSettings,
+         decodeSettings: const ImageClipDecodeSettings(),
+         sourceWidth: source.sourceWidth,
+         sourceHeight: source.sourceHeight,
          operationLabel: operationLabel,
        );
 
@@ -55,6 +64,15 @@ class ImageClipPipeline {
   /// Output encoding settings for the final pipeline result.
   final ImageClipOutputSettings outputSettings;
 
+  /// Decode-time settings applied before pipeline steps.
+  final ImageClipDecodeSettings decodeSettings;
+
+  /// Source decoded width before optional platform-side sampling.
+  final int? sourceWidth;
+
+  /// Source decoded height before optional platform-side sampling.
+  final int? sourceHeight;
+
   /// Optional operation label stored on the resulting [EditedImage].
   final String? operationLabel;
 
@@ -65,6 +83,9 @@ class ImageClipPipeline {
     'label': label,
     'steps': <Map<String, Object?>>[for (final step in steps) step.toMap()],
     'output': outputSettings.toMap(),
+    'decodeSettings': decodeSettings.toMap(),
+    'sourceWidth': sourceWidth,
+    'sourceHeight': sourceHeight,
     'operationLabel': operationLabel,
   };
 }

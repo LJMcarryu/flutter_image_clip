@@ -1,0 +1,19 @@
+{
+  "results": [
+    {
+      "case": "decode png 640x480",
+      "maxMedianMs": 250,
+      "maxOutputBytes": 20000
+    },
+    {
+      "case": "rotate crop export jpeg",
+      "maxMedianMs": 250,
+      "maxOutputBytes": 12000
+    },
+    {
+      "case": "downscale png 2400x1600",
+      "maxMedianMs": 1500,
+      "maxOutputBytes": 22000
+    }
+  ]
+}

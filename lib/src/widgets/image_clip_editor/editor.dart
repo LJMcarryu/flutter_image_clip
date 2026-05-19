@@ -12,6 +12,8 @@ Future<ImageClipResult?> showImageClipEditor(
   List<ImageClipAspectRatio> aspectRatios = ImageClipAspectRatio.defaults,
   ImageClipScaleMode initialScaleMode = ImageClipScaleMode.fill,
   ImageClipOutputSettings outputSettings = const ImageClipOutputSettings.png(),
+  ImageClipDecodeSettings previewDecodeSettings =
+      const ImageClipDecodeSettings(),
   ImageClipProcessingSettings processingSettings =
       const ImageClipProcessingSettings(),
   ImageClipEditorLabels labels = const ImageClipEditorLabels(),
@@ -34,6 +36,7 @@ Future<ImageClipResult?> showImageClipEditor(
           aspectRatios: aspectRatios,
           initialScaleMode: initialScaleMode,
           outputSettings: outputSettings,
+          previewDecodeSettings: previewDecodeSettings,
           processingSettings: processingSettings,
           labels: labels,
           theme: theme,
@@ -155,6 +158,7 @@ class ImageClipEditor extends StatefulWidget {
     this.aspectRatios = ImageClipAspectRatio.defaults,
     this.initialScaleMode = ImageClipScaleMode.fill,
     this.outputSettings = const ImageClipOutputSettings.png(),
+    this.previewDecodeSettings = const ImageClipDecodeSettings(),
     this.processingSettings = const ImageClipProcessingSettings(),
     this.labels = const ImageClipEditorLabels(),
     this.theme = const ImageClipEditorTheme.dark(),
@@ -198,6 +202,12 @@ class ImageClipEditor extends StatefulWidget {
   /// Output encoding settings used for the saved crop result.
   final ImageClipOutputSettings outputSettings;
 
+  /// Decode settings used for the interactive preview image.
+  ///
+  /// Set [ImageClipDecodeSettings.targetLongSide] to keep editor previews small
+  /// while saving from the original bytes when possible.
+  final ImageClipDecodeSettings previewDecodeSettings;
+
   /// Runtime guardrails used when this widget creates its own processor.
   final ImageClipProcessingSettings processingSettings;
 
@@ -239,6 +249,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   EditedImage? _image;
   bool _isBusy = false;
   int _taskSerial = 0;
+  Uint8List? _sourceImageBytes;
+  String? _sourceImageLabel;
   ImageClipTask<EditedImage>? _activeTask;
   StreamSubscription<ImageClipTaskProgress>? _activeProgressSubscription;
   double? _progressValue;
@@ -373,11 +385,17 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     final bytes = widget.initialImageBytes;
     if (bytes != null) {
       return _runImageTask(
-        () => _processor.decodeBytesTask(bytes, label: _initialImageLabel),
+        () => _processor.decodeBytesTask(
+          bytes,
+          label: _initialImageLabel,
+          decodeSettings: widget.previewDecodeSettings,
+        ),
         busyLabel: widget.labels.loadingImageStatus,
         doneLabel: widget.labels.imageLoadedStatus,
         replaceCurrent: true,
         onDone: (_) {
+          _sourceImageBytes = bytes;
+          _sourceImageLabel = _initialImageLabel;
           _resetPreviewTransform();
         },
       );
@@ -390,6 +408,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     _taskSerial++;
     setState(() {
       _image = null;
+      _sourceImageBytes = null;
+      _sourceImageLabel = null;
       _status = widget.labels.waitingForImageStatus;
       _resetPreviewTransform();
     });
@@ -401,11 +421,17 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
         ? widget.labels.defaultImageLabel
         : label;
     return _runImageTask(
-      () => _processor.decodeBytesTask(bytes, label: effectiveLabel),
+      () => _processor.decodeBytesTask(
+        bytes,
+        label: effectiveLabel,
+        decodeSettings: widget.previewDecodeSettings,
+      ),
       busyLabel: widget.labels.loadingImageStatus,
       doneLabel: widget.labels.imageLoadedStatus,
       replaceCurrent: true,
       onDone: (_) {
+        _sourceImageBytes = bytes;
+        _sourceImageLabel = effectiveLabel;
         _resetPreviewTransform();
       },
     );
@@ -418,6 +444,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       doneLabel: widget.labels.sampleGeneratedStatus,
       replaceCurrent: replaceCurrent,
       onDone: (_) {
+        _sourceImageBytes = null;
+        _sourceImageLabel = null;
         _resetPreviewTransform();
       },
     );
@@ -431,6 +459,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     _activeProgressSubscription = null;
     setState(() {
       _image = null;
+      _sourceImageBytes = null;
+      _sourceImageLabel = null;
       _isBusy = false;
       _progressValue = null;
       _resetPreviewTransform();
@@ -639,22 +669,34 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     });
 
     try {
+      final saveRegion = _sourceRegionForSave(source, sourceRegion);
       final steps = <ImageClipPipelineStep>[
-        ImageClipPipelineStep.cropRegion(sourceRegion),
+        ImageClipPipelineStep.cropRegion(saveRegion),
         if (transform.normalizedRotation != 0)
           ImageClipPipelineStep.rotate(degrees: transform.normalizedRotation),
         if (transform.flipHorizontal)
           const ImageClipPipelineStep.flipHorizontal(),
         if (transform.flipVertical) const ImageClipPipelineStep.flipVertical(),
       ];
-      final activeTask = _processor.processPipelineTask(
-        ImageClipPipeline.fromImage(
-          source: source,
-          steps: steps,
-          outputSettings: widget.outputSettings,
-          operationLabel: 'Crop',
-        ),
-      );
+      final saveBytes = _sourceImageBytes;
+      final sourceLabel = _sourceImageLabel ?? source.label;
+      final saveFromOriginal = saveBytes != null && source.isPreviewSized;
+      final activeTask = saveFromOriginal
+          ? _processor.processBytesTask(
+              saveBytes,
+              label: sourceLabel,
+              steps: steps,
+              outputSettings: widget.outputSettings,
+              operationLabel: 'Crop',
+            )
+          : _processor.processPipelineTask(
+              ImageClipPipeline.fromImage(
+                source: source,
+                steps: steps,
+                outputSettings: widget.outputSettings,
+                operationLabel: 'Crop',
+              ),
+            );
       _activeTask = activeTask;
       _listenToProgress(activeTask, taskId);
       final cropped = await activeTask.result;
@@ -664,7 +706,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       final result = ImageClipResult(
         source: source,
         cropped: cropped,
-        region: sourceRegion,
+        region: saveRegion,
         previewRegion: previewRegion,
         rotationDegrees: transform.normalizedRotation,
         flippedHorizontally: transform.flipHorizontal,
@@ -755,6 +797,29 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     _rotationDegrees = 0;
     _flipHorizontal = false;
     _flipVertical = false;
+  }
+
+  CropRegion _sourceRegionForSave(EditedImage source, CropRegion region) {
+    if (!source.isPreviewSized) {
+      return region;
+    }
+    final scaleX = source.sourceWidth / source.width;
+    final scaleY = source.sourceHeight / source.height;
+    final x = (region.x * scaleX).round().clamp(0, source.sourceWidth - 1);
+    final y = (region.y * scaleY).round().clamp(0, source.sourceHeight - 1);
+    return CropRegion(
+      x: x.toInt(),
+      y: y.toInt(),
+      width: (region.width * scaleX)
+          .round()
+          .clamp(1, source.sourceWidth - x)
+          .toInt(),
+      height: (region.height * scaleY)
+          .round()
+          .clamp(1, source.sourceHeight - y)
+          .toInt(),
+      cornerRadius: region.cornerRadius * ((scaleX + scaleY) / 2),
+    );
   }
 
   void _cancelCrop() {

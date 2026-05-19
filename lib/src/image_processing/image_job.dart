@@ -16,6 +16,8 @@ Map<String, Object?> _runImageJob(
   late String label;
   late String operation;
   late ImageClipOutputSettings outputSettings;
+  int? sourceWidth;
+  int? sourceHeight;
 
   switch (kind) {
     case 'sample':
@@ -43,6 +45,8 @@ Map<String, Object?> _runImageJob(
       label = result.label;
       operation = result.operation;
       outputSettings = result.outputSettings;
+      sourceWidth = result.sourceWidth;
+      sourceHeight = result.sourceHeight;
       break;
     default:
       throw ImageClipProcessingException(
@@ -70,6 +74,8 @@ Map<String, Object?> _runImageJob(
     'operation': operation,
     'elapsedMs': stopwatch.elapsedMilliseconds,
     'format': outputSettings.format.name,
+    'sourceWidth': sourceWidth ?? image.width,
+    'sourceHeight': sourceHeight ?? image.height,
   };
 }
 
@@ -82,6 +88,11 @@ _PipelineJobResult _runPipeline(
     pipeline['output'] == null
         ? null
         : Map<Object?, Object?>.from(pipeline['output']! as Map),
+  );
+  final decodeSettings = ImageClipDecodeSettings.fromMap(
+    pipeline['decodeSettings'] == null
+        ? null
+        : Map<Object?, Object?>.from(pipeline['decodeSettings']! as Map),
   );
   final source = pipeline['source'] == null
       ? null
@@ -114,6 +125,9 @@ _PipelineJobResult _runPipeline(
     source == null ? bytes! : _bytesFromIsolateMessage(source['bytes']),
     processingSettings,
   );
+  final sourceWidth = _intOf(pipeline['sourceWidth'], fallback: image.width);
+  final sourceHeight = _intOf(pipeline['sourceHeight'], fallback: image.height);
+  image = _applyDecodeSettings(image, decodeSettings);
   final stepMaps = (pipeline['steps'] as List<Object?>? ?? const <Object?>[])
       .map((step) => Map<Object?, Object?>.from(step! as Map))
       .toList(growable: false);
@@ -144,6 +158,8 @@ _PipelineJobResult _runPipeline(
     label: label,
     operation: operation,
     outputSettings: outputSettings,
+    sourceWidth: sourceWidth,
+    sourceHeight: sourceHeight,
   );
 }
 
@@ -223,10 +239,14 @@ class _PipelineJobResult {
     required this.label,
     required this.operation,
     required this.outputSettings,
+    required this.sourceWidth,
+    required this.sourceHeight,
   });
 
   final img.Image image;
   final String label;
   final String operation;
   final ImageClipOutputSettings outputSettings;
+  final int sourceWidth;
+  final int sourceHeight;
 }
