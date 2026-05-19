@@ -112,6 +112,7 @@ jobs:
   ios-integration:
     name: iOS integration test
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -126,22 +127,12 @@ jobs:
         run: flutter pub get
 
       - name: Run integration test on iOS simulator
-        working-directory: example
-        run: |
-          flutter pub get
-          flutter create --platforms=ios --project-name flutter_image_clip_example .
-          DEVICE_ID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { print $2; exit }')"
-          if [ -z "$DEVICE_ID" ]; then
-            echo "No available iPhone simulator found."
-            exit 1
-          fi
-          xcrun simctl boot "$DEVICE_ID" || true
-          xcrun simctl bootstatus "$DEVICE_ID" -b
-          flutter test integration_test -d "$DEVICE_ID"
+        run: bash tool/run_ios_integration.sh
 
   android-integration:
     name: Android integration test (${{ matrix.flutter-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
