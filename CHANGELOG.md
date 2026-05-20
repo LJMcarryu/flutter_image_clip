@@ -1,3 +1,8 @@
+# 0.7.3
+
+- 将发布截图替换为更小的 WebP 资源，降低 README 和 pub.dev 图片加载体积。
+- README 预览区同时展示全屏编辑器和嵌入式示例两张截图。
+
 # 0.7.2
 
 - Move the iOS plugin source into the Swift Package Manager layout while keeping CocoaPods support.

@@ -2,7 +2,10 @@
 
 `flutter_image_clip` 是一个 Flutter 图片裁剪与位图处理库，提供可直接打开的裁剪 UI、可嵌入页面的裁剪组件，以及基于后台 isolate 的图像处理 API。
 
-![Fullscreen crop editor](screenshots/fullscreen-editor.png)
+<p>
+  <img src="screenshots/fullscreen-editor.webp" alt="Fullscreen crop editor" width="260">
+  <img src="screenshots/embedded-lab.webp" alt="Embedded image clip lab" width="260">
+</p>
 
 ## 功能
 
@@ -31,7 +34,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.7.2
+  flutter_image_clip: ^0.7.3
 ```
 
 然后执行：
