@@ -13,16 +13,28 @@ class ImageClipResult {
     this.flippedVertically = false,
   }) : previewRegion = previewRegion ?? region;
 
-  /// Source image that was displayed in the editor.
+  /// Decoded image that was displayed in the editor.
+  ///
+  /// When preview decoding is enabled, this can be smaller than the original
+  /// input. Use [region] or [sourceRegion] for persistent crop metadata.
   final EditedImage source;
 
   /// Cropped image produced by the editor.
   final EditedImage cropped;
 
-  /// Pixel crop rectangle applied to [source].
+  /// Crop rectangle in original source-image pixel coordinates.
+  ///
+  /// This is the value to persist and later pass back as
+  /// [ImageClipEditor.initialCropRegion].
   final CropRegion region;
 
-  /// Crop rectangle in the rotated preview coordinate space.
+  /// Alias for [region] that makes the coordinate space explicit.
+  CropRegion get sourceRegion => region;
+
+  /// Crop rectangle in the decoded preview coordinate space.
+  ///
+  /// This is mainly useful for diagnostics or custom preview overlays. It is
+  /// not stable across different preview decode sizes.
   final CropRegion previewRegion;
 
   /// Clockwise preview rotation applied to the saved crop, in degrees.
@@ -33,6 +45,15 @@ class ImageClipResult {
 
   /// Whether the saved crop was mirrored around its horizontal axis.
   final bool flippedVertically;
+
+  /// Transform metadata represented by this result.
+  ImageClipCropTransform get transform {
+    return ImageClipCropTransform(
+      rotationDegrees: rotationDegrees,
+      flipHorizontal: flippedHorizontally,
+      flipVertical: flippedVertically,
+    );
+  }
 
   /// Converts the result metadata and images to isolate-safe maps.
   Map<String, Object?> toMap() => <String, Object?>{

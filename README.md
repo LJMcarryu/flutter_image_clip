@@ -66,6 +66,8 @@ dependencies:
 
 默认编辑器采用移动端底部操作布局：顶部为 `Position` 标题和关闭按钮，中间为图片定位预览区，底部包含 Fit / Fill 切换、Rotate、比例选项和保存按钮。默认比例选项展示为 `3:4`、`4:3` 等比例文本。比例支持自定义：通过 `aspectRatios` 传入任意 `ImageClipAspectRatio(label, width, height)`，`label` 只负责 UI 文案，实际裁剪比例由 `width / height` 决定。需要固定主裁剪预览区高度时，可以设置 `cropAreaHeight`；不设置时继续自适应填满剩余空间。
 
+如果业务侧已经保存过裁剪元数据，可以通过 `initialRotationDegrees` 和 `initialCropRegion` 直接恢复用户上次看到的 Position。`initialCropRegion` 使用原图像素坐标；编辑器会结合旋转角度反推预览位置，并根据 `width / height` 自动选中匹配比例。如果传入的宽高不在 `aspectRatios` 里，编辑器会临时插入一个对应比例选项。`initialRotationDegrees` 只支持 90 度倍数；`initialCropRegion` 的越界坐标会在图片加载后夹到原图范围内，非正 `width` / `height` 会被忽略并回退到普通初始比例。
+
 ```dart
 import 'package:flutter_image_clip/flutter_image_clip.dart';
 
@@ -74,6 +76,14 @@ final result = await showImageClipEditor(
   imageBytes: bytes,
   imageLabel: 'avatar.jpg',
   initialAspectRatio: ImageClipAspectRatio.square,
+  initialRotationDegrees: 90,
+  initialCropRegion: const CropRegion(
+    x: 120,
+    y: 80,
+    width: 480,
+    height: 640,
+    cornerRadius: 0,
+  ),
   aspectRatios: const [
     ImageClipAspectRatio.square,
     ImageClipAspectRatio.portrait,
@@ -339,6 +349,28 @@ final result = await processor.processBytes(
     ),
   ],
   outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 88),
+);
+```
+
+需要在业务层提前清理坐标时，可以使用 `CropRegion.clampToBounds`：
+
+```dart
+final safeRegion = savedRegion.clampToBounds(
+  sourceWidth: imageWidth,
+  sourceHeight: imageHeight,
+);
+```
+
+裁剪完成后，`ImageClipResult.region` / `sourceRegion` 始终表示原图坐标，适合直接持久化；`previewRegion` 只表示当前预览解码尺寸下的坐标，通常不建议作为业务数据保存。
+
+需要在编辑器外复用同一套比例推导规则时，可以使用
+`ImageClipAspectRatio.fromCropRegion`：
+
+```dart
+final ratio = ImageClipAspectRatio.fromCropRegion(
+  safeRegion,
+  rotationDegrees: savedRotationDegrees,
+  presets: ImageClipAspectRatio.defaults,
 );
 ```
 

@@ -1,3 +1,16 @@
+# 0.8.0
+
+- 支持通过初始旋转角度和原图裁剪坐标恢复编辑器 Position。
+- 传入初始裁剪坐标时，编辑器会根据宽高自动选中或插入对应比例。
+- 新增 `ImageClipAspectRatio.fromDimensions` 与 `ImageClipAspectRatio.fromCropRegion`，方便业务侧复用比例推导规则。
+- 新增 `CropRegion.hasPositiveSize` 与 `CropRegion.clampToBounds`，统一裁剪坐标边界处理。
+- 新增 `ImageClipResult.sourceRegion` 和 `ImageClipResult.transform`，明确保存结果里的坐标系和变换元数据。
+- `ImageClipTaskProgress` 增加完成状态 helper、相等比较和稳定的 `fraction` 夹取逻辑。
+- 补齐 `CropSettings` 与 `ColorAdjustment` 的 map、copy 和相等比较 helper。
+- 编辑器会忽略非正宽高的 `initialCropRegion`，越界坐标会在图片加载后夹到原图范围内。
+- 输出、解码和处理设置从 map 读取时会清理非正数或越界值。
+- 示例首页新增完整参数面板，fullscreen 入口保留最少参数。
+
 # 0.7.4
 
 - 改用 pub.dev README 会稳定渲染的 Markdown 图片语法展示两张截图。

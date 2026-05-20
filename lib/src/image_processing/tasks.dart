@@ -40,7 +40,7 @@ class ImageClipTaskProgress {
   /// Human-readable status message.
   final String message;
 
-  /// Progress fraction from 0 to 1.
+  /// Progress fraction clamped from 0 to 1.
   double get fraction {
     if (stage == ImageClipTaskProgressStage.completed) {
       return 1;
@@ -54,7 +54,9 @@ class ImageClipTaskProgress {
         ImageClipTaskProgressStage.completed => 1,
       };
     }
-    final processingFraction = completedSteps / totalSteps;
+    final processingFraction = (completedSteps / totalSteps)
+        .clamp(0, 1)
+        .toDouble();
     return switch (stage) {
       ImageClipTaskProgressStage.queued => 0,
       ImageClipTaskProgressStage.decoding => 0.1,
@@ -63,6 +65,31 @@ class ImageClipTaskProgress {
       ImageClipTaskProgressStage.completed => 1,
     };
   }
+
+  /// Whether this event represents a completed task.
+  bool get isCompleted => stage == ImageClipTaskProgressStage.completed;
+
+  @override
+  String toString() {
+    return 'ImageClipTaskProgress('
+        'stage: ${stage.name}, '
+        'completedSteps: $completedSteps, '
+        'totalSteps: $totalSteps, '
+        'message: $message'
+        ')';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ImageClipTaskProgress &&
+        other.stage == stage &&
+        other.completedSteps == completedSteps &&
+        other.totalSteps == totalSteps &&
+        other.message == message;
+  }
+
+  @override
+  int get hashCode => Object.hash(stage, completedSteps, totalSteps, message);
 
   Map<String, Object?> _toMap() => <String, Object?>{
     'stage': stage.name,

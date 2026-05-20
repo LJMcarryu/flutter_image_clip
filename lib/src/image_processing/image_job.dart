@@ -167,12 +167,7 @@ _PipelineJobResult _runPipeline(
 img.Image _applyPipelineStep(img.Image image, Map<Object?, Object?> step) {
   final kind = step['kind']! as String;
   return switch (kind) {
-    'cropCenter' => _cropCenter(
-      image,
-      widthRatio: _doubleOf(step['widthRatio'], fallback: 0.75),
-      heightRatio: _doubleOf(step['heightRatio'], fallback: 0.75),
-      cornerRadius: _doubleOf(step['cornerRadius'], fallback: 0),
-    ),
+    'cropCenter' => _cropCenterWithSettings(image, CropSettings.fromMap(step)),
     'cropRegion' => _cropRegion(
       image,
       x: _intOf(step['x'], fallback: 0),
@@ -192,16 +187,29 @@ img.Image _applyPipelineStep(img.Image image, Map<Object?, Object?> step) {
       image,
       _intOf(step['maxSide'], fallback: 1080),
     ),
-    'adjustColor' => img.adjustColor(
-      image,
-      brightness: _doubleOf(step['brightness'], fallback: 1),
-      contrast: _doubleOf(step['contrast'], fallback: 1),
-      saturation: _doubleOf(step['saturation'], fallback: 1),
-    ),
+    'adjustColor' => _adjustColor(image, ColorAdjustment.fromMap(step)),
     _ => throw ImageClipProcessingException(
       'Unsupported image pipeline step: $kind',
     ),
   };
+}
+
+img.Image _cropCenterWithSettings(img.Image image, CropSettings settings) {
+  return _cropCenter(
+    image,
+    widthRatio: settings.widthRatio,
+    heightRatio: settings.heightRatio,
+    cornerRadius: settings.cornerRadius,
+  );
+}
+
+img.Image _adjustColor(img.Image image, ColorAdjustment adjustment) {
+  return img.adjustColor(
+    image,
+    brightness: adjustment.brightness,
+    contrast: adjustment.contrast,
+    saturation: adjustment.saturation,
+  );
 }
 
 String _defaultPipelineOperationLabel({

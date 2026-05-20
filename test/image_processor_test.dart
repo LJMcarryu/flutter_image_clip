@@ -545,9 +545,31 @@ void main() {
       cornerRadius: 2,
     );
     final restored = CropRegion.fromMap(region.toMap());
+    const cropSettings = CropSettings(
+      widthRatio: 0.6,
+      heightRatio: 0.5,
+      cornerRadius: 4,
+    );
+    const colorAdjustment = ColorAdjustment(
+      brightness: 1.1,
+      contrast: 0.9,
+      saturation: 1.2,
+    );
 
     expect(restored, region);
     expect(region.copyWith(width: 24).width, 24);
+    expect(CropSettings.fromMap(cropSettings.toMap()), cropSettings);
+    expect(cropSettings.copyWith(widthRatio: 0.7).widthRatio, 0.7);
+    expect(
+      CropSettings.fromMap(<Object?, Object?>{'widthRatio': 'invalid'}),
+      const CropSettings(widthRatio: 0.75, heightRatio: 0.75, cornerRadius: 0),
+    );
+    expect(ColorAdjustment.fromMap(colorAdjustment.toMap()), colorAdjustment);
+    expect(colorAdjustment.copyWith(saturation: 0.8).saturation, 0.8);
+    expect(
+      ColorAdjustment.fromMap(<Object?, Object?>{'contrast': 'invalid'}),
+      const ColorAdjustment(brightness: 1, contrast: 1, saturation: 1),
+    );
     expect(
       const ImageClipOutputSettings.jpeg(
         jpegQuality: 80,
@@ -560,6 +582,35 @@ void main() {
       ).copyWith(clearTargetLongSide: true).targetLongSide,
       isNull,
     );
+  });
+
+  test('task progress helpers are stable for UI state', () {
+    const progress = ImageClipTaskProgress(
+      stage: ImageClipTaskProgressStage.processing,
+      completedSteps: 12,
+      totalSteps: 10,
+      message: 'Processing',
+    );
+    const sameProgress = ImageClipTaskProgress(
+      stage: ImageClipTaskProgressStage.processing,
+      completedSteps: 12,
+      totalSteps: 10,
+      message: 'Processing',
+    );
+    const completed = ImageClipTaskProgress(
+      stage: ImageClipTaskProgressStage.completed,
+      completedSteps: 1,
+      totalSteps: 1,
+      message: 'Completed',
+    );
+
+    expect(progress.fraction, 0.85);
+    expect(progress.isCompleted, isFalse);
+    expect(progress, sameProgress);
+    expect(progress.hashCode, sameProgress.hashCode);
+    expect(progress.toString(), contains('Processing'));
+    expect(completed.fraction, 1);
+    expect(completed.isCompleted, isTrue);
   });
 
   test('single rotate and flip operations can export JPEG directly', () async {

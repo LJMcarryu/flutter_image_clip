@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:math' as math;
 
 import 'exceptions.dart';
 
@@ -115,7 +116,8 @@ class ImageClipProcessingSettings {
     this.maxInputPixels = 48000000,
     this.maxOutputPixels = 16000000,
     this.autoDownscale = true,
-  });
+  }) : assert(maxInputPixels == null || maxInputPixels > 0),
+       assert(maxOutputPixels == null || maxOutputPixels > 0);
 
   /// Creates settings without input or output pixel limits.
   const ImageClipProcessingSettings.unrestricted()
@@ -150,8 +152,8 @@ class ImageClipProcessingSettings {
       return const ImageClipProcessingSettings();
     }
     return ImageClipProcessingSettings(
-      maxInputPixels: _nullableIntOf(map['maxInputPixels']),
-      maxOutputPixels: _nullableIntOf(map['maxOutputPixels']),
+      maxInputPixels: _positiveNullableIntOf(map['maxInputPixels']),
+      maxOutputPixels: _positiveNullableIntOf(map['maxOutputPixels']),
       autoDownscale: _boolOf(map['autoDownscale'], fallback: true),
     );
   }
@@ -225,7 +227,7 @@ class ImageClipDecodeSettings {
       return const ImageClipDecodeSettings();
     }
     return ImageClipDecodeSettings(
-      targetLongSide: _nullableIntOf(map['targetLongSide']),
+      targetLongSide: _positiveNullableIntOf(map['targetLongSide']),
       usePlatformAdapter: _boolOf(map['usePlatformAdapter'], fallback: true),
     );
   }
@@ -262,16 +264,19 @@ class ImageClipOutputSettings {
     this.format = ImageClipOutputFormat.png,
     this.jpegQuality = 90,
     this.pngLevel = 6,
-  });
+  }) : assert(jpegQuality >= 1 && jpegQuality <= 100),
+       assert(pngLevel >= 0 && pngLevel <= 9);
 
   /// Creates lossless PNG output settings.
   const ImageClipOutputSettings.png({this.pngLevel = 6})
-    : format = ImageClipOutputFormat.png,
+    : assert(pngLevel >= 0 && pngLevel <= 9),
+      format = ImageClipOutputFormat.png,
       jpegQuality = 90;
 
   /// Creates JPEG output settings.
   const ImageClipOutputSettings.jpeg({this.jpegQuality = 90})
-    : format = ImageClipOutputFormat.jpeg,
+    : assert(jpegQuality >= 1 && jpegQuality <= 100),
+      format = ImageClipOutputFormat.jpeg,
       pngLevel = 6;
 
   /// Encoded output format.
@@ -309,8 +314,11 @@ class ImageClipOutputSettings {
     }
     return ImageClipOutputSettings(
       format: _formatFromName(map['format'] as String?),
-      jpegQuality: _intOf(map['jpegQuality'], fallback: 90),
-      pngLevel: _intOf(map['pngLevel'], fallback: 6),
+      jpegQuality: _intOf(
+        map['jpegQuality'],
+        fallback: 90,
+      ).clamp(1, 100).toInt(),
+      pngLevel: _intOf(map['pngLevel'], fallback: 6).clamp(0, 9).toInt(),
     );
   }
 
@@ -484,6 +492,39 @@ class CropSettings {
     'heightRatio': heightRatio,
     'cornerRadius': cornerRadius,
   };
+
+  /// Creates center-crop settings from a map.
+  static CropSettings fromMap(Map<Object?, Object?> map) {
+    return CropSettings(
+      widthRatio: _doubleOf(map['widthRatio'], fallback: 0.75),
+      heightRatio: _doubleOf(map['heightRatio'], fallback: 0.75),
+      cornerRadius: _doubleOf(map['cornerRadius'], fallback: 0),
+    );
+  }
+
+  /// Returns a copy with selected values replaced.
+  CropSettings copyWith({
+    double? widthRatio,
+    double? heightRatio,
+    double? cornerRadius,
+  }) {
+    return CropSettings(
+      widthRatio: widthRatio ?? this.widthRatio,
+      heightRatio: heightRatio ?? this.heightRatio,
+      cornerRadius: cornerRadius ?? this.cornerRadius,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is CropSettings &&
+        other.widthRatio == widthRatio &&
+        other.heightRatio == heightRatio &&
+        other.cornerRadius == cornerRadius;
+  }
+
+  @override
+  int get hashCode => Object.hash(widthRatio, heightRatio, cornerRadius);
 }
 
 /// Pixel crop rectangle used by explicit crop-region operations.
@@ -511,6 +552,53 @@ class CropRegion {
 
   /// Rounded corner radius in source-image pixels.
   final double cornerRadius;
+
+  /// Whether [width] and [height] describe a non-empty rectangle.
+  bool get hasPositiveSize => width > 0 && height > 0;
+
+  /// Returns this region clamped to an image of [sourceWidth] x [sourceHeight].
+  ///
+  /// The returned rectangle is always at least 1 pixel wide and high. Negative
+  /// or zero input sizes are normalized to a 1px crop anchored near [x] and [y],
+  /// while out-of-range coordinates are moved inside the image bounds.
+  CropRegion clampToBounds({
+    required int sourceWidth,
+    required int sourceHeight,
+  }) {
+    if (sourceWidth <= 0) {
+      throw ArgumentError.value(
+        sourceWidth,
+        'sourceWidth',
+        'Source width must be greater than zero.',
+      );
+    }
+    if (sourceHeight <= 0) {
+      throw ArgumentError.value(
+        sourceHeight,
+        'sourceHeight',
+        'Source height must be greater than zero.',
+      );
+    }
+
+    final left = x.clamp(0, sourceWidth - 1).toInt();
+    final top = y.clamp(0, sourceHeight - 1).toInt();
+    final rawRight = hasPositiveSize ? x + width : x + 1;
+    final rawBottom = hasPositiveSize ? y + height : y + 1;
+    final right = rawRight.clamp(left + 1, sourceWidth).toInt();
+    final bottom = rawBottom.clamp(top + 1, sourceHeight).toInt();
+    final boundedWidth = right - left;
+    final boundedHeight = bottom - top;
+    final safeCornerRadius = cornerRadius.isFinite ? cornerRadius : 0.0;
+    final maxCornerRadius = math.min(boundedWidth, boundedHeight) / 2;
+
+    return CropRegion(
+      x: left,
+      y: top,
+      width: boundedWidth,
+      height: boundedHeight,
+      cornerRadius: safeCornerRadius.clamp(0, maxCornerRadius).toDouble(),
+    );
+  }
 
   /// Converts this region to the map used by the background processor.
   Map<String, Object?> toMap() => <String, Object?>{
@@ -587,6 +675,39 @@ class ColorAdjustment {
     'contrast': contrast,
     'saturation': saturation,
   };
+
+  /// Creates color adjustment multipliers from a map.
+  static ColorAdjustment fromMap(Map<Object?, Object?> map) {
+    return ColorAdjustment(
+      brightness: _doubleOf(map['brightness'], fallback: 1),
+      contrast: _doubleOf(map['contrast'], fallback: 1),
+      saturation: _doubleOf(map['saturation'], fallback: 1),
+    );
+  }
+
+  /// Returns a copy with selected values replaced.
+  ColorAdjustment copyWith({
+    double? brightness,
+    double? contrast,
+    double? saturation,
+  }) {
+    return ColorAdjustment(
+      brightness: brightness ?? this.brightness,
+      contrast: contrast ?? this.contrast,
+      saturation: saturation ?? this.saturation,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ColorAdjustment &&
+        other.brightness == brightness &&
+        other.contrast == contrast &&
+        other.saturation == saturation;
+  }
+
+  @override
+  int get hashCode => Object.hash(brightness, contrast, saturation);
 }
 
 ImageClipOutputFormat _formatFromName(String? name) {
@@ -610,6 +731,14 @@ int? _nullableIntOf(Object? value) {
     return value.round();
   }
   return null;
+}
+
+int? _positiveNullableIntOf(Object? value) {
+  final integer = _nullableIntOf(value);
+  if (integer == null || integer <= 0) {
+    return null;
+  }
+  return integer;
 }
 
 double _doubleOf(Object? value, {required double fallback}) {

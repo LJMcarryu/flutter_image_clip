@@ -2,6 +2,11 @@ part of '../image_clip_editor.dart';
 
 /// Opens a full-screen image crop editor and returns an [ImageClipResult].
 ///
+/// [initialRotationDegrees] must be a quarter-turn rotation. When
+/// [initialCropRegion] is supplied it is interpreted in original source-image
+/// pixel coordinates, then clamped to the loaded image bounds before the
+/// preview is restored. Non-positive crop sizes are ignored.
+///
 /// Set [cropAreaHeight] to pin the main crop preview area to a fixed height.
 /// When omitted, the preview keeps the default adaptive height.
 Future<ImageClipResult?> showImageClipEditor(
@@ -12,6 +17,8 @@ Future<ImageClipResult?> showImageClipEditor(
   ImageClipCropOrientation initialOrientation =
       ImageClipCropOrientation.portrait,
   ImageClipAspectRatio? initialAspectRatio,
+  int initialRotationDegrees = 0,
+  CropRegion? initialCropRegion,
   List<ImageClipAspectRatio> aspectRatios = ImageClipAspectRatio.defaults,
   ImageClipScaleMode initialScaleMode = ImageClipScaleMode.fit,
   ImageClipOutputSettings outputSettings = const ImageClipOutputSettings.png(),
@@ -37,6 +44,8 @@ Future<ImageClipResult?> showImageClipEditor(
           initialImageLabel: imageLabel,
           initialOrientation: initialOrientation,
           initialAspectRatio: initialAspectRatio,
+          initialRotationDegrees: initialRotationDegrees,
+          initialCropRegion: initialCropRegion,
           aspectRatios: aspectRatios,
           initialScaleMode: initialScaleMode,
           outputSettings: outputSettings,
@@ -126,6 +135,86 @@ class ImageClipAspectRatio {
     };
   }
 
+  /// Creates an aspect ratio from pixel [width] and [height].
+  ///
+  /// If [presets] contains a ratio with the same numeric value, that preset is
+  /// returned so callers keep the intended UI label. Otherwise a new ratio is
+  /// created with a reduced label such as `3:4`.
+  static ImageClipAspectRatio fromDimensions({
+    required int width,
+    required int height,
+    String? label,
+    Iterable<ImageClipAspectRatio> presets = const <ImageClipAspectRatio>[],
+  }) {
+    if (width <= 0) {
+      throw ArgumentError.value(
+        width,
+        'width',
+        'Aspect ratio width must be greater than zero.',
+      );
+    }
+    if (height <= 0) {
+      throw ArgumentError.value(
+        height,
+        'height',
+        'Aspect ratio height must be greater than zero.',
+      );
+    }
+
+    final target = width / height;
+    for (final preset in presets) {
+      if ((preset.value - target).abs() < _aspectRatioTolerance) {
+        return preset;
+      }
+    }
+
+    final divisor = _greatestCommonDivisor(width, height);
+    final reducedWidth = width ~/ divisor;
+    final reducedHeight = height ~/ divisor;
+    return ImageClipAspectRatio(
+      label: label ?? '$reducedWidth:$reducedHeight',
+      width: width.toDouble(),
+      height: height.toDouble(),
+    );
+  }
+
+  /// Creates an aspect ratio from a saved [region] and preview rotation.
+  ///
+  /// [rotationDegrees] must be a quarter-turn rotation. For `90` and `270`
+  /// degrees, [CropRegion.width] and [CropRegion.height] are swapped before the
+  /// ratio is resolved.
+  static ImageClipAspectRatio fromCropRegion(
+    CropRegion region, {
+    int rotationDegrees = 0,
+    String? label,
+    Iterable<ImageClipAspectRatio> presets = const <ImageClipAspectRatio>[],
+  }) {
+    if (!region.hasPositiveSize) {
+      throw ArgumentError.value(
+        region,
+        'region',
+        'Crop region width and height must be greater than zero.',
+      );
+    }
+    if (!ImageClipCropTransform.isQuarterTurnRotation(rotationDegrees)) {
+      throw ArgumentError.value(
+        rotationDegrees,
+        'rotationDegrees',
+        'Only quarter-turn rotations are supported.',
+      );
+    }
+
+    final rotated = ImageClipCropTransform(
+      rotationDegrees: rotationDegrees,
+    ).quarterTurns.isOdd;
+    return ImageClipAspectRatio.fromDimensions(
+      width: rotated ? region.height : region.width,
+      height: rotated ? region.width : region.height,
+      label: label,
+      presets: presets,
+    );
+  }
+
   /// User-facing preset label.
   final String label;
 
@@ -170,6 +259,8 @@ class ImageClipEditor extends StatefulWidget {
     this.initialImageLabel = '',
     this.initialOrientation = ImageClipCropOrientation.portrait,
     this.initialAspectRatio,
+    this.initialRotationDegrees = 0,
+    this.initialCropRegion,
     this.aspectRatios = ImageClipAspectRatio.defaults,
     this.initialScaleMode = ImageClipScaleMode.fit,
     this.outputSettings = const ImageClipOutputSettings.png(),
@@ -185,7 +276,8 @@ class ImageClipEditor extends StatefulWidget {
     this.onCancel,
     this.onProgress,
     this.onResult,
-  }) : assert(cropAreaHeight == null || cropAreaHeight > 0);
+  }) : assert(initialRotationDegrees % 90 == 0),
+       assert(cropAreaHeight == null || cropAreaHeight > 0);
 
   /// Optional controller used to drive this editor from parent widgets.
   final ImageClipEditorController? controller;
@@ -208,6 +300,24 @@ class ImageClipEditor extends StatefulWidget {
 
   /// Initial crop-box aspect ratio that overrides [initialOrientation].
   final ImageClipAspectRatio? initialAspectRatio;
+
+  /// Initial clockwise preview rotation in degrees.
+  ///
+  /// Only quarter-turn rotations are supported. Values outside `0..359` are
+  /// normalized, so `-90` and `270` are equivalent.
+  final int initialRotationDegrees;
+
+  /// Initial crop position in source-image pixel coordinates.
+  ///
+  /// When provided, the editor restores the preview scale and offset so this
+  /// source region is shown inside the crop frame. The initial crop aspect
+  /// ratio is derived from this region and [initialRotationDegrees].
+  ///
+  /// Coordinates outside the source image are clamped after the image loads.
+  /// Regions with non-positive [CropRegion.width] or [CropRegion.height] are
+  /// ignored and the editor falls back to [initialAspectRatio] or
+  /// [initialOrientation].
+  final CropRegion? initialCropRegion;
 
   /// Aspect ratio presets shown in the bottom toolbar.
   final List<ImageClipAspectRatio> aspectRatios;
@@ -281,6 +391,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   late ImageClipAspectRatio _cropAspectRatio;
   late ImageClipScaleMode _cropScaleMode;
   int _rotationDegrees = 0;
+  int _initialCropRegionRevision = 0;
   bool _flipHorizontal = false;
   bool _flipVertical = false;
 
@@ -295,6 +406,10 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   }
 
   ImageClipAspectRatio get _initialAspectRatio {
+    final region = _validInitialCropRegion;
+    if (region != null) {
+      return _aspectRatioForInitialRegion(region);
+    }
     return widget.initialAspectRatio ??
         ImageClipAspectRatio.fromOrientation(widget.initialOrientation);
   }
@@ -315,6 +430,20 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     return <ImageClipAspectRatio>[_cropAspectRatio, ...presets];
   }
 
+  ImageClipCropTransform get _initialCropTransform {
+    return ImageClipCropTransform(
+      rotationDegrees: widget.initialRotationDegrees,
+    );
+  }
+
+  CropRegion? get _validInitialCropRegion {
+    final region = widget.initialCropRegion;
+    if (region == null || !region.hasPositiveSize) {
+      return null;
+    }
+    return region;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -324,6 +453,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     _status = widget.labels.initialStatus;
     _cropAspectRatio = _initialAspectRatio;
     _cropScaleMode = widget.initialScaleMode;
+    _rotationDegrees = _initialCropTransform.normalizedRotation;
     widget.controller?._attach(this);
     unawaited(_loadInitialImage());
   }
@@ -338,6 +468,20 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     if (oldWidget.initialImageBytes != widget.initialImageBytes ||
         oldWidget.initialImageLabel != widget.initialImageLabel) {
       unawaited(_loadInitialImage());
+    }
+    final initialCropRegionChanged =
+        oldWidget.initialRotationDegrees != widget.initialRotationDegrees ||
+        oldWidget.initialCropRegion != widget.initialCropRegion;
+    if (initialCropRegionChanged ||
+        oldWidget.initialAspectRatio != widget.initialAspectRatio ||
+        oldWidget.initialOrientation != widget.initialOrientation) {
+      setState(() {
+        if (initialCropRegionChanged) {
+          _initialCropRegionRevision++;
+        }
+        _cropAspectRatio = _initialAspectRatio;
+        _resetPreviewTransform();
+      });
     }
   }
 
@@ -377,6 +521,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
                 cropAspectRatio: _cropAspectRatioValue,
                 scaleMode: _cropScaleMode,
                 transform: _cropTransform,
+                initialCropRegion: _initialPreviewCropRegionFor(_image),
+                initialCropRegionRevision: _initialCropRegionRevision,
                 labels: widget.labels,
                 theme: widget.theme,
               ),
@@ -508,6 +654,49 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       _resetPreviewTransform();
     });
     return Future<void>.value();
+  }
+
+  CropRegion? _initialPreviewCropRegionFor(EditedImage? image) {
+    final initialRegion = _validInitialCropRegion;
+    if (image == null || initialRegion == null) {
+      return null;
+    }
+    final sourceRegion = initialRegion.clampToBounds(
+      sourceWidth: image.sourceWidth,
+      sourceHeight: image.sourceHeight,
+    );
+    final previewSourceRegion = _previewSourceRegionForInitial(
+      image,
+      sourceRegion,
+    );
+    return _cropTransform.previewRegionForSource(
+      sourceWidth: image.width,
+      sourceHeight: image.height,
+      sourceRegion: previewSourceRegion,
+    );
+  }
+
+  CropRegion _previewSourceRegionForInitial(
+    EditedImage image,
+    CropRegion region,
+  ) {
+    if (!image.isPreviewSized) {
+      return region;
+    }
+    final scaleX = image.width / image.sourceWidth;
+    final scaleY = image.height / image.sourceHeight;
+    final x = (region.x * scaleX).round().clamp(0, image.width - 1);
+    final y = (region.y * scaleY).round().clamp(0, image.height - 1);
+    return CropRegion(
+      x: x.toInt(),
+      y: y.toInt(),
+      width: (region.width * scaleX).round().clamp(1, image.width - x).toInt(),
+      height: (region.height * scaleY)
+          .round()
+          .clamp(1, image.height - y)
+          .toInt(),
+      cornerRadius: region.cornerRadius * ((scaleX + scaleY) / 2),
+    );
   }
 
   Future<void> _loadControllerImage(Uint8List bytes, {required String label}) {
@@ -781,7 +970,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   }
 
   void _resetPreviewTransform() {
-    _rotationDegrees = 0;
+    _rotationDegrees = _initialCropTransform.normalizedRotation;
     _flipHorizontal = false;
     _flipVertical = false;
   }
@@ -795,6 +984,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     setState(() {
       _cropAspectRatio = _initialAspectRatio;
       _cropScaleMode = widget.initialScaleMode;
+      _resetPreviewTransform();
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -817,4 +1007,27 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       }
     });
   }
+
+  ImageClipAspectRatio _aspectRatioForInitialRegion(CropRegion region) {
+    return ImageClipAspectRatio.fromCropRegion(
+      region,
+      rotationDegrees: widget.initialRotationDegrees,
+      presets: widget.aspectRatios.isEmpty
+          ? ImageClipAspectRatio.defaults
+          : widget.aspectRatios,
+    );
+  }
+}
+
+const _aspectRatioTolerance = 0.001;
+
+int _greatestCommonDivisor(int a, int b) {
+  var x = a.abs();
+  var y = b.abs();
+  while (y != 0) {
+    final next = x % y;
+    x = y;
+    y = next;
+  }
+  return x == 0 ? 1 : x;
 }

@@ -9,12 +9,164 @@ import 'package:image/image.dart' as img;
 void main() {
   test('supports custom aspect ratios and the 16:10 / 10:16 presets', () {
     const custom = ImageClipAspectRatio(label: '21:9', width: 21, height: 9);
+    final generated = ImageClipAspectRatio.fromDimensions(
+      width: 480,
+      height: 640,
+    );
+    final matched = ImageClipAspectRatio.fromDimensions(
+      width: 1600,
+      height: 1000,
+      presets: const <ImageClipAspectRatio>[ImageClipAspectRatio.ratio16x10],
+    );
+    final rotatedRegionRatio = ImageClipAspectRatio.fromCropRegion(
+      const CropRegion(x: 0, y: 0, width: 200, height: 100, cornerRadius: 0),
+      rotationDegrees: 90,
+    );
 
     expect(custom.value, closeTo(21 / 9, 0.0001));
+    expect(generated.label, '3:4');
+    expect(generated.value, closeTo(0.75, 0.0001));
+    expect(matched, ImageClipAspectRatio.ratio16x10);
+    expect(rotatedRegionRatio.label, '1:2');
+    expect(rotatedRegionRatio.value, closeTo(0.5, 0.0001));
     expect(ImageClipAspectRatio.ratio16x10.label, '16:10');
     expect(ImageClipAspectRatio.ratio16x10.value, closeTo(1.6, 0.0001));
     expect(ImageClipAspectRatio.ratio10x16.label, '10:16');
     expect(ImageClipAspectRatio.ratio10x16.value, closeTo(0.625, 0.0001));
+    expect(
+      () => ImageClipAspectRatio.fromDimensions(width: 0, height: 1),
+      throwsArgumentError,
+    );
+    expect(
+      () => ImageClipAspectRatio.fromCropRegion(
+        const CropRegion(x: 0, y: 0, width: 1, height: 1, cornerRadius: 0),
+        rotationDegrees: 45,
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('normalizes crop regions and quarter-turn rotations', () {
+    expect(ImageClipCropTransform.isQuarterTurnRotation(450), isTrue);
+    const invalidRotation = ImageClipCropTransform(rotationDegrees: 45);
+    expect(invalidRotation.hasQuarterTurnRotation, isFalse);
+    expect(() => invalidRotation.quarterTurns, throwsArgumentError);
+
+    final oversized = const CropRegion(
+      x: -10,
+      y: 295,
+      width: 500,
+      height: 50,
+      cornerRadius: 99,
+    ).clampToBounds(sourceWidth: 400, sourceHeight: 300);
+
+    expect(
+      oversized,
+      const CropRegion(x: 0, y: 295, width: 400, height: 5, cornerRadius: 2.5),
+    );
+
+    final empty = const CropRegion(
+      x: 500,
+      y: -20,
+      width: 0,
+      height: -5,
+      cornerRadius: double.nan,
+    ).clampToBounds(sourceWidth: 400, sourceHeight: 300);
+
+    expect(
+      empty,
+      const CropRegion(x: 399, y: 0, width: 1, height: 1, cornerRadius: 0),
+    );
+  });
+
+  test('clamps encoded output settings read from maps', () {
+    final settings = ImageClipOutputSettings.fromMap(<Object?, Object?>{
+      'format': 'jpeg',
+      'jpegQuality': 120,
+      'pngLevel': -3,
+    });
+
+    expect(settings.format, ImageClipOutputFormat.jpeg);
+    expect(settings.jpegQuality, 100);
+    expect(settings.pngLevel, 0);
+  });
+
+  test('ignores non-positive processing and decode limits from maps', () {
+    final processing = ImageClipProcessingSettings.fromMap(<Object?, Object?>{
+      'maxInputPixels': -1,
+      'maxOutputPixels': 0,
+      'autoDownscale': false,
+    });
+    final decode = ImageClipDecodeSettings.fromMap(<Object?, Object?>{
+      'targetLongSide': 0,
+      'usePlatformAdapter': false,
+    });
+
+    expect(processing.maxInputPixels, isNull);
+    expect(processing.maxOutputPixels, isNull);
+    expect(processing.autoDownscale, isFalse);
+    expect(decode.targetLongSide, isNull);
+    expect(decode.usePlatformAdapter, isFalse);
+  });
+
+  test('maps crop regions between source and rotated preview coordinates', () {
+    const transform = ImageClipCropTransform(rotationDegrees: 90);
+    const sourceRegion = CropRegion(
+      x: 50,
+      y: 40,
+      width: 200,
+      height: 100,
+      cornerRadius: 0,
+    );
+
+    final previewRegion = transform.previewRegionForSource(
+      sourceWidth: 400,
+      sourceHeight: 300,
+      sourceRegion: sourceRegion,
+    );
+
+    expect(
+      previewRegion,
+      const CropRegion(x: 160, y: 50, width: 100, height: 200, cornerRadius: 0),
+    );
+    expect(
+      transform.sourceRegionForPreview(
+        sourceWidth: 400,
+        sourceHeight: 300,
+        previewRegion: previewRegion,
+      ),
+      sourceRegion,
+    );
+  });
+
+  test('clamps crop regions before mapping rotated coordinates', () {
+    const transform = ImageClipCropTransform(rotationDegrees: 90);
+    const sourceRegion = CropRegion(
+      x: -10,
+      y: 250,
+      width: 500,
+      height: 100,
+      cornerRadius: 99,
+    );
+    final boundedSourceRegion = sourceRegion.clampToBounds(
+      sourceWidth: 400,
+      sourceHeight: 300,
+    );
+
+    final previewRegion = transform.previewRegionForSource(
+      sourceWidth: 400,
+      sourceHeight: 300,
+      sourceRegion: sourceRegion,
+    );
+
+    expect(
+      transform.sourceRegionForPreview(
+        sourceWidth: 400,
+        sourceHeight: 300,
+        previewRegion: previewRegion,
+      ),
+      boundedSourceRegion,
+    );
   });
 
   Future<void> pumpUntilSampleLoads(WidgetTester tester) async {
@@ -787,6 +939,199 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('restores initial crop position and derives its ratio', (
+    tester,
+  ) async {
+    final controller = ImageClipEditorController();
+    final imageBytes = _pngBytes(400, 300);
+    const initialRegion = CropRegion(
+      x: 50,
+      y: 40,
+      width: 200,
+      height: 100,
+      cornerRadius: 0,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: controller,
+          initialImageBytes: imageBytes,
+          initialImageLabel: 'restore-source.png',
+          initialRotationDegrees: 90,
+          initialCropRegion: initialRegion,
+          loadSampleOnStart: false,
+          showResultPage: false,
+        ),
+      ),
+    );
+    await pumpUntilIdle(tester);
+    await tester.pump();
+
+    expect(find.text('1:2'), findsOneWidget);
+    final restored = controller.currentCropRegion();
+    expect(restored, isNotNull);
+    expect(restored!.x, closeTo(initialRegion.x, 1));
+    expect(restored.y, closeTo(initialRegion.y, 1));
+    expect(restored.width, closeTo(initialRegion.width, 1));
+    expect(restored.height, closeTo(initialRegion.height, 1));
+
+    final result = await tester.runAsync(controller.crop);
+    await tester.pump();
+
+    expect(result, isNotNull);
+    expect(result!.rotationDegrees, 90);
+    expect(result.sourceRegion, result.region);
+    expect(result.transform, const ImageClipCropTransform(rotationDegrees: 90));
+    expect(result.region.x, closeTo(initialRegion.x, 1));
+    expect(result.region.y, closeTo(initialRegion.y, 1));
+    expect(result.region.width, closeTo(initialRegion.width, 1));
+    expect(result.region.height, closeTo(initialRegion.height, 1));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('initial crop position does not override editor controls', (
+    tester,
+  ) async {
+    final controller = ImageClipEditorController();
+    final imageBytes = _pngBytes(400, 300);
+    const initialRegion = CropRegion(
+      x: 30,
+      y: 20,
+      width: 120,
+      height: 80,
+      cornerRadius: 0,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: controller,
+          initialImageBytes: imageBytes,
+          initialImageLabel: 'restore-source.png',
+          initialCropRegion: initialRegion,
+          loadSampleOnStart: false,
+          showResultPage: false,
+        ),
+      ),
+    );
+    await pumpUntilIdle(tester);
+    await tester.pump();
+
+    expect(
+      _isCloseToRegion(controller.currentCropRegion(), initialRegion),
+      isTrue,
+    );
+
+    await controller.rotateRight();
+    await tester.pump();
+    expect(
+      _isCloseToRegion(controller.currentCropRegion(), initialRegion),
+      isFalse,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('image_clip_editor_close_hit_area')),
+      warnIfMissed: false,
+    );
+    await tester.pump();
+    expect(
+      _isCloseToRegion(controller.currentCropRegion(), initialRegion),
+      isFalse,
+    );
+
+    await tester.tap(find.text('Fill'));
+    await tester.pump();
+    expect(
+      _isCloseToRegion(controller.currentCropRegion(), initialRegion),
+      isFalse,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ignores invalid initial crop sizes without crashing', (
+    tester,
+  ) async {
+    final controller = ImageClipEditorController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: controller,
+          initialImageBytes: _pngBytes(400, 300),
+          initialImageLabel: 'invalid-restore-source.png',
+          initialAspectRatio: ImageClipAspectRatio.square,
+          initialCropRegion: const CropRegion(
+            x: 10,
+            y: 10,
+            width: 0,
+            height: -20,
+            cornerRadius: 0,
+          ),
+          loadSampleOnStart: false,
+          showResultPage: false,
+        ),
+      ),
+    );
+    await pumpUntilIdle(tester);
+    await tester.pump();
+
+    expect(find.text('1:1'), findsOneWidget);
+    expect(controller.currentCropRegion(), isNotNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('updates restored crop position when initial region changes', (
+    tester,
+  ) async {
+    final controller = ImageClipEditorController();
+    final imageBytes = _pngBytes(400, 300);
+    const firstRegion = CropRegion(
+      x: 40,
+      y: 30,
+      width: 160,
+      height: 120,
+      cornerRadius: 0,
+    );
+    const nextRegion = CropRegion(
+      x: 120,
+      y: 80,
+      width: 200,
+      height: 100,
+      cornerRadius: 0,
+    );
+
+    Widget buildEditor(CropRegion region) {
+      return MaterialApp(
+        home: ImageClipEditor(
+          controller: controller,
+          initialImageBytes: imageBytes,
+          initialImageLabel: 'restore-source.png',
+          initialCropRegion: region,
+          loadSampleOnStart: false,
+          showResultPage: false,
+        ),
+      );
+    }
+
+    await tester.pumpWidget(buildEditor(firstRegion));
+    await pumpUntilIdle(tester);
+    await tester.pump();
+    expect(controller.currentCropRegion()?.x, closeTo(firstRegion.x, 1));
+
+    await tester.pumpWidget(buildEditor(nextRegion));
+    await pumpUntilIdle(tester);
+    await tester.pump();
+
+    final restored = controller.currentCropRegion();
+    expect(restored, isNotNull);
+    expect(restored!.x, closeTo(nextRegion.x, 1));
+    expect(restored.y, closeTo(nextRegion.y, 1));
+    expect(restored.width, closeTo(nextRegion.width, 1));
+    expect(restored.height, closeTo(nextRegion.height, 1));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('newer image loads ignore stale async completions', (
     tester,
   ) async {
@@ -861,6 +1206,17 @@ void main() {
     expect(controller.image, isNull);
     expect(tester.takeException(), isNull);
   });
+}
+
+bool _isCloseToRegion(CropRegion? actual, CropRegion expected) {
+  if (actual == null) {
+    return false;
+  }
+  const tolerance = 1;
+  return (actual.x - expected.x).abs() <= tolerance &&
+      (actual.y - expected.y).abs() <= tolerance &&
+      (actual.width - expected.width).abs() <= tolerance &&
+      (actual.height - expected.height).abs() <= tolerance;
 }
 
 Uint8List _pngBytes(int width, int height) {

@@ -50,6 +50,12 @@ class ImageClipCropTransform {
     return normalized < 0 ? normalized + 360 : normalized;
   }
 
+  /// Whether [degrees] can be represented as whole quarter turns.
+  static bool isQuarterTurnRotation(int degrees) => degrees % 90 == 0;
+
+  /// Whether [rotationDegrees] can be represented as whole quarter turns.
+  bool get hasQuarterTurnRotation => isQuarterTurnRotation(normalizedRotation);
+
   /// Number of clockwise quarter turns represented by [rotationDegrees].
   int get quarterTurns {
     final rotation = normalizedRotation;
@@ -90,10 +96,14 @@ class ImageClipCropTransform {
       sourceWidth: sourceWidth,
       sourceHeight: sourceHeight,
     );
-    var x = previewRegion.x;
-    var y = previewRegion.y;
-    var width = previewRegion.width;
-    var height = previewRegion.height;
+    final boundedPreviewRegion = previewRegion.clampToBounds(
+      sourceWidth: visual.width,
+      sourceHeight: visual.height,
+    );
+    var x = boundedPreviewRegion.x;
+    var y = boundedPreviewRegion.y;
+    var width = boundedPreviewRegion.width;
+    var height = boundedPreviewRegion.height;
 
     if (flipHorizontal) {
       x = visual.width - x - width;
@@ -110,7 +120,7 @@ class ImageClipCropTransform {
         height: width,
         sourceWidth: sourceWidth,
         sourceHeight: sourceHeight,
-        cornerRadius: previewRegion.cornerRadius,
+        cornerRadius: boundedPreviewRegion.cornerRadius,
       ),
       180 => _boundedCropRegion(
         x: sourceWidth - x - width,
@@ -119,7 +129,7 @@ class ImageClipCropTransform {
         height: height,
         sourceWidth: sourceWidth,
         sourceHeight: sourceHeight,
-        cornerRadius: previewRegion.cornerRadius,
+        cornerRadius: boundedPreviewRegion.cornerRadius,
       ),
       270 => _boundedCropRegion(
         x: sourceWidth - y - height,
@@ -128,7 +138,7 @@ class ImageClipCropTransform {
         height: width,
         sourceWidth: sourceWidth,
         sourceHeight: sourceHeight,
-        cornerRadius: previewRegion.cornerRadius,
+        cornerRadius: boundedPreviewRegion.cornerRadius,
       ),
       _ => _boundedCropRegion(
         x: x,
@@ -137,9 +147,68 @@ class ImageClipCropTransform {
         height: height,
         sourceWidth: sourceWidth,
         sourceHeight: sourceHeight,
-        cornerRadius: previewRegion.cornerRadius,
+        cornerRadius: boundedPreviewRegion.cornerRadius,
       ),
     };
+  }
+
+  /// Maps [sourceRegion] in source-image coordinates into transformed preview
+  /// coordinates.
+  ///
+  /// This is the inverse of [sourceRegionForPreview] and is useful when an
+  /// editor needs to restore a crop position from previously saved metadata.
+  CropRegion previewRegionForSource({
+    required int sourceWidth,
+    required int sourceHeight,
+    required CropRegion sourceRegion,
+  }) {
+    final visual = visualSize(
+      sourceWidth: sourceWidth,
+      sourceHeight: sourceHeight,
+    );
+    final boundedSourceRegion = sourceRegion.clampToBounds(
+      sourceWidth: sourceWidth,
+      sourceHeight: sourceHeight,
+    );
+    var x = boundedSourceRegion.x;
+    var y = boundedSourceRegion.y;
+    var width = boundedSourceRegion.width;
+    var height = boundedSourceRegion.height;
+
+    switch (normalizedRotation) {
+      case 90:
+        final nextWidth = height;
+        x = sourceHeight - boundedSourceRegion.y - boundedSourceRegion.height;
+        y = boundedSourceRegion.x;
+        width = nextWidth;
+        height = boundedSourceRegion.width;
+      case 180:
+        x = sourceWidth - boundedSourceRegion.x - boundedSourceRegion.width;
+        y = sourceHeight - boundedSourceRegion.y - boundedSourceRegion.height;
+      case 270:
+        final nextWidth = height;
+        x = boundedSourceRegion.y;
+        y = sourceWidth - boundedSourceRegion.x - boundedSourceRegion.width;
+        width = nextWidth;
+        height = boundedSourceRegion.width;
+    }
+
+    if (flipHorizontal) {
+      x = visual.width - x - width;
+    }
+    if (flipVertical) {
+      y = visual.height - y - height;
+    }
+
+    return _boundedCropRegion(
+      x: x,
+      y: y,
+      width: width,
+      height: height,
+      sourceWidth: visual.width,
+      sourceHeight: visual.height,
+      cornerRadius: boundedSourceRegion.cornerRadius,
+    );
   }
 
   /// Returns a copy with selected fields replaced.
@@ -177,15 +246,11 @@ CropRegion _boundedCropRegion({
   required int sourceHeight,
   required double cornerRadius,
 }) {
-  final left = x.clamp(0, sourceWidth - 1).toInt();
-  final top = y.clamp(0, sourceHeight - 1).toInt();
-  final right = (x + width).clamp(left + 1, sourceWidth).toInt();
-  final bottom = (y + height).clamp(top + 1, sourceHeight).toInt();
   return CropRegion(
-    x: left,
-    y: top,
-    width: right - left,
-    height: bottom - top,
+    x: x,
+    y: y,
+    width: width,
+    height: height,
     cornerRadius: cornerRadius,
-  );
+  ).clampToBounds(sourceWidth: sourceWidth, sourceHeight: sourceHeight);
 }

@@ -9,6 +9,8 @@ class _PreviewPanel extends StatefulWidget {
     required this.cropAspectRatio,
     required this.scaleMode,
     required this.transform,
+    required this.initialCropRegion,
+    required this.initialCropRegionRevision,
     required this.labels,
     required this.theme,
   });
@@ -19,6 +21,8 @@ class _PreviewPanel extends StatefulWidget {
   final double cropAspectRatio;
   final ImageClipScaleMode scaleMode;
   final ImageClipCropTransform transform;
+  final CropRegion? initialCropRegion;
+  final int initialCropRegionRevision;
   final ImageClipEditorLabels labels;
   final ImageClipEditorTheme theme;
 
@@ -36,16 +40,22 @@ class _PreviewPanelState extends State<_PreviewPanel> {
   double _startScale = 1;
   Offset _startOffset = Offset.zero;
   Offset _startLocalFocalPoint = Offset.zero;
+  bool _resetOnNextLayout = false;
+  bool _restoreInitialCropRegionOnNextLayout = true;
 
   @override
   void didUpdateWidget(covariant _PreviewPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialCropRegionRevision !=
+        widget.initialCropRegionRevision) {
+      _resetOnNextLayout = true;
+      _restoreInitialCropRegionOnNextLayout = true;
+      return;
+    }
     if (oldWidget.scaleMode != widget.scaleMode ||
-        oldWidget.transform != widget.transform) {
-      final layout = _layout;
-      if (layout != null) {
-        _resetToLayout(layout);
-      }
+        oldWidget.transform != widget.transform ||
+        oldWidget.cropAspectRatio != widget.cropAspectRatio) {
+      _resetOnNextLayout = true;
     }
   }
 
@@ -262,11 +272,20 @@ class _PreviewPanelState extends State<_PreviewPanel> {
     _layout = layout;
     final imageKey =
         '${image.label}:${image.width}x${image.height}:'
-        '${image.bytes.length}:r${widget.transform.normalizedRotation}:'
-        'h${widget.transform.flipHorizontal}:v${widget.transform.flipVertical}';
-    if (_lastImageKey != imageKey) {
+        '${image.sourceWidth}x${image.sourceHeight}:${image.bytes.length}';
+    final hasNewImage = _lastImageKey != imageKey;
+    if (hasNewImage) {
       _lastImageKey = imageKey;
-      _resetToLayout(layout);
+      _restoreInitialCropRegionOnNextLayout = true;
+    }
+    if (hasNewImage || _resetOnNextLayout) {
+      final restoreInitialCropRegion = _restoreInitialCropRegionOnNextLayout;
+      _resetOnNextLayout = false;
+      _restoreInitialCropRegionOnNextLayout = false;
+      _resetToLayout(
+        layout,
+        restoreInitialCropRegion: restoreInitialCropRegion,
+      );
       return;
     }
 
@@ -341,9 +360,59 @@ class _PreviewPanelState extends State<_PreviewPanel> {
     return value.clamp(lower, upper).toDouble();
   }
 
-  void _resetToLayout(_CropPreviewLayout layout) {
+  void _resetToLayout(
+    _CropPreviewLayout layout, {
+    bool restoreInitialCropRegion = false,
+  }) {
+    final initialCropRegion = widget.initialCropRegion;
+    if (restoreInitialCropRegion &&
+        initialCropRegion != null &&
+        _resetToCropRegion(initialCropRegion, layout)) {
+      return;
+    }
     _scale = layout.minScaleFor(widget.scaleMode);
     _offset = _clampOffset(Offset.zero, layout, _scale, widget.scaleMode);
+  }
+
+  bool _resetToCropRegion(CropRegion region, _CropPreviewLayout layout) {
+    final image = widget.image;
+    if (image == null) {
+      return false;
+    }
+    final visualSize = widget.transform.visualSize(
+      sourceWidth: image.width,
+      sourceHeight: image.height,
+    );
+    final bounded = _boundedPreviewRegion(
+      region,
+      width: visualSize.width,
+      height: visualSize.height,
+    );
+    final scaleForWidth =
+        layout.cropRect.width *
+        visualSize.width /
+        (layout.baseRect.width * bounded.width);
+    final scaleForHeight =
+        layout.cropRect.height *
+        visualSize.height /
+        (layout.baseRect.height * bounded.height);
+    final targetScale =
+        (scaleForWidth > scaleForHeight ? scaleForWidth : scaleForHeight)
+            .clamp(layout.minScaleFor(widget.scaleMode), _maxScale)
+            .toDouble();
+    final pixelsPerLogicalPixel =
+        visualSize.width / (layout.baseRect.width * targetScale);
+    final imageLeft = layout.cropRect.left - bounded.x / pixelsPerLogicalPixel;
+    final imageTop = layout.cropRect.top - bounded.y / pixelsPerLogicalPixel;
+
+    _scale = targetScale;
+    _offset = _clampOffset(
+      Offset(imageLeft - layout.baseRect.left, imageTop - layout.baseRect.top),
+      layout,
+      targetScale,
+      widget.scaleMode,
+    );
+    return true;
   }
 
   void _resetGestureCrop() {
@@ -405,6 +474,14 @@ class _PreviewPanelState extends State<_PreviewPanel> {
       _offset = _clampOffset(nextOffset, layout, nextScale, widget.scaleMode);
     });
   }
+}
+
+CropRegion _boundedPreviewRegion(
+  CropRegion region, {
+  required int width,
+  required int height,
+}) {
+  return region.clampToBounds(sourceWidth: width, sourceHeight: height);
 }
 
 Size _cropSizeFor(Size size, double aspectRatio) {
