@@ -12,6 +12,8 @@ docs/
 test/
 benchmark/
 tool/
+!screenshots/
+!screenshots/**
 
 android/*
 !android/build.gradle
@@ -21,11 +23,9 @@ android/*
 !android/src/main/kotlin/
 !android/src/main/kotlin/**
 ios/*
-!ios/Classes/
-!ios/Classes/**
-!ios/Resources/
-!ios/Resources/**
 !ios/flutter_image_clip.podspec
+!ios/flutter_image_clip/
+!ios/flutter_image_clip/**
 linux/
 macos/
 web/

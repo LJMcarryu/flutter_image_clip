@@ -20,6 +20,3 @@ jobs:
 
       - name: Review dependency changes
         uses: actions/dependency-review-action@v5
-        # Keep Dependabot PRs non-blocking until GitHub Dependency graph is
-        # enabled for the repository.
-        continue-on-error: true

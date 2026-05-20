@@ -4,6 +4,11 @@ import ImageIO
 import MobileCoreServices
 
 public class FlutterImageClipPlugin: NSObject, FlutterPlugin {
+  private let decodeQueue = DispatchQueue(
+    label: "flutter_image_clip.decode",
+    qos: .userInitiated
+  )
+
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(
       name: "flutter_image_clip/decode",
@@ -26,20 +31,31 @@ public class FlutterImageClipPlugin: NSObject, FlutterPlugin {
       return
     }
 
-    do {
-      let targetLongSide = arguments["targetLongSide"] as? Int
-      let decoded = try decodeImage(data: typedData.data, targetLongSide: targetLongSide)
-      result([
-        "bytes": FlutterStandardTypedData(bytes: decoded.bytes),
-        "sourceWidth": decoded.sourceWidth,
-        "sourceHeight": decoded.sourceHeight,
-      ])
-    } catch DecodeError.unsupportedFormat {
-      result(FlutterError(code: "unsupported_format", message: DecodeError.unsupportedFormat.localizedDescription, details: nil))
-    } catch DecodeError.encodingFailed {
-      result(FlutterError(code: "encode_failed", message: DecodeError.encodingFailed.localizedDescription, details: nil))
-    } catch {
-      result(FlutterError(code: "decode_failed", message: error.localizedDescription, details: nil))
+    let data = typedData.data
+    let targetLongSide = arguments["targetLongSide"] as? Int
+    decodeQueue.async { [self] in
+      do {
+        let decoded = try decodeImage(data: data, targetLongSide: targetLongSide)
+        DispatchQueue.main.async {
+          result([
+            "bytes": FlutterStandardTypedData(bytes: decoded.bytes),
+            "sourceWidth": decoded.sourceWidth,
+            "sourceHeight": decoded.sourceHeight,
+          ])
+        }
+      } catch DecodeError.unsupportedFormat {
+        DispatchQueue.main.async {
+          result(FlutterError(code: "unsupported_format", message: DecodeError.unsupportedFormat.localizedDescription, details: nil))
+        }
+      } catch DecodeError.encodingFailed {
+        DispatchQueue.main.async {
+          result(FlutterError(code: "encode_failed", message: DecodeError.encodingFailed.localizedDescription, details: nil))
+        }
+      } catch {
+        DispatchQueue.main.async {
+          result(FlutterError(code: "decode_failed", message: error.localizedDescription, details: nil))
+        }
+      }
     }
   }
 

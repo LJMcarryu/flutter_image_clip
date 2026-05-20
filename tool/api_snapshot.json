@@ -336,6 +336,7 @@
     {
       "file": "lib/src/widgets/image_clip_editor/controller.dart",
       "declarations": [
+        "  constructor ImageClipEditorController()",
         "  getter ImageClipEditorController.image",
         "  getter ImageClipEditorController.isAttached",
         "  getter ImageClipEditorController.isBusy",

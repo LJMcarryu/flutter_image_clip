@@ -4,8 +4,10 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.graphics.Matrix
-import android.os.Build
 import android.media.ExifInterface
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -14,14 +16,21 @@ import io.flutter.plugin.common.MethodChannel.Result
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import kotlin.math.max
 import kotlin.math.roundToInt
 
 /** Android platform implementation for flutter_image_clip. */
 class FlutterImageClipPlugin : FlutterPlugin, MethodCallHandler {
     private var channel: MethodChannel? = null
+    private var decodeExecutor: ExecutorService = newDecodeExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        if (decodeExecutor.isShutdown) {
+            decodeExecutor = newDecodeExecutor()
+        }
         channel = MethodChannel(binding.binaryMessenger, "flutter_image_clip/decode")
         channel?.setMethodCallHandler(this)
     }
@@ -29,6 +38,7 @@ class FlutterImageClipPlugin : FlutterPlugin, MethodCallHandler {
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel?.setMethodCallHandler(null)
         channel = null
+        decodeExecutor.shutdownNow()
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -43,22 +53,32 @@ class FlutterImageClipPlugin : FlutterPlugin, MethodCallHandler {
             return
         }
 
-        try {
-            val targetLongSide = call.argument<Int>("targetLongSide")
-            val decoded = decodeImage(bytes, targetLongSide)
-            result.success(
-                mapOf(
-                    "bytes" to decoded.bytes,
-                    "sourceWidth" to decoded.sourceWidth,
-                    "sourceHeight" to decoded.sourceHeight
-                )
-            )
-        } catch (error: UnsupportedImageFormatException) {
-            result.error("unsupported_format", error.message ?: "Unsupported image format", null)
-        } catch (error: IllegalArgumentException) {
-            result.error("invalid_args", error.message ?: "Invalid decode arguments", null)
-        } catch (error: Throwable) {
-            result.error("decode_failed", error.message ?: "Unable to decode image", null)
+        val targetLongSide = call.argument<Int>("targetLongSide")
+        decodeExecutor.execute {
+            try {
+                val decoded = decodeImage(bytes, targetLongSide)
+                mainHandler.post {
+                    result.success(
+                        mapOf(
+                            "bytes" to decoded.bytes,
+                            "sourceWidth" to decoded.sourceWidth,
+                            "sourceHeight" to decoded.sourceHeight
+                        )
+                    )
+                }
+            } catch (error: UnsupportedImageFormatException) {
+                mainHandler.post {
+                    result.error("unsupported_format", error.message ?: "Unsupported image format", null)
+                }
+            } catch (error: IllegalArgumentException) {
+                mainHandler.post {
+                    result.error("invalid_args", error.message ?: "Invalid decode arguments", null)
+                }
+            } catch (error: Throwable) {
+                mainHandler.post {
+                    result.error("decode_failed", error.message ?: "Unable to decode image", null)
+                }
+            }
         }
     }
 
@@ -199,4 +219,8 @@ class FlutterImageClipPlugin : FlutterPlugin, MethodCallHandler {
     )
 
     private class UnsupportedImageFormatException(message: String) : Exception(message)
+
+    private fun newDecodeExecutor(): ExecutorService {
+        return Executors.newSingleThreadExecutor()
+    }
 }

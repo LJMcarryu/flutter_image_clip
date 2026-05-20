@@ -23,6 +23,7 @@
 - [ ] `flutter analyze`
 - [ ] `flutter test`
 - [ ] `dart run tool/check_api_snapshot.dart`
+- [ ] `dart run tool/check_public_api_docs.dart`
 - [ ] `dart run benchmark/image_processor_benchmark.dart --check benchmark/baseline.json`
 - [ ] `dart doc --output doc/api`
 - [ ] `dart pub publish --dry-run`
@@ -32,3 +33,4 @@
 - [ ] Android emulator 或真机
 - [ ] iOS simulator 或真机
 - [ ] 大图 / HEIC / EXIF / 透明 PNG 场景不受影响
+- [ ] 如涉及平台解码或发布版本，已更新 `guides/真实设备验收记录.md`

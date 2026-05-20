@@ -6,6 +6,9 @@ part of '../image_clip_editor.dart';
 /// call these methods from parent widgets to load images, reset the viewport, or
 /// trigger crop operations without relying on toolbar taps.
 class ImageClipEditorController {
+  /// Creates a controller for driving a single [ImageClipEditor].
+  ImageClipEditorController();
+
   _ImageClipEditorState? _state;
 
   /// Whether this controller is currently attached to an editor state.

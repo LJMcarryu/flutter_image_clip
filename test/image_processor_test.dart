@@ -476,6 +476,66 @@ void main() {
     expect(sourceRegion.cornerRadius, 2);
   });
 
+  test('crop transforms cover quarter-turn, flip, and bounded regions', () {
+    expect(
+      const ImageClipCropTransform(rotationDegrees: -90).normalizedRotation,
+      270,
+    );
+    expect(
+      const ImageClipCropTransform(rotationDegrees: 180).sourceRegionForPreview(
+        sourceWidth: 120,
+        sourceHeight: 100,
+        previewRegion: const CropRegion(
+          x: 90,
+          y: 70,
+          width: 30,
+          height: 20,
+          cornerRadius: 4,
+        ),
+      ),
+      const CropRegion(x: 0, y: 10, width: 30, height: 20, cornerRadius: 4),
+    );
+    expect(
+      const ImageClipCropTransform(
+        rotationDegrees: 270,
+        flipVertical: true,
+      ).sourceRegionForPreview(
+        sourceWidth: 100,
+        sourceHeight: 80,
+        previewRegion: const CropRegion(
+          x: 10,
+          y: 20,
+          width: 30,
+          height: 40,
+          cornerRadius: 3,
+        ),
+      ),
+      const CropRegion(x: 20, y: 10, width: 40, height: 30, cornerRadius: 3),
+    );
+    expect(
+      const ImageClipCropTransform().sourceRegionForPreview(
+        sourceWidth: 20,
+        sourceHeight: 10,
+        previewRegion: const CropRegion(
+          x: -8,
+          y: -6,
+          width: 80,
+          height: 40,
+          cornerRadius: 0,
+        ),
+      ),
+      const CropRegion(x: 0, y: 0, width: 20, height: 10, cornerRadius: 0),
+    );
+    expect(
+      () => const ImageClipCropTransform(rotationDegrees: 45).quarterTurns,
+      throwsA(isA<ArgumentError>()),
+    );
+    expect(
+      const ImageClipCropTransform().copyWith(flipHorizontal: true),
+      const ImageClipCropTransform(flipHorizontal: true),
+    );
+  });
+
   test('crop regions and settings support stable map/copy helpers', () {
     const region = CropRegion(
       x: 4,
@@ -557,6 +617,44 @@ void main() {
     expect(session.operationCount, 2);
   });
 
+  test('replacing a session image cancels stale work', () async {
+    final processor = _DelayedPipelineProcessor();
+    final initial = _editedImage('initial.png', width: 80, height: 60);
+    final replacement = _editedImage('replacement.png', width: 40, height: 30);
+    final session = ImageClipSession(image: initial, processor: processor);
+
+    final task = session.rotateTask();
+    expect(session.isBusy, isTrue);
+
+    session.replaceImage(replacement);
+
+    await expectLater(
+      task.result,
+      throwsA(isA<ImageClipTaskCanceledException>()),
+    );
+    expect(session.isBusy, isFalse);
+    expect(session.image, same(replacement));
+    expect(session.operationCount, 0);
+  });
+
+  test('session failures keep the current image unchanged', () async {
+    final source = _editedImage('source.png', width: 80, height: 60);
+    final session = ImageClipSession(image: source);
+
+    final task = session.cropRegionTask(
+      const CropRegion(x: 0, y: 0, width: 0, height: 20, cornerRadius: 0),
+    );
+
+    await expectLater(
+      task.result,
+      throwsA(isA<ImageClipInvalidCropRegionException>()),
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(session.isBusy, isFalse);
+    expect(session.image, same(source));
+    expect(session.operationCount, 0);
+  });
+
   test('cancels the active image clip session task', () async {
     final processor = _DelayedPipelineProcessor();
     final session = ImageClipSession(
@@ -602,6 +700,31 @@ void main() {
     expect(exported.height, 40);
     expect(exported.format, ImageClipOutputFormat.jpeg);
     expect(exported.bytes.sublist(0, 2), <int>[0xFF, 0xD8]);
+  });
+
+  test('decoded sessions support all in-memory edit helpers', () async {
+    final processor = ImageProcessor();
+    final source = await processor.decodeBytes(
+      img.encodePng(img.Image(width: 256, height: 128)),
+      label: 'decoded-source.png',
+    );
+    final session = ImageClipDecodedSession.fromEditedImage(source);
+
+    session.flipHorizontal();
+    session.flipVertical();
+    session.resizeLongSide(128);
+    session.adjustColor(
+      const ColorAdjustment(brightness: 1.05, contrast: 0.95, saturation: 1.1),
+    );
+
+    final exported = session.exportImage(operationLabel: 'Use decoded pixels');
+
+    expect(session.operationCount, 4);
+    expect(session.width, 128);
+    expect(session.height, 64);
+    expect(exported.label, 'decoded-source.png');
+    expect(exported.operation, 'Use decoded pixels');
+    expect(exported.format, ImageClipOutputFormat.png);
   });
 
   test('emits progress events for pipeline tasks', () async {

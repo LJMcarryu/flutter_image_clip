@@ -2,6 +2,8 @@
 
 `flutter_image_clip` 是一个 Flutter 图片裁剪与位图处理库，提供可直接打开的裁剪 UI、可嵌入页面的裁剪组件，以及基于后台 isolate 的图像处理 API。
 
+![Fullscreen crop editor](screenshots/fullscreen-editor.png)
+
 ## 功能
 
 - `showImageClipEditor`：一行代码打开完整裁剪界面。
@@ -29,7 +31,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.7.1
+  flutter_image_clip: ^0.7.2
 ```
 
 然后执行：
@@ -55,6 +57,8 @@ dependencies:
 - [迁移指南](guides/迁移指南.md)：按版本说明兼容性变化和升级检查项。
 - [发布流程](guides/发布流程.md)：tag、release checks、pub.dev OIDC 自动发布和失败处理。
 - [真实设备验收](guides/真实设备验收.md)：Android/iOS 真机图片样本和发布前验收记录。
+- [真实设备验收记录](guides/真实设备验收记录.md)：逐版本真机验收状态表。
+- [仓库信任与安全配置](guides/仓库信任与安全配置.md)：verified publisher、Dependency graph 和安全门禁配置。
 
 ## 使用裁剪 UI
 

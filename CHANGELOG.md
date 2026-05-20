@@ -1,107 +1,119 @@
+# 0.7.2
+
+- Move the iOS plugin source into the Swift Package Manager layout while keeping CocoaPods support.
+- Run Android and iOS native decode work on background queues before returning MethodChannel results.
+- Add the missing `ImageClipEditorController` constructor dartdoc.
+- Document real-device release validation and repository security hardening tasks.
+- Add pub.dev screenshots for the fullscreen editor and embedded example lab.
+
 # 0.7.1
 
-- 修复远端 Linux / Flutter stable 环境下 full-page golden 因微小抗锯齿差异导致 release checks 失败的问题，保留 1% 像素容差并继续用布局与语义测试兜底。
-- Release workflow 增加 gated `Publish to pub.dev` job，tag 校验全部通过且启用 `PUB_DEV_AUTOMATED_PUBLISHING` 后再通过 pub.dev GitHub Actions OIDC 发布。
-- Benchmark baseline 增加进程 RSS delta 指标，开始监控大图处理内存回归。
-- 新增公开 API dartdoc 检查，避免新增 public API 时漏写文档。
-- 新增 Dependabot、Dependency Review、issue 表单、PR 模板和 `SECURITY.md`。
-- 新增发布流程、故障排查、迁移指南和真实设备验收文档。
+- Fixed release-check golden flakiness on remote Linux / Flutter stable by allowing a 1% pixel tolerance while keeping layout and semantics tests as stronger guards.
+- Added a gated `Publish to pub.dev` job to the release workflow. Tagged packages publish through pub.dev GitHub Actions OIDC only after validation passes and `PUB_DEV_AUTOMATED_PUBLISHING` is enabled.
+- Added process RSS delta tracking to the benchmark baseline to catch large-image memory regressions.
+- Added a public API dartdoc check so new public APIs cannot be added without documentation.
+- Added Dependabot, Dependency Review, issue forms, a pull request template, and `SECURITY.md`.
+- Added release, troubleshooting, migration, and real-device validation guides.
 
 # 0.7.0
 
-- Android 集成测试迁移到 `example/integration_test`，避免根包本地 app scaffold 干扰插件编译；CI 会在 example 中创建 Android 工程后运行设备测试。
-- 根包移除 `integration_test` 开发依赖，示例 App 单独声明集成测试依赖。
-- 编辑器不再内置 Inter 字体，默认继承业务 App 字体，减少发布包体积和样式侵入。
-- 根包兼容性声明调整为 Dart `>=3.10.0 <4.0.0`、Flutter `>=3.38.1`，避免 Dart / Flutter 最低版本不一致。
-- CI 主校验、发布校验和 Android 集成测试增加最低 Flutter `3.38.1` 与最新 stable 双版本覆盖。
-- CI 新增 iOS simulator 集成测试，Android/iOS 都会在 example App 中覆盖原生 sampled decode。
-- `ImageClipPlatformDecodeAdapter` 将平台侧错误映射为 `ImageClipUnsupportedFormatException`、`ImageClipPlatformException` 或 `ImageClipDecodeException`。
-- Android 原生 sampled decode 现在保留原图尺寸元数据，预览裁剪坐标可稳定映射回原图。
-- `ImageClipEditorTheme` 新增顶部栏、底部栏、保存按钮和比例选项间距等布局 token，业务可以更完整地对齐设计系统。
-- iOS plugin 新增 `PrivacyInfo.xcprivacy`，声明不采集数据、不追踪用户且不使用 required reason API。
-- 发布包通过 `.pubignore` 收敛内容，排除测试、benchmark、tool 和集成测试 scaffold。
-- 新增接入配方、平台矩阵和可访问性检查清单文档。
-- 公开 API snapshot 改为基于 analyzer 生成完整导出快照，减少 semver 漏检。
-- Android 集成测试增加命令级和用例级超时，并在等待图片处理或裁剪结果超时时给出明确失败原因。
-- README 补充兼容性策略和公开 API 导入约定。
+- Moved Android integration tests into `example/integration_test` so generated root app scaffolding no longer interferes with plugin compilation.
+- Moved the integration test dependency into the example app and removed it from the root package.
+- Removed the bundled Inter font from the editor. The editor now inherits the host app font, reducing package size and style intrusion.
+- Updated compatibility constraints to Dart `>=3.10.0 <4.0.0` and Flutter `>=3.38.1`.
+- Added CI coverage for both the minimum supported Flutter version and the latest stable Flutter version.
+- Added iOS simulator integration tests. Android and iOS integration tests both cover the editor flow and native sampled decode.
+- Mapped `ImageClipPlatformDecodeAdapter` platform errors to `ImageClipUnsupportedFormatException`, `ImageClipPlatformException`, or `ImageClipDecodeException`.
+- Preserved original source dimensions in Android native sampled decode so preview crop coordinates map back to the source image reliably.
+- Added layout tokens to `ImageClipEditorTheme` for the top bar, bottom bar, save button, and aspect-ratio controls.
+- Added the iOS `PrivacyInfo.xcprivacy` manifest.
+- Tightened `.pubignore` so test, benchmark, tool, and generated integration scaffolding files are not published.
+- Added integration recipes, a platform matrix, and an accessibility checklist.
+- Reworked the public API snapshot to use analyzer-based exported API discovery.
+- Added command-level and test-level timeouts to Android integration tests with clearer timeout failures.
+- Expanded README compatibility and public import guidance.
 
 # 0.6.6
 
-- 包结构升级为 Android/iOS Flutter plugin，内置 `ImageClipPlatformDecodeAdapter`，支持平台侧 sampled decode 和 HEIC/HEIF 等格式归一化入口。
-- `ImageProcessor` 新增 `probeFile`、`decodeFile`、`processFile`、`writeImageToFile`，文件输入会在后台 isolate 内读取，减少 UI isolate 上的大图字节复制。
-- 新增 Android emulator `integration_test`，覆盖加载、预览缩略图、旋转、翻转、保存和中文文案流程。
-- benchmark 增加 JPEG 预览解码和文件路径裁剪导出样本，并纳入基准门禁。
-- 新增 `tool/check_api_snapshot.dart` 和 `tool/api_snapshot.json`，CI 会检查核心公共 API 片段。
-- 编辑器保存链路拆到 `editor_save.dart`，降低 `editor.dart` 维护压力。
-- `ImageClipEditorLabels` 新增 `english` 和 `zhHans` 预设，并补充中文语义测试。
-- 新增 tag 触发的 release 校验 workflow，发布前重复执行格式、分析、测试、benchmark、API 文档和 pub dry-run。
+- Converted the package into an Android/iOS Flutter plugin with the built-in `ImageClipPlatformDecodeAdapter`.
+- Added platform-side sampled decode and format normalization entry points for HEIC/HEIF and other system-supported image formats.
+- Added `ImageProcessor.probeFile`, `decodeFile`, `processFile`, and `writeImageToFile`. File input is read inside the worker isolate to reduce UI-isolate byte copying.
+- Added Android emulator integration tests for loading, preview thumbnails, rotation, flipping, saving, and Chinese labels.
+- Added JPEG preview decode and file-path crop/export cases to the benchmark suite.
+- Added `tool/check_api_snapshot.dart` and `tool/api_snapshot.json` to guard key public APIs in CI.
+- Split the editor save flow into `editor_save.dart` to reduce the maintenance load in `editor.dart`.
+- Added `ImageClipEditorLabels.english` and `ImageClipEditorLabels.zhHans`.
+- Added tag-triggered release checks that run format, analysis, tests, benchmarks, API docs, and pub dry-run before publishing.
 
 # 0.6.5
 
-- 新增 `ImageClipDecodeSettings`，支持预览解码目标长边配置，并在 `EditedImage` 中保留 `sourceWidth`、`sourceHeight` 原图尺寸元数据。
-- `ImageProcessor` 新增 `decodePreviewBytes` / `decodePreviewBytesTask`，并支持通过 `ImageClipDecodeAdapter` 在 Dart 解码前接入平台转码或 sampled decode。
-- `ImageClipEditor` 新增 `previewDecodeSettings`，交互预览可使用小图，保存时会把裁剪区域映射回原图并从原始 bytes 导出。
-- `ImageClipResult`、`CropRegion` 和核心设置模型补充 map/copy/equality 能力，方便业务持久化、测试和 API 稳定性约束。
-- benchmark 新增 `--check benchmark/baseline.json` 回归门禁，CI 会检查固定样本的耗时和输出大小。
-- CI 新增 Android debug APK 构建和 iOS debug no-codesign 构建，覆盖真实移动端工程生成与构建链路。
-- 补充预览缩略图原图导出、大字体横屏布局、decode adapter 和模型稳定性测试。
+- Added `ImageClipDecodeSettings` for preview decode target long-side configuration.
+- Added `sourceWidth` and `sourceHeight` metadata to `EditedImage`.
+- Added `ImageProcessor.decodePreviewBytes` and `decodePreviewBytesTask`.
+- Added `ImageClipDecodeAdapter` so callers can normalize platform-only formats or run platform sampled decode before Dart decoding.
+- Added `ImageClipEditor.previewDecodeSettings`. The editor can use a smaller preview image while saving still maps the crop region back to original source bytes.
+- Added map, copy, and equality helpers to `ImageClipResult`, `CropRegion`, and core settings models.
+- Added benchmark regression checking through `--check benchmark/baseline.json`.
+- Added Android debug APK and iOS no-codesign debug builds to CI.
+- Added tests for preview-to-source export, large text landscape layout, decode adapters, and model stability.
 
 # 0.6.4
 
-- 编辑器旋转和翻转改为预览态更新，保存时再将预览裁剪区域映射回原图并一次性导出，避免交互按钮触发整图重编码。
-- 新增 `ImageClipCropTransform` 和 `ImageClipDimensions`，可复用编辑器的旋转/翻转裁剪坐标映射逻辑。
-- `ImageClipResult` 新增 `previewRegion`、`flippedHorizontally` 和 `flippedVertically` 元数据。
-- `ImageProcessor.rotate`、`rotateRight`、`flipHorizontal`、`flipVertical` 及对应 task API 支持 `outputSettings`，单步旋转/翻转可直接输出 JPEG。
-- `ImageClipSession` 新增异步 `flipHorizontal`、`flipVertical` 及 task API，并为 `rotate` 支持 `outputSettings`。
+- Changed editor rotate and flip actions to update preview state immediately. The final save maps the preview crop area back to source pixels and exports once.
+- Added `ImageClipCropTransform` and `ImageClipDimensions` for reusable rotation/flip crop coordinate mapping.
+- Added `previewRegion`, `flippedHorizontally`, and `flippedVertically` metadata to `ImageClipResult`.
+- Added `outputSettings` support to `ImageProcessor.rotate`, `rotateRight`, `flipHorizontal`, `flipVertical`, and their task APIs.
+- Added async `flipHorizontal` and `flipVertical` APIs to `ImageClipSession`, and added `outputSettings` support to `rotate`.
 
 # 0.6.3
 
-- 新增 HEIC/HEIF header 识别，并在纯 Dart 解码前抛出 `ImageClipUnsupportedFormatException`，提示业务先做平台转码。
-- 新增 `ImageClipDecodedSession`，支持在内存中保留已解码像素，连续处理时避免中间步骤反复 decode/encode。
-- 为编辑器预览、裁剪框、工具按钮和比例选项补充 Semantics，提升 TalkBack/VoiceOver 可访问性。
-- 新增默认编辑器 golden 测试，覆盖核心裁剪 UI 的视觉回归。
+- Added HEIC/HEIF header detection and typed `ImageClipUnsupportedFormatException` failures before pure Dart decoding.
+- Added `ImageClipDecodedSession` for keeping decoded pixels in memory across multiple small-image operations.
+- Added Semantics for the editor preview, crop frame, tool buttons, and aspect-ratio controls.
+- Added a default editor golden test for visual regression coverage.
 
 # 0.6.2
 
-- 新增 `ImageClipSession`，用于在连续编辑流程中持有当前图片状态，并支持 session 级任务取消。
-- 将 example 整理为独立 Flutter app，示例依赖迁移到 `example/pubspec.yaml`，避免污染库本身依赖面。
-- 补充移动端图片 fixture 测试，覆盖 EXIF orientation 1-8、透明 PNG 和损坏 JPEG。
+- Added `ImageClipSession` for holding current image state across continuous editing flows.
+- Added session-level task cancellation.
+- Organized the example as a standalone Flutter app with its own `example/pubspec.yaml`.
+- Added mobile image fixture tests for EXIF orientation values 1-8, transparent PNG, and corrupt JPEG input.
 
 # 0.6.1
 
-- 新增 `ImageProcessor.probeBytes` 和 `ImageClipImageInfo`，可在完整解码前识别 PNG、JPEG、GIF、WebP 的格式与尺寸。
-- 解码前会优先通过图片 header 执行输入像素上限检查，减少异常超大图片带来的内存压力。
-- 后台 isolate 的图片字节请求和结果改用 `TransferableTypedData` 传输，降低大图处理时的跨 isolate 拷贝成本。
-- `ImageClipTask.fromFuture` 现在同样支持 `ImageClipTaskOptions.timeout`。
-- `ImageClipEditor` 新增 `onProgress` 回调，并将编辑器进度条接入后台任务进度。
-- example 更新为移动端接入示例，支持相册选图、样例图、任务取消、输入探测信息和导出结果预览。
-- benchmark 新增 `--json` 输出，便于后续接入性能回归比对。
+- Added `ImageProcessor.probeBytes` and `ImageClipImageInfo` for detecting PNG, JPEG, GIF, and WebP format and dimensions before full decoding.
+- Added header-based input pixel limit checks before decode to reduce memory pressure from oversized images.
+- Switched large isolate byte messages to `TransferableTypedData`.
+- Added timeout support to `ImageClipTask.fromFuture`.
+- Added `ImageClipEditor.onProgress` and wired editor progress UI to background task progress.
+- Updated the example with gallery selection, sample loading, task cancellation, input probe details, and export preview.
+- Added `--json` output to the benchmark command.
 
 # 0.6.0
 
-- 将发布包平台声明收敛为仅支持 Android 和 iOS。
-- 更新 README 和 pubspec 描述，移除面向桌面/Web 的平台暗示。
-- 拆分编辑器 UI 层，将控制器、编辑器主体、预览面板、工具栏、结果页、主题、文案和裁剪遮罩 painter 拆到独立文件。
-- 新增 `ImageClipTask`、`ImageClipTaskOptions` 和 `ImageClipTaskProgress`，支持任务取消、进度监听和超时取消。
-- `ImageClipEditorController` 新增 `cancelTask()`，可取消当前编辑器后台处理任务。
-- 新增 `benchmark/image_processor_benchmark.dart`，覆盖解码、旋转裁剪导出 JPEG 和大图 downscale 的耗时基准。
-- 补充任务进度和取消测试。
+- Limited published platform support to Android and iOS.
+- Updated README and pubspec descriptions to remove desktop and web support implications.
+- Split editor UI code into controller, editor, preview panel, toolbar, result page, theme, labels, and painter files.
+- Added `ImageClipTask`, `ImageClipTaskOptions`, and `ImageClipTaskProgress` for cancellation, progress, and timeouts.
+- Added `ImageClipEditorController.cancelTask()`.
+- Added `benchmark/image_processor_benchmark.dart` covering decode, rotate/crop/JPEG export, and large-image downscale cases.
+- Added tests for task progress and cancellation.
 
 # 0.5.0
 
-- 新增 `ImageClipPipeline` 和 `ImageClipPipelineStep`，支持把解码、旋转、裁剪、翻转、缩放、调色和导出合并为一次后台任务。
-- 新增 `ImageProcessor.processPipeline` 和 `ImageProcessor.processBytes`，减少多步处理时的重复 decode/encode 和 isolate 往返。
-- 重构图像处理层文件结构，将异常、模型、pipeline 描述、isolate job、像素操作和示例图生成拆分到独立模块。
-- 保留 `cropRegion`、`rotate`、`adjustColor`、`exportJpeg` 等既有单步 API，旧调用方式无需迁移。
-- 补充 pipeline 多步处理测试，覆盖从原始字节和已有 `EditedImage` 两种入口运行。
+- Added `ImageClipPipeline` and `ImageClipPipelineStep` for batching decode, rotate, crop, flip, resize, color adjustment, and export into one background task.
+- Added `ImageProcessor.processPipeline` and `processBytes` to reduce repeated decode/encode work.
+- Refactored image processing into dedicated exception, model, pipeline, isolate job, pixel operation, and sample image modules.
+- Kept existing single-step APIs such as `cropRegion`, `rotate`, `adjustColor`, and `exportJpeg`.
+- Added pipeline tests for raw byte input and existing `EditedImage` input.
 
 # 0.4.0
 
-- 新增 `ImageClipEditorController`，支持父组件主动加载图片、清空图片、重置裁剪视图、旋转图片、读取当前裁剪区域并触发裁剪。
-- 优化编辑器异步任务生命周期：新的图片加载请求会使旧任务结果失效，避免快速切换图片时旧结果覆盖新状态。
-- 裁剪保存任务也加入过期结果保护，避免图片被替换后继续回写旧裁剪结果。
-- 补充控制器驱动流程和乱序异步加载的 Widget 测试。
-- 更新 README 的控制器集成示例。
+- Added `ImageClipEditorController` for loading images, clearing images, resetting the crop viewport, rotating images, reading the crop region, and triggering crop operations from parent widgets.
+- Improved editor async lifecycle handling so newer image load requests invalidate older task results.
+- Added stale-result protection to crop saving when the current image is replaced while a save is still running.
+- Added widget tests for controller-driven flows and out-of-order async image loading.
+- Updated README controller integration examples.
 
 # 0.3.0
 
