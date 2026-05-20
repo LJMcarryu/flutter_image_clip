@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'flutter_image_clip'
-  s.version          = '0.7.3'
+  s.version          = '0.7.4'
   s.summary          = 'Native decode helpers for flutter_image_clip.'
   s.description      = <<-DESC
 Native sampled image decode and format normalization for flutter_image_clip.
