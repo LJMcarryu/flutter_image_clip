@@ -19,6 +19,14 @@ void main() {
       height: 1000,
       presets: const <ImageClipAspectRatio>[ImageClipAspectRatio.ratio16x10],
     );
+    final closest = ImageClipAspectRatio.fromDimensions(
+      width: 500,
+      height: 300,
+      presets: const <ImageClipAspectRatio>[
+        ImageClipAspectRatio.square,
+        ImageClipAspectRatio.widescreen,
+      ],
+    );
     final rotatedRegionRatio = ImageClipAspectRatio.fromCropRegion(
       const CropRegion(x: 0, y: 0, width: 200, height: 100, cornerRadius: 0),
       rotationDegrees: 90,
@@ -30,6 +38,7 @@ void main() {
     expect(generated.height, 4);
     expect(generated.value, closeTo(0.75, 0.0001));
     expect(matched, ImageClipAspectRatio.ratio16x10);
+    expect(closest, ImageClipAspectRatio.widescreen);
     expect(rotatedRegionRatio.label, '1:2');
     expect(rotatedRegionRatio.width, 1);
     expect(rotatedRegionRatio.height, 2);
@@ -1023,6 +1032,47 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('initial aspect ratio chooses closest supported preset', (
+    tester,
+  ) async {
+    final controller = ImageClipEditorController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: controller,
+          initialImageBytes: _pngBytes(1001, 777),
+          initialImageLabel: 'closest-explicit-ratio-source.png',
+          initialAspectRatio: const ImageClipAspectRatio(
+            label: '7:5',
+            width: 7,
+            height: 5,
+          ),
+          aspectRatios: const <ImageClipAspectRatio>[
+            ImageClipAspectRatio.square,
+            ImageClipAspectRatio.widescreen,
+          ],
+          loadSampleOnStart: false,
+          showResultPage: false,
+        ),
+      ),
+    );
+    await pumpUntilIdle(tester);
+    await tester.pump();
+
+    expect(find.text('7:5'), findsNothing);
+    expect(find.text('16:9'), findsOneWidget);
+
+    final result = await tester.runAsync(controller.crop);
+    await tester.pump();
+
+    expect(result, isNotNull);
+    expect(result!.aspectRatio, ImageClipAspectRatio.widescreen);
+    expect(result.region.width * 9, result.region.height * 16);
+    expect(result.cropped.width * 9, result.cropped.height * 16);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'fit-mode region restores letterbox spacing without extra state',
     (tester) async {
@@ -1426,7 +1476,8 @@ void main() {
     await pumpUntilIdle(tester);
     await tester.pump();
 
-    expect(find.text('1:1'), findsOneWidget);
+    expect(find.text('1:1'), findsNothing);
+    expect(find.text('3:4'), findsOneWidget);
     expect(controller.currentCropRegion(), isNotNull);
     expect(tester.takeException(), isNull);
   });

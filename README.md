@@ -45,7 +45,7 @@ After the package is published to pub.dev, add it to your app:
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.9.3
+  flutter_image_clip: ^0.9.4
 ```
 
 Then run:
@@ -613,7 +613,7 @@ MIT License. See `LICENSE`.
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.9.3
+  flutter_image_clip: ^0.9.4
 ```
 
 执行：

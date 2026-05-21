@@ -144,9 +144,9 @@ class ImageClipAspectRatio {
 
   /// Creates an aspect ratio from pixel [width] and [height].
   ///
-  /// If [presets] contains a ratio with the same numeric value, that preset is
-  /// returned so callers keep the intended UI label. Otherwise a new ratio is
-  /// created with a reduced label such as `3:4`.
+  /// If [presets] contains ratios, the preset with the closest numeric value is
+  /// returned so callers stay within the supported UI choices. Otherwise a new
+  /// ratio is created with a reduced label such as `3:4`.
   static ImageClipAspectRatio fromDimensions({
     required int width,
     required int height,
@@ -169,10 +169,9 @@ class ImageClipAspectRatio {
     }
 
     final target = width / height;
-    for (final preset in presets) {
-      if ((preset.value - target).abs() < _aspectRatioTolerance) {
-        return preset;
-      }
+    final closestPreset = _closestAspectRatioIn(presets, target);
+    if (closestPreset != null) {
+      return closestPreset;
     }
 
     final divisor = _greatestCommonDivisor(width, height);
@@ -319,6 +318,9 @@ class ImageClipEditor extends StatefulWidget {
   final ImageClipCropOrientation initialOrientation;
 
   /// Initial crop-box aspect ratio that overrides [initialOrientation].
+  ///
+  /// The editor resolves this to the closest entry in [aspectRatios] instead
+  /// of adding a new toolbar ratio.
   final ImageClipAspectRatio? initialAspectRatio;
 
   /// Initial clockwise preview rotation in degrees.
@@ -343,7 +345,7 @@ class ImageClipEditor extends StatefulWidget {
   /// [initialOrientation].
   final CropRegion? initialCropRegion;
 
-  /// Aspect ratio presets shown in the bottom toolbar.
+  /// Supported aspect ratio presets shown in the bottom toolbar.
   final List<ImageClipAspectRatio> aspectRatios;
 
   /// Initial image scaling mode.
@@ -434,7 +436,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   ImageClipAspectRatio get _initialAspectRatio {
     final explicit = widget.initialAspectRatio;
     if (explicit != null) {
-      return _matchingAspectRatioForValue(explicit.value) ?? explicit;
+      return _closestAspectRatioForValue(explicit.value);
     }
     final region = _validInitialCropRegion;
     if (region != null) {
@@ -443,8 +445,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     final orientationRatio = ImageClipAspectRatio.fromOrientation(
       widget.initialOrientation,
     );
-    return _matchingAspectRatioForValue(orientationRatio.value) ??
-        orientationRatio;
+    return _closestAspectRatioForValue(orientationRatio.value);
   }
 
   String get _initialImageLabel {
@@ -454,11 +455,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   }
 
   List<ImageClipAspectRatio> get _aspectRatioChoices {
-    final presets = _supportedAspectRatios;
-    if (presets.contains(_cropAspectRatio)) {
-      return presets;
-    }
-    return <ImageClipAspectRatio>[_cropAspectRatio, ...presets];
+    return _supportedAspectRatios;
   }
 
   List<ImageClipAspectRatio> get _supportedAspectRatios {
@@ -510,9 +507,11 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     final initialCropRegionChanged =
         oldWidget.initialRotationDegrees != widget.initialRotationDegrees ||
         oldWidget.initialCropRegion != widget.initialCropRegion;
+    final aspectRatiosChanged = oldWidget.aspectRatios != widget.aspectRatios;
     if (initialCropRegionChanged ||
         oldWidget.initialAspectRatio != widget.initialAspectRatio ||
-        oldWidget.initialOrientation != widget.initialOrientation) {
+        oldWidget.initialOrientation != widget.initialOrientation ||
+        aspectRatiosChanged) {
       setState(() {
         if (initialCropRegionChanged) {
           _initialCropRegionRevision++;
@@ -1074,11 +1073,12 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   }
 
   void _setCropAspectRatio(ImageClipAspectRatio aspectRatio) {
-    if (_cropAspectRatio == aspectRatio || _isBusy) {
+    final supportedAspectRatio = _closestAspectRatioForValue(aspectRatio.value);
+    if (_cropAspectRatio == supportedAspectRatio || _isBusy) {
       return;
     }
     setState(() {
-      _cropAspectRatio = aspectRatio;
+      _cropAspectRatio = supportedAspectRatio;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -1095,33 +1095,44 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     return _closestAspectRatioForValue(target);
   }
 
-  ImageClipAspectRatio? _matchingAspectRatioForValue(double target) {
-    for (final preset in _supportedAspectRatios) {
-      if ((preset.value - target).abs() < _aspectRatioTolerance) {
-        return preset;
-      }
-    }
-    return null;
-  }
-
   ImageClipAspectRatio _closestAspectRatioForValue(double target) {
-    final presets = _supportedAspectRatios;
-    var closest = presets.first;
-    var closestDistance = (closest.value - target).abs();
-
-    for (final preset in presets.skip(1)) {
-      final distance = (preset.value - target).abs();
-      if (distance < closestDistance) {
-        closest = preset;
-        closestDistance = distance;
-      }
-    }
-
-    return closest;
+    return _closestAspectRatioIn(_supportedAspectRatios, target)!;
   }
 }
 
 const _aspectRatioTolerance = 0.001;
+
+ImageClipAspectRatio? _matchingAspectRatioIn(
+  Iterable<ImageClipAspectRatio> presets,
+  double target,
+) {
+  for (final preset in presets) {
+    if ((preset.value - target).abs() < _aspectRatioTolerance) {
+      return preset;
+    }
+  }
+  return null;
+}
+
+ImageClipAspectRatio? _closestAspectRatioIn(
+  Iterable<ImageClipAspectRatio> presets,
+  double target,
+) {
+  ImageClipAspectRatio? closest = _matchingAspectRatioIn(presets, target);
+  if (closest != null) {
+    return closest;
+  }
+
+  double? closestDistance;
+  for (final preset in presets) {
+    final distance = (preset.value - target).abs();
+    if (closestDistance == null || distance < closestDistance) {
+      closest = preset;
+      closestDistance = distance;
+    }
+  }
+  return closest;
+}
 
 CropRegion _virtualSourceRegionForPreview({
   required ImageClipCropTransform transform,
