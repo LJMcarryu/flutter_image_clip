@@ -976,6 +976,87 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('fit-mode visible region restores letterbox spacing', (
+    tester,
+  ) async {
+    final firstController = ImageClipEditorController();
+    final imageBytes = _pngBytes(100, 200);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: firstController,
+          initialImageBytes: imageBytes,
+          initialImageLabel: 'letterbox-source.png',
+          initialAspectRatio: ImageClipAspectRatio.square,
+          aspectRatios: const <ImageClipAspectRatio>[
+            ImageClipAspectRatio.portrait,
+            ImageClipAspectRatio.square,
+          ],
+          previewDecodeSettings: const ImageClipDecodeSettings.preview(
+            targetLongSide: 100,
+          ),
+          loadSampleOnStart: false,
+          showResultPage: false,
+        ),
+      ),
+    );
+    await pumpUntilIdle(tester);
+
+    final saved = await tester.runAsync(firstController.crop);
+    await tester.pump();
+
+    expect(saved, isNotNull);
+    expect(saved!.source.isPreviewSized, isTrue);
+    expect(saved.aspectRatio, ImageClipAspectRatio.square);
+    expect(saved.visibleRegion.x, 0);
+    expect(saved.visibleRegion.y, 0);
+    expect(saved.visibleRegion.width, 100);
+    expect(saved.visibleRegion.height, 200);
+    expect(saved.region.width, saved.region.height);
+
+    final secondController = ImageClipEditorController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: secondController,
+          initialImageBytes: imageBytes,
+          initialImageLabel: 'letterbox-source.png',
+          initialAspectRatio: saved.aspectRatio,
+          initialCropRegion: saved.visibleRegion,
+          aspectRatios: const <ImageClipAspectRatio>[
+            ImageClipAspectRatio.portrait,
+            ImageClipAspectRatio.square,
+          ],
+          previewDecodeSettings: const ImageClipDecodeSettings.preview(
+            targetLongSide: 100,
+          ),
+          loadSampleOnStart: false,
+          showResultPage: false,
+        ),
+      ),
+    );
+    await pumpUntilIdle(tester);
+
+    expect(find.text('1:1'), findsOneWidget);
+    final restored = secondController.currentCropRegion();
+    expect(restored, isNotNull);
+    expect(restored!.x, closeTo(saved.previewRegion.x, 1));
+    expect(restored.y, closeTo(saved.previewRegion.y, 1));
+    expect(restored.width, closeTo(saved.previewRegion.width, 1));
+    expect(restored.height, closeTo(saved.previewRegion.height, 1));
+
+    final restoredResult = await tester.runAsync(secondController.crop);
+    await tester.pump();
+
+    expect(restoredResult, isNotNull);
+    expect(restoredResult!.visibleRegion.x, saved.visibleRegion.x);
+    expect(restoredResult.visibleRegion.y, saved.visibleRegion.y);
+    expect(restoredResult.visibleRegion.width, saved.visibleRegion.width);
+    expect(restoredResult.visibleRegion.height, saved.visibleRegion.height);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('rotated source save region preserves visual 10:16 ratio', (
     tester,
   ) async {

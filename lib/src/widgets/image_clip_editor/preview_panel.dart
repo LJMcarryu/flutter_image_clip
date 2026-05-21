@@ -396,10 +396,13 @@ class _PreviewPanelState extends State<_PreviewPanel> {
         layout.cropRect.height *
         visualSize.height /
         (layout.baseRect.height * bounded.height);
-    final targetScale =
-        (scaleForWidth > scaleForHeight ? scaleForWidth : scaleForHeight)
-            .clamp(layout.minScaleFor(widget.scaleMode), _maxScale)
-            .toDouble();
+    final targetScaleBasis =
+        _shouldFitInitialRegionInsideCrop(bounded, visualSize)
+        ? math.min(scaleForWidth, scaleForHeight)
+        : math.max(scaleForWidth, scaleForHeight);
+    final targetScale = targetScaleBasis
+        .clamp(layout.minScaleFor(widget.scaleMode), _maxScale)
+        .toDouble();
     final pixelsPerLogicalPixel =
         visualSize.width / (layout.baseRect.width * targetScale);
     final imageLeft = layout.cropRect.left - bounded.x / pixelsPerLogicalPixel;
@@ -413,6 +416,23 @@ class _PreviewPanelState extends State<_PreviewPanel> {
       widget.scaleMode,
     );
     return true;
+  }
+
+  bool _shouldFitInitialRegionInsideCrop(
+    CropRegion region,
+    ImageClipDimensions visualSize,
+  ) {
+    if (widget.scaleMode != ImageClipScaleMode.fit) {
+      return false;
+    }
+    final regionRatio = region.width / region.height;
+    if ((regionRatio - widget.cropAspectRatio).abs() <= _aspectRatioTolerance) {
+      return false;
+    }
+
+    final spansFullWidth = region.x <= 0 && region.width >= visualSize.width;
+    final spansFullHeight = region.y <= 0 && region.height >= visualSize.height;
+    return spansFullWidth || spansFullHeight;
   }
 
   void _resetGestureCrop() {

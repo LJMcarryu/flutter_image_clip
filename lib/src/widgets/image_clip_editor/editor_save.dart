@@ -24,6 +24,7 @@ extension _ImageClipEditorSave on _ImageClipEditorState {
     });
 
     try {
+      final visibleRegion = _sourceVisibleRegionForResult(source, sourceRegion);
       final saveRegion = _sourceRegionForSave(source, sourceRegion, transform);
       final steps = <ImageClipPipelineStep>[
         ImageClipPipelineStep.cropRegion(saveRegion),
@@ -72,6 +73,8 @@ extension _ImageClipEditorSave on _ImageClipEditorState {
         cropped: cropped,
         region: saveRegion,
         previewRegion: previewRegion,
+        visibleRegion: visibleRegion,
+        aspectRatio: _cropAspectRatio,
         rotationDegrees: transform.normalizedRotation,
         flippedHorizontally: transform.flipHorizontal,
         flippedVertically: transform.flipVertical,
@@ -117,6 +120,36 @@ extension _ImageClipEditorSave on _ImageClipEditorState {
       _showMessage(widget.labels.errorMessage(error));
       return null;
     }
+  }
+
+  CropRegion _sourceVisibleRegionForResult(
+    EditedImage source,
+    CropRegion region,
+  ) {
+    if (!source.isPreviewSized) {
+      return region.clampToBounds(
+        sourceWidth: source.sourceWidth,
+        sourceHeight: source.sourceHeight,
+      );
+    }
+
+    final scaleX = source.sourceWidth / source.width;
+    final scaleY = source.sourceHeight / source.height;
+    final x = (region.x * scaleX).round().clamp(0, source.sourceWidth - 1);
+    final y = (region.y * scaleY).round().clamp(0, source.sourceHeight - 1);
+    return CropRegion(
+      x: x.toInt(),
+      y: y.toInt(),
+      width: (region.width * scaleX)
+          .round()
+          .clamp(1, source.sourceWidth - x)
+          .toInt(),
+      height: (region.height * scaleY)
+          .round()
+          .clamp(1, source.sourceHeight - y)
+          .toInt(),
+      cornerRadius: region.cornerRadius * ((scaleX + scaleY) / 2),
+    );
   }
 
   CropRegion _sourceRegionForSave(

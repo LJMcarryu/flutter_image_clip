@@ -9,9 +9,12 @@ class ImageClipResult {
     required this.region,
     required this.rotationDegrees,
     CropRegion? previewRegion,
+    CropRegion? visibleRegion,
+    this.aspectRatio,
     this.flippedHorizontally = false,
     this.flippedVertically = false,
-  }) : previewRegion = previewRegion ?? region;
+  }) : previewRegion = previewRegion ?? region,
+       visibleRegion = visibleRegion ?? region;
 
   /// Decoded image that was displayed in the editor.
   ///
@@ -24,8 +27,9 @@ class ImageClipResult {
 
   /// Crop rectangle in original source-image pixel coordinates.
   ///
-  /// This is the value to persist and later pass back as
-  /// [ImageClipEditor.initialCropRegion].
+  /// This is the source region used for the exported image. For restoring the
+  /// editor UI, especially Fit-mode crops that include letterbox or pillarbox
+  /// space, persist [visibleRegion] and [aspectRatio] instead.
   final CropRegion region;
 
   /// Alias for [region] that makes the coordinate space explicit.
@@ -36,6 +40,20 @@ class ImageClipResult {
   /// This is mainly useful for diagnostics or custom preview overlays. It is
   /// not stable across different preview decode sizes.
   final CropRegion previewRegion;
+
+  /// Source-image pixels that were visible inside the crop frame before save.
+  ///
+  /// This is the preferred region to persist and later pass back as
+  /// [ImageClipEditor.initialCropRegion]. Persist [aspectRatio] with it and
+  /// pass that value back as [ImageClipEditor.initialAspectRatio] so Fit-mode
+  /// crops with blank space can restore the same visual placement.
+  final CropRegion visibleRegion;
+
+  /// Crop aspect ratio selected when this result was saved.
+  ///
+  /// Persist this with [visibleRegion] and pass it back as
+  /// [ImageClipEditor.initialAspectRatio] when restoring an editor session.
+  final ImageClipAspectRatio? aspectRatio;
 
   /// Clockwise preview rotation applied to the saved crop, in degrees.
   final int rotationDegrees;
@@ -61,6 +79,8 @@ class ImageClipResult {
     'cropped': cropped.toMap(),
     'region': region.toMap(),
     'previewRegion': previewRegion.toMap(),
+    'visibleRegion': visibleRegion.toMap(),
+    'aspectRatio': _aspectRatioToMap(aspectRatio),
     'rotationDegrees': rotationDegrees,
     'flippedHorizontally': flippedHorizontally,
     'flippedVertically': flippedVertically,
@@ -84,6 +104,12 @@ class ImageClipResult {
           : CropRegion.fromMap(
               Map<Object?, Object?>.from(map['previewRegion']! as Map),
             ),
+      visibleRegion: map['visibleRegion'] == null
+          ? region
+          : CropRegion.fromMap(
+              Map<Object?, Object?>.from(map['visibleRegion']! as Map),
+            ),
+      aspectRatio: _aspectRatioFromMap(map['aspectRatio']),
       rotationDegrees: _intOf(map['rotationDegrees'], fallback: 0),
       flippedHorizontally: _boolOf(map['flippedHorizontally'], fallback: false),
       flippedVertically: _boolOf(map['flippedVertically'], fallback: false),
@@ -379,16 +405,22 @@ class _ResultDataPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final region = result.region;
     final previewRegion = result.previewRegion;
+    final visibleRegion = result.visibleRegion;
     final data =
         'rotationDegrees: ${result.rotationDegrees}\n'
         'region.x: ${region.x}\n'
         'region.y: ${region.y}\n'
         'region.width: ${region.width}\n'
         'region.height: ${region.height}\n'
+        'visibleRegion.x: ${visibleRegion.x}\n'
+        'visibleRegion.y: ${visibleRegion.y}\n'
+        'visibleRegion.width: ${visibleRegion.width}\n'
+        'visibleRegion.height: ${visibleRegion.height}\n'
         'previewRegion.x: ${previewRegion.x}\n'
         'previewRegion.y: ${previewRegion.y}\n'
         'previewRegion.width: ${previewRegion.width}\n'
         'previewRegion.height: ${previewRegion.height}\n'
+        'aspectRatio: ${result.aspectRatio?.label ?? '-'}\n'
         'flippedHorizontally: ${result.flippedHorizontally}\n'
         'flippedVertically: ${result.flippedVertically}\n'
         'cropped.width: ${result.cropped.width}\n'
@@ -427,6 +459,38 @@ class _ResultDataPreview extends StatelessWidget {
       ),
     );
   }
+}
+
+Map<String, Object?>? _aspectRatioToMap(ImageClipAspectRatio? aspectRatio) {
+  if (aspectRatio == null) {
+    return null;
+  }
+  return <String, Object?>{
+    'label': aspectRatio.label,
+    'width': aspectRatio.width,
+    'height': aspectRatio.height,
+  };
+}
+
+ImageClipAspectRatio? _aspectRatioFromMap(Object? value) {
+  if (value is! Map) {
+    return null;
+  }
+  final map = Map<Object?, Object?>.from(value);
+  final label = map['label'];
+  final width = map['width'];
+  final height = map['height'];
+  if (label is! String || width is! num || height is! num) {
+    return null;
+  }
+  if (width <= 0 || height <= 0) {
+    return null;
+  }
+  return ImageClipAspectRatio(
+    label: label,
+    width: width.toDouble(),
+    height: height.toDouble(),
+  );
 }
 
 int _intOf(Object? value, {required int fallback}) {

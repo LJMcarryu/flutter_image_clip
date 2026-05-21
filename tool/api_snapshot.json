@@ -489,8 +489,9 @@
     {
       "file": "lib/src/widgets/image_clip_editor/result_page.dart",
       "declarations": [
-        "  constructor ImageClipResult(required this.source, required this.cropped, required this.region, required this.rotationDegrees, CropRegion? previewRegion, this.flippedHorizontally, this.flippedVertically)",
+        "  constructor ImageClipResult(required this.source, required this.cropped, required this.region, required this.rotationDegrees, CropRegion? previewRegion, CropRegion? visibleRegion, this.aspectRatio, this.flippedHorizontally, this.flippedVertically)",
         "  constructor ImageClipResultPage(super.key, required this.result, this.labels, this.theme)",
+        "  field ImageClipResult.aspectRatio",
         "  field ImageClipResult.cropped",
         "  field ImageClipResult.flippedHorizontally",
         "  field ImageClipResult.flippedVertically",
@@ -498,6 +499,7 @@
         "  field ImageClipResult.region",
         "  field ImageClipResult.rotationDegrees",
         "  field ImageClipResult.source",
+        "  field ImageClipResult.visibleRegion",
         "  field ImageClipResultPage.labels",
         "  field ImageClipResultPage.result",
         "  field ImageClipResultPage.theme",

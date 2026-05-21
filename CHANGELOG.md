@@ -1,3 +1,10 @@
+# 0.9.1
+
+- 修复 Fit 模式下图片左右或上下留白时，保存后再传入初始裁剪信息会恢复成无留白位置的问题。
+- 新增 `ImageClipResult.visibleRegion` 和 `ImageClipResult.aspectRatio`，用于持久化并恢复编辑器里的可见区域与裁剪比例。
+- `ImageClipEditor.initialAspectRatio` 现在会优先于 `initialCropRegion` 的自动比例推导，方便业务按保存时的比例恢复 Position。
+- README 改为英文优先的中英文文档，并缩小示例图为一行两张。
+
 # 0.9.0
 
 - 新增 `ImageClipEditor.initialImagePath`、`showImageClipEditor(imagePath:)` 和 `ImageClipEditorController.loadImageFile()`，相册本地文件可走 file-backed preview/save 链路，减少 UI isolate 原图 bytes 占用。

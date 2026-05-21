@@ -1,48 +1,60 @@
 # flutter_image_clip
 
-`flutter_image_clip` 是一个 Flutter 图片裁剪与位图处理库，提供可直接打开的裁剪 UI、可嵌入页面的裁剪组件，以及基于后台 isolate 的图像处理 API。
+`flutter_image_clip` is a Flutter image clipping and bitmap processing library for Android and iOS. It includes a ready-to-use fullscreen crop editor, an embeddable crop widget, and isolate-backed image processing APIs for file-backed and byte-backed workflows.
 
-![Fullscreen crop editor](screenshots/fullscreen-editor.webp)
+[English](#flutter_image_clip) | [简体中文](#简体中文)
 
-![Embedded image clip lab](screenshots/embedded-lab.webp)
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="screenshots/fullscreen-editor.webp" alt="Fullscreen crop editor" width="220">
+      <br>
+      <sub>Fullscreen editor</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="screenshots/embedded-lab.webp" alt="Embedded image clip lab" width="220">
+      <br>
+      <sub>Embedded lab</sub>
+    </td>
+  </tr>
+</table>
 
-## 功能
+## Features
 
-- `showImageClipEditor`：一行代码打开完整裁剪界面。
-- `ImageClipEditor`：可嵌入业务页面的裁剪 Widget。
-- `ImageClipEditorController`：从父组件主动加载图片、重置视图、旋转和触发裁剪。
-- 平台支持：Android 和 iOS。
-- 手势支持：拖动、双指缩放、双击复位。
-- 裁剪模式：可配置命名比例预设、Fit / Fill、90 度旋转。
-- 文案配置：通过 `ImageClipEditorLabels` 覆盖按钮、状态、结果页文案，默认使用英文。
-- 输出格式：裁剪结果可输出 PNG 或 JPEG，并可配置 JPEG quality。
-- 图像处理：解码、中心裁剪、区域裁剪、旋转、翻转、缩放、调色、PNG/JPEG 导出。
-- 输入探测：可在完整解码前识别 PNG、JPEG、GIF、WebP、HEIC、HEIF，用于移动端大图保护和格式提示。
-- 预览解码：通过 `ImageClipDecodeSettings.preview` 为编辑器或业务预览生成小图，同时保留原图尺寸元数据。
-- 原生适配：内置 `ImageClipPlatformDecodeAdapter`，也可通过 `ImageClipDecodeAdapter` 接入自定义 HEIC/HEIF 转码或平台 sampled decode；本地文件 JPEG 保存可选走平台 `cropFile` 快路径。
-- 文件链路：支持 `decodeFile`、`processFile` 和 `writeImageToFile`，本地文件输入会在后台 isolate 内读取。
-- 批处理 pipeline：多步图像操作可合并为一次后台任务，减少重复编解码。
-- 编辑会话：通过 `ImageClipSession` 持有连续编辑状态，减少业务层手动传递中间结果。
-- 解码会话：通过 `ImageClipDecodedSession` 保留已解码像素，适合后台 isolate 或小图连续处理。
-- 可取消任务：通过 `ImageClipTask` 监听进度、取消任务或设置超时。
-- 处理任务通过后台 isolate 执行，并使用 `TransferableTypedData` 传输大字节数组，降低 UI isolate 压力。
+- `showImageClipEditor`: open the complete crop editor with one call.
+- `ImageClipEditor`: embed the crop editor in your own page or form.
+- `ImageClipEditorController`: load images, reset the view, rotate, flip, crop, and cancel work from parent widgets.
+- Platform support: Android and iOS.
+- Gestures: drag, pinch to zoom, and double-tap to reset.
+- Crop modes: configurable aspect-ratio presets, Fit / Fill, and 90-degree rotation.
+- Labels: override editor buttons, status text, and result-page copy with `ImageClipEditorLabels`. The default labels are English.
+- Output: export PNG or JPEG, with configurable JPEG quality.
+- Image operations: decode, center crop, region crop, rotate, flip, resize, adjust color, and export PNG/JPEG.
+- Input probing: detect PNG, JPEG, GIF, WebP, HEIC, and HEIF before full decode.
+- Preview decode: generate smaller previews with `ImageClipDecodeSettings.preview` while preserving original source dimensions.
+- Native adapter: use the built-in `ImageClipPlatformDecodeAdapter`, or plug in a custom `ImageClipDecodeAdapter` for HEIC/HEIF conversion or platform sampled decode.
+- File-backed pipeline: `decodeFile`, `processFile`, and `writeImageToFile` keep large local files out of the UI isolate.
+- Batch pipeline: combine multiple image operations into one background task to avoid repeated decode/encode work.
+- Sessions: `ImageClipSession` and `ImageClipDecodedSession` help keep editing state across multiple operations.
+- Cancellable tasks: `ImageClipTask` exposes progress, cancellation, and timeout controls.
+- Background processing: heavy work runs in a background isolate and uses `TransferableTypedData` for large byte transfers.
 
-## 安装
+## Installation
 
-发布到 pub.dev 后，在业务项目的 `pubspec.yaml` 中添加：
+After the package is published to pub.dev, add it to your app:
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.9.0
+  flutter_image_clip: ^0.9.1
 ```
 
-然后执行：
+Then run:
 
 ```sh
 flutter pub get
 ```
 
-如果发布前需要本地调试，可以临时使用 `path` 依赖：
+For local development before publishing, use a path dependency:
 
 ```yaml
 dependencies:
@@ -50,27 +62,27 @@ dependencies:
     path: /Users/admin/Desktop/demos/flutter_image_clip_demo
 ```
 
-## 文档导航
+## Documentation
 
-- [常见接入配方](guides/接入配方.md)：头像、封面、`image_picker`、HEIC、文件路径、大图和异常处理。
-- [平台与 CI 矩阵](guides/平台矩阵.md)：Android/iOS 原生解码能力、设备测试覆盖和发布前校验。
-- [可访问性检查清单](guides/可访问性检查清单.md)：VoiceOver、TalkBack、大字体、键盘和对比度验收项。
-- [故障排查](guides/故障排查.md)：HEIC、大图内存、EXIF、golden、iOS privacy 和 pub.dev 自动发布问题。
-- [迁移指南](guides/迁移指南.md)：按版本说明兼容性变化和升级检查项。
-- [发布流程](guides/发布流程.md)：tag、release checks、pub.dev OIDC 自动发布和失败处理。
-- [真实设备验收](guides/真实设备验收.md)：Android/iOS 真机图片样本和发布前验收记录。
-- [真实设备验收记录](guides/真实设备验收记录.md)：逐版本真机验收状态表。
-- [仓库信任与安全配置](guides/仓库信任与安全配置.md)：verified publisher、Dependency graph 和安全门禁配置。
+- [Integration recipes](guides/接入配方.md): avatars, covers, `image_picker`, HEIC, file paths, large images, and error handling.
+- [Platform and CI matrix](guides/平台矩阵.md): Android/iOS native decode support, device coverage, and release checks.
+- [Accessibility checklist](guides/可访问性检查清单.md): VoiceOver, TalkBack, large text, keyboard, and contrast validation.
+- [Troubleshooting](guides/故障排查.md): HEIC, large-image memory, EXIF, golden tests, iOS privacy, and pub.dev publishing.
+- [Migration guide](guides/迁移指南.md): compatibility changes and upgrade notes by version.
+- [Release process](guides/发布流程.md): tags, release checks, pub.dev OIDC publishing, and failure handling.
+- [Real-device validation](guides/真实设备验收.md): Android/iOS sample images and pre-release validation.
+- [Real-device validation records](guides/真实设备验收记录.md): versioned real-device validation status.
+- [Repository trust and security](guides/仓库信任与安全配置.md): verified publisher, Dependency graph, and security gates.
 
-## 使用裁剪 UI
+## Crop UI
 
-默认编辑器采用移动端底部操作布局：顶部为 `Position` 标题和关闭按钮，中间为图片定位预览区，底部包含 Fit / Fill 切换、Rotate、比例选项和保存按钮。默认比例选项展示为 `3:4`、`4:3` 等比例文本。比例支持自定义：通过 `aspectRatios` 传入任意 `ImageClipAspectRatio(label, width, height)`，`label` 只负责 UI 文案，实际裁剪比例由 `width / height` 决定。需要固定主裁剪预览区高度时，可以设置 `cropAreaHeight`；不设置时继续自适应填满剩余空间。
+The default editor uses a mobile bottom-action layout: the top bar shows the `Position` title and close button, the center area shows the image positioning preview, and the bottom bar contains Fit / Fill, Rotate, aspect-ratio presets, and the save button. Aspect ratios are configured with `ImageClipAspectRatio(label, width, height)`: `label` only controls the UI text, while `width / height` controls the actual crop ratio.
 
-本地相册图片优先使用 `imagePath` / `initialImagePath`，这样编辑器预览和保存都可以从文件路径进入后台任务，避免业务页先持有一份完整原图 bytes。只有网络图、内存图或没有稳定本地路径时再传 `imageBytes`。
+Use `imagePath` / `initialImagePath` for local gallery images whenever possible. That lets preview and save operations enter the file-backed pipeline directly, so the business page does not need to keep a full original image in memory as `Uint8List`. Use `imageBytes` for network images, in-memory images, or inputs without a stable file path.
 
-`showImageClipEditor` 默认带 `ImageClipPlatformDecodeAdapter`，fullscreen 场景通常只需要传图片路径和少量业务参数；需要自定义处理上限或关闭平台能力时再显式传 `processor` 或 `previewDecodeSettings`。
+`showImageClipEditor` enables `ImageClipPlatformDecodeAdapter` by default. Fullscreen usage usually only needs the image path and business-level settings; pass a custom `processor` or `previewDecodeSettings` only when you need stricter limits or custom platform behavior.
 
-如果业务侧已经保存过裁剪元数据，可以通过 `initialRotationDegrees` 和 `initialCropRegion` 直接恢复用户上次看到的 Position。`initialCropRegion` 使用原图像素坐标；编辑器会结合旋转角度反推预览位置，并根据 `width / height` 从传入的 `aspectRatios` 中自动选择比例。没有精确匹配时会选择最接近的受支持比例，不会插入临时比例选项。`initialRotationDegrees` 只支持 90 度倍数；`initialCropRegion` 的越界坐标会在图片加载后夹到原图范围内，非正 `width` / `height` 会被忽略并回退到普通初始比例。
+If your app persists crop metadata, pass `initialRotationDegrees`, `initialAspectRatio`, and `initialCropRegion` to restore the previous visible position. Use `result.visibleRegion` for `initialCropRegion` and `result.aspectRatio` for `initialAspectRatio`; this preserves Fit-mode crops where the image had left/right or top/bottom blank space. If `initialAspectRatio` is not provided, the editor maps `initialCropRegion` into the rotated preview and selects the nearest supported aspect ratio from `aspectRatios`. `initialRotationDegrees` supports 90-degree increments; invalid or out-of-bounds crop regions are clamped or ignored after image load.
 
 ```dart
 import 'package:flutter_image_clip/flutter_image_clip.dart';
@@ -116,9 +128,9 @@ final result = await showImageClipEditor(
 
 if (result != null) {
   final croppedBytes = result.cropped.bytes;
-  // 原图坐标：实际用于裁剪 source 的像素区域。
-  final region = result.region;
-  // 预览坐标：用户在旋转预览中看到的裁剪区域。
+  final sourceRegion = result.region;
+  final visibleRegion = result.visibleRegion;
+  final aspectRatio = result.aspectRatio;
   final previewRegion = result.previewRegion;
   final rotationDegrees = result.rotationDegrees;
   final flippedHorizontally = result.flippedHorizontally;
@@ -126,7 +138,7 @@ if (result != null) {
 }
 ```
 
-相册文件路径接入：
+Local file input:
 
 ```dart
 final result = await showImageClipEditor(
@@ -139,7 +151,7 @@ final result = await showImageClipEditor(
 );
 ```
 
-`ImageClipResult` 返回结构：
+`ImageClipResult` contains source/cropped images, source-space crop metadata, preview-space crop metadata, and transform metadata:
 
 ```dart
 {
@@ -152,6 +164,14 @@ final result = await showImageClipEditor(
     height: 640,
     cornerRadius: 0,
   ),
+  visibleRegion: CropRegion(
+    x: 120,
+    y: 0,
+    width: 480,
+    height: 640,
+    cornerRadius: 0,
+  ),
+  aspectRatio: ImageClipAspectRatio.portrait,
   previewRegion: CropRegion(
     x: 0,
     y: 120,
@@ -165,7 +185,7 @@ final result = await showImageClipEditor(
 }
 ```
 
-## 嵌入页面
+## Embedded Editor
 
 ```dart
 ImageClipEditor(
@@ -195,11 +215,11 @@ ImageClipEditor(
 )
 ```
 
-`previewDecodeSettings` 只约束编辑器交互预览。只要编辑器还持有原始输入 bytes 或本地文件路径，保存时会把预览裁剪框映射回原图坐标，并从原图导出最终结果。
+`previewDecodeSettings` only controls the interactive preview. As long as the editor still has the original bytes or a local file path, saving maps the preview crop area back to the source image before export.
 
-## 使用控制器
+## Controller API
 
-`ImageClipEditorController` 适合头像上传、资料编辑器、表单页等需要由业务按钮驱动裁剪流程的场景。
+`ImageClipEditorController` is useful for avatar upload, profile forms, and other flows where business controls trigger crop actions.
 
 ```dart
 final controller = ImageClipEditorController();
@@ -214,10 +234,9 @@ ImageClipEditor(
 );
 
 await controller.loadImageFile(picked.path, label: picked.name);
-// 没有稳定文件路径时也可以使用 bytes：
+// Use bytes only when there is no stable file path:
 // await controller.loadImage(bytes, label: 'avatar.jpg');
 controller.resetView();
-// 只更新编辑器预览，不会立即重编码整张图。
 await controller.rotateRight();
 await controller.flipHorizontal();
 
@@ -229,9 +248,9 @@ final region = controller.currentCropRegion();
 controller.cancelTask();
 ```
 
-当新的图片加载请求早于旧请求完成时，编辑器会忽略旧请求的回写结果，避免业务快速切换图片时显示过期裁剪状态。
+When a new image load request finishes after a newer request has already started, the editor ignores the stale result to avoid showing outdated crop state.
 
-## 自定义编辑器文案
+## Labels
 
 ```dart
 ImageClipEditor(
@@ -248,11 +267,9 @@ ImageClipEditor(
 )
 ```
 
-`flipHorizontalButton` 和 `flipVerticalButton` 仍会用于结果页元数据；默认编辑器工具栏不再展示翻转按钮，业务可以通过 `ImageClipEditorController.flipHorizontal()` 和 `ImageClipEditorController.flipVertical()` 主动触发。
+`flipHorizontalButton` and `flipVerticalButton` are still used by result-page metadata. The default editor toolbar does not show flip buttons; use `ImageClipEditorController.flipHorizontal()` and `ImageClipEditorController.flipVertical()` when your app needs those actions.
 
-顶部左侧标题通过 `ImageClipEditorLabels.editorTitle` 传入，底部提示文案通过 `ImageClipEditorLabels.positionHint` 传入；`showImageClipEditor` 和嵌入式 `ImageClipEditor` 两种入口都会使用同一套 `labels` 配置。
-
-## 自定义主题
+## Theme
 
 ```dart
 ImageClipEditor(
@@ -272,9 +289,7 @@ ImageClipEditor(
 )
 ```
 
-如果需要旧版深色视觉，可以使用 `const ImageClipEditorTheme.dark()` 作为起点再覆盖 token。
-
-也可以从业务 App 的 `ColorScheme` 生成：
+For the older dark look, start from `const ImageClipEditorTheme.dark()` and override individual tokens. You can also derive a theme from the host app:
 
 ```dart
 ImageClipEditor(
@@ -284,7 +299,7 @@ ImageClipEditor(
 )
 ```
 
-工具栏高度、保存按钮尺寸和比例选项间距也可以通过同一个 theme 调整，便于业务 App 对齐自己的设计系统：
+Layout tokens are part of the same theme object:
 
 ```dart
 ImageClipEditor(
@@ -301,7 +316,7 @@ ImageClipEditor(
 )
 ```
 
-## 使用图像处理 API
+## Image Processing APIs
 
 ```dart
 final processor = ImageProcessor();
@@ -336,7 +351,7 @@ final png = await processor.exportPng(adjusted);
 final jpeg = await processor.exportJpeg(adjusted, quality: 88);
 ```
 
-处理本地相册文件时可以直接走文件路径，避免业务层先把大图读成 `Uint8List`：
+Use file paths for local gallery images to avoid loading full originals into the UI isolate:
 
 ```dart
 final result = await processor.processFile(
@@ -352,7 +367,7 @@ final result = await processor.processFile(
 await processor.writeImageToFile(result, '/path/to/cropped.jpg');
 ```
 
-多步处理建议使用 pipeline，这样会在一次后台任务里完成 decode、transform 和 encode：
+Use a pipeline when multiple operations can be completed in one background task:
 
 ```dart
 final result = await processor.processBytes(
@@ -371,7 +386,7 @@ final result = await processor.processBytes(
 );
 ```
 
-需要在业务层提前清理坐标时，可以使用 `CropRegion.clampToBounds`：
+Clean saved coordinates before use:
 
 ```dart
 final safeRegion = savedRegion.clampToBounds(
@@ -380,10 +395,9 @@ final safeRegion = savedRegion.clampToBounds(
 );
 ```
 
-裁剪完成后，`ImageClipResult.region` / `sourceRegion` 始终表示原图坐标，适合直接持久化；`previewRegion` 只表示当前预览解码尺寸下的坐标，通常不建议作为业务数据保存。
+`ImageClipResult.region` / `sourceRegion` represent the source pixels used by the exported image. To restore the editor UI, persist `visibleRegion`, `aspectRatio`, `rotationDegrees`, `flippedHorizontally`, and `flippedVertically`; pass `visibleRegion` back as `initialCropRegion` and `aspectRatio` back as `initialAspectRatio`. `previewRegion` represents the current preview size and should usually stay internal to the UI.
 
-需要在编辑器外复用同一套比例推导规则时，可以使用
-`ImageClipAspectRatio.fromCropRegion`：
+Reuse the editor's aspect-ratio inference outside the editor:
 
 ```dart
 final ratio = ImageClipAspectRatio.fromCropRegion(
@@ -393,7 +407,7 @@ final ratio = ImageClipAspectRatio.fromCropRegion(
 );
 ```
 
-连续编辑可以使用 session 持有当前图像状态：
+Use `ImageClipSession` for continuous edits:
 
 ```dart
 final source = await processor.decodeBytes(bytes, label: 'input.jpg');
@@ -409,7 +423,7 @@ final jpeg = await session.exportImage(
 );
 ```
 
-如果业务自己做编辑预览，可以使用 `ImageClipCropTransform` 复用编辑器的坐标映射逻辑：
+Use `ImageClipCropTransform` if your app owns the editing preview and only needs the coordinate mapping:
 
 ```dart
 const transform = ImageClipCropTransform(
@@ -424,7 +438,7 @@ final sourceRegion = transform.sourceRegionForPreview(
 );
 ```
 
-如果连续处理已经运行在后台 isolate 中，或图片较小，可以使用 decoded session 避免中间结果重复编码：
+For work that already runs in a background isolate, or for small images, use `ImageClipDecodedSession` to avoid repeated intermediate encodes:
 
 ```dart
 final session = ImageClipDecodedSession.decode(bytes, label: 'input.jpg');
@@ -437,7 +451,7 @@ final jpeg = session.exportImage(
 );
 ```
 
-如果需要进度、取消或超时控制，可以使用 task API：
+Task API:
 
 ```dart
 final task = processor.processBytesTask(
@@ -461,11 +475,11 @@ final task = processor.processBytesTask(
 final result = await task.result;
 ```
 
-`decodeBytes` 和后续裁剪/旋转处理会自动烘焙 EXIF orientation，手机拍摄的旋转照片会按视觉方向进入裁剪流程。
+`decodeBytes` and later crop/rotate operations automatically bake EXIF orientation, so rotated mobile photos enter the crop flow in their visual orientation.
 
-## 原生解码适配
+## Native Decode Adapter
 
-`ImageClipPlatformDecodeAdapter` 会调用库内置的 Android/iOS 原生实现，在进入 Dart 图像管线前执行 HEIC/HEIF 转码或大图 sampled decode。照片类预览会优先返回 JPEG，带透明通道的图像返回 PNG，以降低 MethodChannel 传输体积：
+`ImageClipPlatformDecodeAdapter` calls the built-in Android/iOS native implementation before the Dart image pipeline. It can convert HEIC/HEIF or run sampled decode for large images. Photo previews prefer JPEG, while images with alpha use PNG to preserve transparency:
 
 ```dart
 final processor = ImageProcessor(
@@ -473,9 +487,9 @@ final processor = ImageProcessor(
 );
 ```
 
-当文件管线只包含区域裁剪、90 度倍数旋转和翻转且输出为 JPEG 时，内置平台适配器还会尝试走原生 `cropFile` 快路径；如果平台不支持、参数超出能力、PNG 输出或通道不可用，会自动回退到 Dart isolate 管线。
+When a file-backed pipeline only contains region crop, 90-degree rotation, flips, and JPEG output, the built-in platform adapter can try the native `cropFile` fast path. Unsupported platforms, unsupported parameters, PNG output, or unavailable native channels automatically fall back to the Dart isolate pipeline.
 
-如果业务需要接入自有相册 SDK 或图片服务，也可以实现 `ImageClipDecodeAdapter`：
+Custom adapter example:
 
 ```dart
 class NativeDecodeAdapter extends ImageClipDecodeAdapter {
@@ -510,9 +524,9 @@ class NativeDecodeAdapter extends ImageClipDecodeAdapter {
 }
 ```
 
-平台侧会把常见失败映射为 Dart typed exception：不支持的格式抛出 `ImageClipUnsupportedFormatException`，参数或通道前置错误抛出 `ImageClipPlatformException`，原生解码或编码失败抛出 `ImageClipDecodeException`。
+Platform failures are mapped to typed Dart exceptions: unsupported formats throw `ImageClipUnsupportedFormatException`, invalid parameters or channel precondition failures throw `ImageClipPlatformException`, and native decode/encode failures throw `ImageClipDecodeException`.
 
-## 性能基准
+## Benchmarks and Checks
 
 ```sh
 dart run benchmark/image_processor_benchmark.dart
@@ -522,9 +536,9 @@ dart run tool/check_api_snapshot.dart
 dart run tool/check_public_api_docs.dart
 ```
 
-基准脚本会输出解码、旋转裁剪导出 JPEG、大图 downscale、JPEG 预览解码和文件路径裁剪导出的平均耗时、中位耗时、进程 RSS delta、输出尺寸和字节数。`--check` 会按 `benchmark/baseline.json` 检查中位耗时、内存变化和输出字节数，适合放进 CI 防止性能回退。`tool/check_api_snapshot.dart` 会检查核心公共 API 片段，避免无意破坏 semver；`tool/check_public_api_docs.dart` 会阻止新增公开 API 时漏写 dartdoc。
+The benchmark reports average and median time, process RSS delta, output dimensions, and output bytes for decode, rotate/crop/export JPEG, large-image downscale, JPEG preview decode, and file-path crop export. `--check` compares median time, memory delta, and output bytes with `benchmark/baseline.json` for CI regression detection.
 
-## 大图保护与异常处理
+## Large Image Protection
 
 ```dart
 final processor = ImageProcessor(
@@ -548,19 +562,17 @@ try {
 }
 ```
 
-默认配置会拒绝超过 4800 万像素的输入，并把超过 1600 万像素的输出自动 downscale。需要完全关闭限制时可使用：
+The default settings reject inputs above 48 million pixels and automatically downscale outputs above 16 million pixels. Use `const ImageClipProcessingSettings.unrestricted()` only when your app owns the memory risk.
 
-```dart
-const ImageClipProcessingSettings.unrestricted()
-```
+## Compatibility
 
-## 兼容性策略
+Import public APIs from `package:flutter_image_clip/flutter_image_clip.dart`. Avoid depending on files under `src/`.
 
-业务侧应从 `package:flutter_image_clip/flutter_image_clip.dart` 导入公开 API，避免直接依赖 `src/` 下的内部实现。项目使用 `tool/check_api_snapshot.dart` 检查完整公开 API 快照；发布破坏性变更时提升主版本号，新增能力提升次版本号，纯修复提升 patch 版本，并在 `CHANGELOG.md` 中给出迁移说明。
+The package requires Dart `>=3.10.0 <4.0.0` and Flutter `>=3.38.1`. CI covers both the minimum supported Flutter version and the latest stable version. The editor inherits the host app's font and does not bundle a custom typeface.
 
-根包兼容性声明为 Dart `>=3.10.0 <4.0.0`、Flutter `>=3.38.1`。CI 同时覆盖最低支持版本和最新 stable，避免示例 App 或工具链升级后虚标兼容范围。编辑器默认继承业务 App 字体，不随库打包自定义字体，避免增加包体积或覆盖业务品牌风格。
+Breaking public API changes should bump the major version, new capabilities should bump the minor version, and fixes should bump the patch version. Document migration notes in `CHANGELOG.md`.
 
-## 本地开发
+## Local Development
 
 ```sh
 flutter pub get
@@ -578,6 +590,218 @@ flutter test integration_test
 flutter run
 ```
 
-## 许可证
+## License
+
+MIT License. See `LICENSE`.
+
+## 简体中文
+
+`flutter_image_clip` 是一个面向 Android 和 iOS 的 Flutter 图片裁剪与位图处理库，提供可直接打开的全屏裁剪 UI、可嵌入业务页面的裁剪组件，以及基于后台 isolate 的图像处理 API。README 默认以英文展示，本节提供中文说明。
+
+### 功能
+
+- `showImageClipEditor`：一行代码打开完整裁剪界面。
+- `ImageClipEditor`：把裁剪器嵌入业务页面、表单或上传流程。
+- `ImageClipEditorController`：由父组件主动加载图片、重置视图、旋转、翻转、裁剪和取消任务。
+- 支持 Android 和 iOS。
+- 支持拖动、双指缩放、双击复位。
+- 支持命名比例预设、Fit / Fill、90 度旋转。
+- 通过 `ImageClipEditorLabels` 覆盖编辑器按钮、状态和结果页文案，默认文案为英文。
+- 裁剪结果可输出 PNG 或 JPEG，并可配置 JPEG quality。
+- 支持解码、中心裁剪、区域裁剪、旋转、翻转、缩放、调色、PNG/JPEG 导出。
+- 可在完整解码前探测 PNG、JPEG、GIF、WebP、HEIC、HEIF。
+- 可用 `ImageClipDecodeSettings.preview` 生成小图预览，同时保留原图尺寸元数据。
+- 内置 `ImageClipPlatformDecodeAdapter`，也可以通过 `ImageClipDecodeAdapter` 接入自定义 HEIC/HEIF 转码或平台 sampled decode。
+- 支持 `decodeFile`、`processFile` 和 `writeImageToFile`，本地大图可直接进入文件链路。
+- 多步图像操作可合并为一次后台任务，减少重复编解码。
+- `ImageClipSession` 和 `ImageClipDecodedSession` 适合连续编辑状态管理。
+- `ImageClipTask` 支持进度监听、取消和超时。
+
+### 安装
+
+发布到 pub.dev 后，在业务项目的 `pubspec.yaml` 中添加：
+
+```yaml
+dependencies:
+  flutter_image_clip: ^0.9.1
+```
+
+执行：
+
+```sh
+flutter pub get
+```
+
+发布前本地调试可以使用 `path` 依赖：
+
+```yaml
+dependencies:
+  flutter_image_clip:
+    path: /Users/admin/Desktop/demos/flutter_image_clip_demo
+```
+
+### 文档导航
+
+- [常见接入配方](guides/接入配方.md)：头像、封面、`image_picker`、HEIC、文件路径、大图和异常处理。
+- [平台与 CI 矩阵](guides/平台矩阵.md)：Android/iOS 原生解码能力、设备测试覆盖和发布前校验。
+- [可访问性检查清单](guides/可访问性检查清单.md)：VoiceOver、TalkBack、大字体、键盘和对比度验收项。
+- [故障排查](guides/故障排查.md)：HEIC、大图内存、EXIF、golden、iOS privacy 和 pub.dev 自动发布问题。
+- [迁移指南](guides/迁移指南.md)：按版本说明兼容性变化和升级检查项。
+- [发布流程](guides/发布流程.md)：tag、release checks、pub.dev OIDC 自动发布和失败处理。
+- [真实设备验收](guides/真实设备验收.md)：Android/iOS 真机图片样本和发布前验收记录。
+- [真实设备验收记录](guides/真实设备验收记录.md)：逐版本真机验收状态表。
+- [仓库信任与安全配置](guides/仓库信任与安全配置.md)：verified publisher、Dependency graph 和安全门禁配置。
+
+### 快速使用
+
+全屏裁剪建议优先传 `imagePath`，这样相册本地文件可以走 file-backed preview/save 链路，避免业务页提前持有完整原图 bytes。只有网络图、内存图或没有稳定本地路径时再传 `imageBytes`。
+
+如果需要保存后下次恢复编辑器位置，建议持久化 `result.visibleRegion`、`result.aspectRatio`、`result.rotationDegrees`、`result.flippedHorizontally` 和 `result.flippedVertically`。恢复时把 `visibleRegion` 传给 `initialCropRegion`，把 `aspectRatio` 传给 `initialAspectRatio`，这样 Fit 模式下左右或上下留白的位置也能按原样恢复。
+
+```dart
+final result = await showImageClipEditor(
+  context,
+  imagePath: picked.path,
+  imageLabel: picked.name,
+  initialAspectRatio: ImageClipAspectRatio.square,
+  outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 88),
+  previewDecodeSettings: const ImageClipDecodeSettings.preview(
+    targetLongSide: 1200,
+  ),
+);
+
+if (result != null) {
+  final croppedBytes = result.cropped.bytes;
+  final visibleRegion = result.visibleRegion;
+  final aspectRatio = result.aspectRatio;
+  final previewRegion = result.previewRegion;
+}
+```
+
+嵌入式页面：
+
+```dart
+ImageClipEditor(
+  initialImagePath: picked.path,
+  initialImageLabel: picked.name,
+  initialAspectRatio: ImageClipAspectRatio.square,
+  aspectRatios: const [
+    ImageClipAspectRatio.square,
+    ImageClipAspectRatio.portrait,
+    ImageClipAspectRatio.landscape,
+    ImageClipAspectRatio.widescreen,
+  ],
+  showResultPage: false,
+  onResult: (result) {
+    final croppedBytes = result.cropped.bytes;
+  },
+)
+```
+
+控制器适合由业务按钮驱动裁剪流程：
+
+```dart
+final controller = ImageClipEditorController();
+
+ImageClipEditor(
+  controller: controller,
+  loadSampleOnStart: false,
+  showResultPage: false,
+  onResult: (result) {
+    final bytes = result.cropped.bytes;
+  },
+);
+
+await controller.loadImageFile(picked.path, label: picked.name);
+await controller.rotateRight();
+final result = await controller.crop();
+controller.cancelTask();
+```
+
+### 图像处理
+
+本地文件可直接走文件路径处理，减少 UI isolate 的大字节数组占用：
+
+```dart
+final processor = ImageProcessor();
+
+final result = await processor.processFile(
+  '/path/to/camera.jpg',
+  steps: const [
+    ImageClipPipelineStep.cropRegion(
+      CropRegion(x: 120, y: 80, width: 1200, height: 900, cornerRadius: 0),
+    ),
+  ],
+  outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 88),
+);
+
+await processor.writeImageToFile(result, '/path/to/cropped.jpg');
+```
+
+多步处理建议使用 pipeline，在一次后台任务里完成 decode、transform 和 encode：
+
+```dart
+final result = await processor.processBytes(
+  bytes,
+  label: 'input.jpg',
+  steps: const [
+    ImageClipPipelineStep.rotate(),
+    ImageClipPipelineStep.cropRegion(
+      CropRegion(x: 20, y: 20, width: 240, height: 240, cornerRadius: 0),
+    ),
+  ],
+  outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 88),
+);
+```
+
+### 原生解码适配
+
+`ImageClipPlatformDecodeAdapter` 会在进入 Dart 图像管线前调用库内置的 Android/iOS 原生实现，用于 HEIC/HEIF 转码或大图 sampled decode。`showImageClipEditor` 默认启用该适配器；自定义处理器时可以显式配置：
+
+```dart
+final processor = ImageProcessor(
+  decodeAdapter: const ImageClipPlatformDecodeAdapter(),
+);
+```
+
+当文件管线只包含区域裁剪、90 度倍数旋转、翻转且输出为 JPEG 时，内置平台适配器会尝试走原生 `cropFile` 快路径；平台不支持、参数超出能力、PNG 输出或通道不可用时会自动回退到 Dart isolate 管线。
+
+### 大图保护与异常
+
+默认配置会拒绝超过 4800 万像素的输入，并把超过 1600 万像素的输出自动 downscale。需要自定义限制时：
+
+```dart
+final processor = ImageProcessor(
+  processingSettings: const ImageClipProcessingSettings(
+    maxInputPixels: 48000000,
+    maxOutputPixels: 16000000,
+    autoDownscale: true,
+  ),
+);
+```
+
+需要完全关闭限制时可使用 `const ImageClipProcessingSettings.unrestricted()`，但业务侧需要自行承担内存风险。
+
+### 本地开发
+
+```sh
+flutter pub get
+dart format lib test benchmark tool example/lib example/integration_test
+flutter analyze
+flutter test
+dart run tool/check_api_snapshot.dart
+dart run tool/check_public_api_docs.dart
+dart run benchmark/image_processor_benchmark.dart --check benchmark/baseline.json
+dart doc --output doc/api
+dart pub publish --dry-run
+cd example
+flutter pub get
+flutter test integration_test
+flutter run
+```
+
+### 兼容性与许可证
+
+业务侧应从 `package:flutter_image_clip/flutter_image_clip.dart` 导入公开 API，避免直接依赖 `src/` 下的内部实现。根包兼容 Dart `>=3.10.0 <4.0.0`、Flutter `>=3.38.1`。
 
 MIT License。详见 `LICENSE`。

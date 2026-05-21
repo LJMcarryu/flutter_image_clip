@@ -330,10 +330,10 @@ class ImageClipEditor extends StatefulWidget {
   /// Initial crop position in source-image pixel coordinates.
   ///
   /// When provided, the editor restores the preview scale and offset so this
-  /// source region is shown inside the crop frame. The initial crop aspect ratio
-  /// is selected from [aspectRatios] using this region and
-  /// [initialRotationDegrees]. If no supported ratio matches exactly, the
-  /// closest supported ratio is used.
+  /// source region is shown inside the crop frame. When [initialAspectRatio] is
+  /// not provided, the initial crop aspect ratio is selected from
+  /// [aspectRatios] using this region and [initialRotationDegrees]. If no
+  /// supported ratio matches exactly, the closest supported ratio is used.
   ///
   /// Coordinates outside the source image are clamped after the image loads.
   /// Regions with non-positive [CropRegion.width] or [CropRegion.height] are
@@ -430,12 +430,15 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   }
 
   ImageClipAspectRatio get _initialAspectRatio {
+    final explicit = widget.initialAspectRatio;
+    if (explicit != null) {
+      return explicit;
+    }
     final region = _validInitialCropRegion;
     if (region != null) {
       return _aspectRatioForInitialRegion(region);
     }
-    return widget.initialAspectRatio ??
-        ImageClipAspectRatio.fromOrientation(widget.initialOrientation);
+    return ImageClipAspectRatio.fromOrientation(widget.initialOrientation);
   }
 
   String get _initialImageLabel {
