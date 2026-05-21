@@ -180,8 +180,8 @@ class ImageClipAspectRatio {
     final reducedHeight = height ~/ divisor;
     return ImageClipAspectRatio(
       label: label ?? '$reducedWidth:$reducedHeight',
-      width: width.toDouble(),
-      height: height.toDouble(),
+      width: reducedWidth.toDouble(),
+      height: reducedHeight.toDouble(),
     );
   }
 
@@ -434,13 +434,17 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   ImageClipAspectRatio get _initialAspectRatio {
     final explicit = widget.initialAspectRatio;
     if (explicit != null) {
-      return explicit;
+      return _matchingAspectRatioForValue(explicit.value) ?? explicit;
     }
     final region = _validInitialCropRegion;
     if (region != null) {
       return _aspectRatioForInitialRegion(region);
     }
-    return ImageClipAspectRatio.fromOrientation(widget.initialOrientation);
+    final orientationRatio = ImageClipAspectRatio.fromOrientation(
+      widget.initialOrientation,
+    );
+    return _matchingAspectRatioForValue(orientationRatio.value) ??
+        orientationRatio;
   }
 
   String get _initialImageLabel {
@@ -1088,6 +1092,19 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     final target =
         (rotated ? region.height : region.width) /
         (rotated ? region.width : region.height);
+    return _closestAspectRatioForValue(target);
+  }
+
+  ImageClipAspectRatio? _matchingAspectRatioForValue(double target) {
+    for (final preset in _supportedAspectRatios) {
+      if ((preset.value - target).abs() < _aspectRatioTolerance) {
+        return preset;
+      }
+    }
+    return null;
+  }
+
+  ImageClipAspectRatio _closestAspectRatioForValue(double target) {
     final presets = _supportedAspectRatios;
     var closest = presets.first;
     var closestDistance = (closest.value - target).abs();

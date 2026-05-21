@@ -26,9 +26,13 @@ void main() {
 
     expect(custom.value, closeTo(21 / 9, 0.0001));
     expect(generated.label, '3:4');
+    expect(generated.width, 3);
+    expect(generated.height, 4);
     expect(generated.value, closeTo(0.75, 0.0001));
     expect(matched, ImageClipAspectRatio.ratio16x10);
     expect(rotatedRegionRatio.label, '1:2');
+    expect(rotatedRegionRatio.width, 1);
+    expect(rotatedRegionRatio.height, 2);
     expect(rotatedRegionRatio.value, closeTo(0.5, 0.0001));
     expect(ImageClipAspectRatio.ratio16x10.label, '16:10');
     expect(ImageClipAspectRatio.ratio16x10.value, closeTo(1.6, 0.0001));
@@ -977,6 +981,45 @@ void main() {
     expect(result!.source.isPreviewSized, isTrue);
     expect(result.region.width * 16, result.region.height * 10);
     expect(result.cropped.width * 16, result.cropped.height * 10);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('initial aspect ratio uses equivalent supported preset', (
+    tester,
+  ) async {
+    final controller = ImageClipEditorController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: controller,
+          initialImageBytes: _pngBytes(480, 640),
+          initialImageLabel: 'equivalent-ratio-source.png',
+          initialAspectRatio: const ImageClipAspectRatio(
+            label: '480:640',
+            width: 480,
+            height: 640,
+          ),
+          aspectRatios: const <ImageClipAspectRatio>[
+            ImageClipAspectRatio.portrait,
+            ImageClipAspectRatio.square,
+          ],
+          loadSampleOnStart: false,
+          showResultPage: false,
+        ),
+      ),
+    );
+    await pumpUntilIdle(tester);
+    await tester.pump();
+
+    expect(find.text('480:640'), findsNothing);
+    expect(find.text('3:4'), findsOneWidget);
+
+    final result = await tester.runAsync(controller.crop);
+    await tester.pump();
+
+    expect(result, isNotNull);
+    expect(result!.aspectRatio, ImageClipAspectRatio.portrait);
     expect(tester.takeException(), isNull);
   });
 

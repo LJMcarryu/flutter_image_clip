@@ -1,3 +1,8 @@
+# 0.9.3
+
+- 修复显式传入等价裁剪比例时，编辑器会把 `480:640` 等比例作为临时新比例插入工具栏的问题；现在会优先复用 `aspectRatios` 中数值等价的预设。
+- `ImageClipAspectRatio.fromDimensions` 和 `fromCropRegion` 生成自定义比例时会保存约分后的 `width` / `height`，确保比例元数据和展示 label 保持一致。
+
 # 0.9.2
 
 - 调整裁剪元数据恢复策略：`ImageClipResult.region` 现在会保存裁剪框映射到原图坐标后的虚拟矩形，允许 `x` / `y` 为负数或 `width` / `height` 超出图片边界，用同一组 `rotationDegrees + x/y/w/h` 即可恢复 Fit 模式下的左右或上下留白。
