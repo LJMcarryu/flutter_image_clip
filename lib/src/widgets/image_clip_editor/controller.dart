@@ -33,6 +33,15 @@ class ImageClipEditorController {
     return _requireState()._loadControllerImage(bytes, label: label);
   }
 
+  /// Loads a local image file [path] into the attached editor.
+  ///
+  /// Use this for gallery files when available. It avoids keeping the full
+  /// original source bytes in widget state and lets save operations read the
+  /// source file inside background processing.
+  Future<void> loadImageFile(String path, {String label = ''}) {
+    return _requireState()._loadControllerImageFile(path, label: label);
+  }
+
   /// Generates and loads the built-in sample image.
   Future<void> loadSample() {
     return _requireState()._loadSample(replaceCurrent: true);

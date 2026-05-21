@@ -12,6 +12,7 @@ part of '../image_clip_editor.dart';
 Future<ImageClipResult?> showImageClipEditor(
   BuildContext context, {
   Uint8List? imageBytes,
+  String? imagePath,
   String imageLabel = '',
   ImageProcessor? processor,
   ImageClipCropOrientation initialOrientation =
@@ -39,8 +40,14 @@ Future<ImageClipResult?> showImageClipEditor(
       settings: routeSettings,
       builder: (context) {
         return ImageClipEditor(
-          processor: processor,
+          processor:
+              processor ??
+              ImageProcessor(
+                processingSettings: processingSettings,
+                decodeAdapter: const ImageClipPlatformDecodeAdapter(),
+              ),
           initialImageBytes: imageBytes,
+          initialImagePath: imagePath,
           initialImageLabel: imageLabel,
           initialOrientation: initialOrientation,
           initialAspectRatio: initialAspectRatio,
@@ -256,6 +263,7 @@ class ImageClipEditor extends StatefulWidget {
     this.controller,
     this.processor,
     this.initialImageBytes,
+    this.initialImagePath,
     this.initialImageLabel = '',
     this.initialOrientation = ImageClipCropOrientation.portrait,
     this.initialAspectRatio,
@@ -276,7 +284,8 @@ class ImageClipEditor extends StatefulWidget {
     this.onCancel,
     this.onProgress,
     this.onResult,
-  }) : assert(initialRotationDegrees % 90 == 0),
+  }) : assert(initialImageBytes == null || initialImagePath == null),
+       assert(initialRotationDegrees % 90 == 0),
        assert(cropAreaHeight == null || cropAreaHeight > 0);
 
   /// Optional controller used to drive this editor from parent widgets.
@@ -286,9 +295,20 @@ class ImageClipEditor extends StatefulWidget {
   final ImageProcessor? processor;
 
   /// Encoded image bytes loaded when the editor starts.
+  ///
+  /// Prefer [initialImagePath] for local gallery files so preview decode and
+  /// save can avoid keeping the original source bytes in widget state.
   final Uint8List? initialImageBytes;
 
-  /// Label attached to [initialImageBytes] in image processing results.
+  /// Local image file path loaded when the editor starts.
+  ///
+  /// When this is provided, preview decode and save operations can read from
+  /// the file path in background work instead of copying full source bytes
+  /// through the UI isolate.
+  final String? initialImagePath;
+
+  /// Label attached to [initialImageBytes] or [initialImagePath] in image
+  /// processing results.
   ///
   /// When empty, [ImageClipEditorLabels.defaultImageLabel] is used.
   final String initialImageLabel;
@@ -352,7 +372,8 @@ class ImageClipEditor extends StatefulWidget {
   /// toolbar keeps a usable minimum height on short screens.
   final double? cropAreaHeight;
 
-  /// Whether to generate a sample image when [initialImageBytes] is null.
+  /// Whether to generate a sample image when [initialImageBytes] and
+  /// [initialImagePath] are null.
   final bool loadSampleOnStart;
 
   /// Whether canceling the editor should pop the current route.
@@ -385,6 +406,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   bool _isBusy = false;
   int _taskSerial = 0;
   Uint8List? _sourceImageBytes;
+  String? _sourceImagePath;
   String? _sourceImageLabel;
   ImageClipTask<EditedImage>? _activeTask;
   StreamSubscription<ImageClipTaskProgress>? _activeProgressSubscription;
@@ -472,6 +494,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       widget.controller?._attach(this);
     }
     if (oldWidget.initialImageBytes != widget.initialImageBytes ||
+        oldWidget.initialImagePath != widget.initialImagePath ||
         oldWidget.initialImageLabel != widget.initialImageLabel) {
       unawaited(_loadInitialImage());
     }
@@ -641,6 +664,27 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
         replaceCurrent: true,
         onDone: (_) {
           _sourceImageBytes = bytes;
+          _sourceImagePath = null;
+          _sourceImageLabel = _initialImageLabel;
+          _resetPreviewTransform();
+        },
+      );
+    }
+
+    final path = widget.initialImagePath;
+    if (path != null && path.isNotEmpty) {
+      return _runImageTask(
+        () => _processor.decodeFileTask(
+          path,
+          label: _initialImageLabel,
+          decodeSettings: widget.previewDecodeSettings,
+        ),
+        busyLabel: widget.labels.loadingImageStatus,
+        doneLabel: widget.labels.imageLoadedStatus,
+        replaceCurrent: true,
+        onDone: (_) {
+          _sourceImageBytes = null;
+          _sourceImagePath = path;
           _sourceImageLabel = _initialImageLabel;
           _resetPreviewTransform();
         },
@@ -655,6 +699,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     setState(() {
       _image = null;
       _sourceImageBytes = null;
+      _sourceImagePath = null;
       _sourceImageLabel = null;
       _status = widget.labels.waitingForImageStatus;
       _resetPreviewTransform();
@@ -720,6 +765,29 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       replaceCurrent: true,
       onDone: (_) {
         _sourceImageBytes = bytes;
+        _sourceImagePath = null;
+        _sourceImageLabel = effectiveLabel;
+        _resetPreviewTransform();
+      },
+    );
+  }
+
+  Future<void> _loadControllerImageFile(String path, {required String label}) {
+    final effectiveLabel = label.isEmpty
+        ? widget.labels.defaultImageLabel
+        : label;
+    return _runImageTask(
+      () => _processor.decodeFileTask(
+        path,
+        label: effectiveLabel,
+        decodeSettings: widget.previewDecodeSettings,
+      ),
+      busyLabel: widget.labels.loadingImageStatus,
+      doneLabel: widget.labels.imageLoadedStatus,
+      replaceCurrent: true,
+      onDone: (_) {
+        _sourceImageBytes = null;
+        _sourceImagePath = path;
         _sourceImageLabel = effectiveLabel;
         _resetPreviewTransform();
       },
@@ -734,6 +802,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       replaceCurrent: replaceCurrent,
       onDone: (_) {
         _sourceImageBytes = null;
+        _sourceImagePath = null;
         _sourceImageLabel = null;
         _resetPreviewTransform();
       },
@@ -749,6 +818,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     setState(() {
       _image = null;
       _sourceImageBytes = null;
+      _sourceImagePath = null;
       _sourceImageLabel = null;
       _isBusy = false;
       _progressValue = null;

@@ -19,7 +19,7 @@
 - 图像处理：解码、中心裁剪、区域裁剪、旋转、翻转、缩放、调色、PNG/JPEG 导出。
 - 输入探测：可在完整解码前识别 PNG、JPEG、GIF、WebP、HEIC、HEIF，用于移动端大图保护和格式提示。
 - 预览解码：通过 `ImageClipDecodeSettings.preview` 为编辑器或业务预览生成小图，同时保留原图尺寸元数据。
-- 原生解码适配：内置 `ImageClipPlatformDecodeAdapter`，也可通过 `ImageClipDecodeAdapter` 接入自定义 HEIC/HEIF 转码或平台 sampled decode。
+- 原生适配：内置 `ImageClipPlatformDecodeAdapter`，也可通过 `ImageClipDecodeAdapter` 接入自定义 HEIC/HEIF 转码或平台 sampled decode；本地文件 JPEG 保存可选走平台 `cropFile` 快路径。
 - 文件链路：支持 `decodeFile`、`processFile` 和 `writeImageToFile`，本地文件输入会在后台 isolate 内读取。
 - 批处理 pipeline：多步图像操作可合并为一次后台任务，减少重复编解码。
 - 编辑会话：通过 `ImageClipSession` 持有连续编辑状态，减少业务层手动传递中间结果。
@@ -33,7 +33,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.7.4
+  flutter_image_clip: ^0.9.0
 ```
 
 然后执行：
@@ -66,7 +66,11 @@ dependencies:
 
 默认编辑器采用移动端底部操作布局：顶部为 `Position` 标题和关闭按钮，中间为图片定位预览区，底部包含 Fit / Fill 切换、Rotate、比例选项和保存按钮。默认比例选项展示为 `3:4`、`4:3` 等比例文本。比例支持自定义：通过 `aspectRatios` 传入任意 `ImageClipAspectRatio(label, width, height)`，`label` 只负责 UI 文案，实际裁剪比例由 `width / height` 决定。需要固定主裁剪预览区高度时，可以设置 `cropAreaHeight`；不设置时继续自适应填满剩余空间。
 
-如果业务侧已经保存过裁剪元数据，可以通过 `initialRotationDegrees` 和 `initialCropRegion` 直接恢复用户上次看到的 Position。`initialCropRegion` 使用原图像素坐标；编辑器会结合旋转角度反推预览位置，并根据 `width / height` 自动选中匹配比例。如果传入的宽高不在 `aspectRatios` 里，编辑器会临时插入一个对应比例选项。`initialRotationDegrees` 只支持 90 度倍数；`initialCropRegion` 的越界坐标会在图片加载后夹到原图范围内，非正 `width` / `height` 会被忽略并回退到普通初始比例。
+本地相册图片优先使用 `imagePath` / `initialImagePath`，这样编辑器预览和保存都可以从文件路径进入后台任务，避免业务页先持有一份完整原图 bytes。只有网络图、内存图或没有稳定本地路径时再传 `imageBytes`。
+
+`showImageClipEditor` 默认带 `ImageClipPlatformDecodeAdapter`，fullscreen 场景通常只需要传图片路径和少量业务参数；需要自定义处理上限或关闭平台能力时再显式传 `processor` 或 `previewDecodeSettings`。
+
+如果业务侧已经保存过裁剪元数据，可以通过 `initialRotationDegrees` 和 `initialCropRegion` 直接恢复用户上次看到的 Position。`initialCropRegion` 使用原图像素坐标；编辑器会结合旋转角度反推预览位置，并根据 `width / height` 从传入的 `aspectRatios` 中自动选择比例。没有精确匹配时会选择最接近的受支持比例，不会插入临时比例选项。`initialRotationDegrees` 只支持 90 度倍数；`initialCropRegion` 的越界坐标会在图片加载后夹到原图范围内，非正 `width` / `height` 会被忽略并回退到普通初始比例。
 
 ```dart
 import 'package:flutter_image_clip/flutter_image_clip.dart';
@@ -122,6 +126,19 @@ if (result != null) {
 }
 ```
 
+相册文件路径接入：
+
+```dart
+final result = await showImageClipEditor(
+  context,
+  imagePath: picked.path,
+  imageLabel: picked.name,
+  previewDecodeSettings: const ImageClipDecodeSettings.preview(
+    targetLongSide: 1200,
+  ),
+);
+```
+
 `ImageClipResult` 返回结构：
 
 ```dart
@@ -152,8 +169,8 @@ if (result != null) {
 
 ```dart
 ImageClipEditor(
-  initialImageBytes: bytes,
-  initialImageLabel: 'cover.jpg',
+  initialImagePath: picked.path,
+  initialImageLabel: picked.name,
   initialAspectRatio: const ImageClipAspectRatio(
     label: 'Banner',
     width: 16,
@@ -178,7 +195,7 @@ ImageClipEditor(
 )
 ```
 
-`previewDecodeSettings` 只约束编辑器交互预览。只要编辑器还持有原始输入 bytes，保存时会把预览裁剪框映射回原图坐标，并从原图导出最终结果。
+`previewDecodeSettings` 只约束编辑器交互预览。只要编辑器还持有原始输入 bytes 或本地文件路径，保存时会把预览裁剪框映射回原图坐标，并从原图导出最终结果。
 
 ## 使用控制器
 
@@ -196,7 +213,9 @@ ImageClipEditor(
   },
 );
 
-await controller.loadImage(bytes, label: 'avatar.jpg');
+await controller.loadImageFile(picked.path, label: picked.name);
+// 没有稳定文件路径时也可以使用 bytes：
+// await controller.loadImage(bytes, label: 'avatar.jpg');
 controller.resetView();
 // 只更新编辑器预览，不会立即重编码整张图。
 await controller.rotateRight();
@@ -446,13 +465,15 @@ final result = await task.result;
 
 ## 原生解码适配
 
-`ImageClipPlatformDecodeAdapter` 会调用库内置的 Android/iOS 原生实现，在进入 Dart 图像管线前执行 HEIC/HEIF 转码或大图 sampled decode：
+`ImageClipPlatformDecodeAdapter` 会调用库内置的 Android/iOS 原生实现，在进入 Dart 图像管线前执行 HEIC/HEIF 转码或大图 sampled decode。照片类预览会优先返回 JPEG，带透明通道的图像返回 PNG，以降低 MethodChannel 传输体积：
 
 ```dart
 final processor = ImageProcessor(
   decodeAdapter: const ImageClipPlatformDecodeAdapter(),
 );
 ```
+
+当文件管线只包含区域裁剪、90 度倍数旋转和翻转且输出为 JPEG 时，内置平台适配器还会尝试走原生 `cropFile` 快路径；如果平台不支持、参数超出能力、PNG 输出或通道不可用，会自动回退到 Dart isolate 管线。
 
 如果业务需要接入自有相册 SDK 或图片服务，也可以实现 `ImageClipDecodeAdapter`：
 

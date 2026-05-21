@@ -1,3 +1,15 @@
+# 0.9.0
+
+- 新增 `ImageClipEditor.initialImagePath`、`showImageClipEditor(imagePath:)` 和 `ImageClipEditorController.loadImageFile()`，相册本地文件可走 file-backed preview/save 链路，减少 UI isolate 原图 bytes 占用。
+- `ImageClipPlatformDecodeAdapter` 支持从本地文件路径触发 Android/iOS 平台采样解码，示例首页选择相册后优先保留文件路径，只有路径不可用时才退回 `readAsBytes()`。
+- `ImageProcessor.probeFile` 改为只读取文件头做格式探测，避免为了元数据把大图完整读入 UI isolate。
+- 平台采样预览会在无透明通道时返回 JPEG、有透明通道时返回 PNG，减少照片预览的通道传输字节数。
+- `showImageClipEditor` 默认启用 `ImageClipPlatformDecodeAdapter`，fullscreen 入口保持少参数也能使用平台 HEIC/HEIF 和 sampled decode 能力。
+- 新增可选的 `ImageClipFileProcessingAdapter` 能力，内置平台适配器可对支持的本地文件 JPEG 裁剪保存走原生 `cropFile`，不支持或 PNG 输出时自动回退 Dart isolate。
+- 示例首页新增 Pick/probe、Preview task、Save task 耗时指标，方便直接观察相册选择、预览和保存阶段的性能。
+- 修正预览图缩小后映射回原图的保存区域，避免 10:16 等比例因独立 round 宽高而产生像素比例误差。
+- 按 Figma 设计稿更新编辑器 Fit、Fill 和 Rotate 工具图标。
+
 # 0.8.1
 
 - 初始裁剪区域恢复时不再插入临时比例，会在支持的 `aspectRatios` 中选择精确或最接近的比例。

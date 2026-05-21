@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../image_processing/image_processor.dart';
+import '../platform_decode_adapter.dart';
 
 part 'image_clip_editor/controller.dart';
 part 'image_clip_editor/editor.dart';

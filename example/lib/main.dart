@@ -57,10 +57,12 @@ class _ImageClipExampleHomeState extends State<ImageClipExampleHome> {
 
   _DemoSettings _settings = _DemoSettings.defaults();
   Uint8List? _pickedImageBytes;
+  String? _pickedImagePath;
   String _pickedImageLabel = '';
   ImageClipImageInfo? _inputInfo;
   ImageClipResult? _result;
   ImageClipTaskProgress? _progress;
+  int? _pickElapsedMs;
   String _status = 'Ready';
 
   @override
@@ -74,7 +76,9 @@ class _ImageClipExampleHomeState extends State<ImageClipExampleHome> {
               settings: _settings,
               inputInfo: _inputInfo,
               result: _result,
+              previewImage: _controller.image,
               progress: _progress,
+              pickElapsedMs: _pickElapsedMs,
               status: _status,
               canCancel: _controller.isBusy,
               onSettingsChanged: _setSettings,
@@ -92,7 +96,10 @@ class _ImageClipExampleHomeState extends State<ImageClipExampleHome> {
                       decodeAdapter: const ImageClipPlatformDecodeAdapter(),
                     )
                   : null,
-              initialImageBytes: _pickedImageBytes,
+              initialImageBytes: _pickedImagePath == null
+                  ? _pickedImageBytes
+                  : null,
+              initialImagePath: _pickedImagePath,
               initialImageLabel: _pickedImageLabel,
               initialOrientation: _settings.initialOrientation,
               initialAspectRatio: _settings.initialAspectRatio,
@@ -126,6 +133,7 @@ class _ImageClipExampleHomeState extends State<ImageClipExampleHome> {
                 setState(() {
                   _result = result;
                   _progress = null;
+                  _pickElapsedMs = null;
                   _status = 'Saved ${result.cropped.dimensionsLabel}';
                 });
               },
@@ -179,14 +187,31 @@ class _ImageClipExampleHomeState extends State<ImageClipExampleHome> {
         return;
       }
 
-      final bytes = await picked.readAsBytes();
-      final info = _processor.probeBytes(bytes);
+      final stopwatch = Stopwatch()..start();
+      var path = picked.path.trim().isEmpty ? null : picked.path;
+      Uint8List? bytes;
+      late ImageClipImageInfo info;
+      if (path == null) {
+        bytes = await picked.readAsBytes();
+        info = _processor.probeBytes(bytes);
+      } else {
+        try {
+          info = await _processor.probeFile(path);
+        } catch (_) {
+          path = null;
+          bytes = await picked.readAsBytes();
+          info = _processor.probeBytes(bytes);
+        }
+      }
+      stopwatch.stop();
       setState(() {
+        _pickedImagePath = path;
         _pickedImageBytes = bytes;
         _pickedImageLabel = picked.name;
         _inputInfo = info;
         _result = null;
         _progress = null;
+        _pickElapsedMs = stopwatch.elapsedMilliseconds;
         _status = 'Loaded ${picked.name}';
       });
     } catch (error) {
@@ -197,10 +222,12 @@ class _ImageClipExampleHomeState extends State<ImageClipExampleHome> {
   Future<void> _loadSample() async {
     try {
       setState(() {
+        _pickedImagePath = null;
         _pickedImageBytes = null;
         _pickedImageLabel = '';
         _result = null;
         _progress = null;
+        _pickElapsedMs = null;
         _status = 'Loading sample';
       });
       await _controller.loadSample();
@@ -254,6 +281,7 @@ class _ImageClipExampleHomeState extends State<ImageClipExampleHome> {
         );
         _result = result;
         _progress = null;
+        _pickElapsedMs = null;
         _status = 'Fullscreen saved ${result.cropped.dimensionsLabel}';
       });
     } catch (error) {
@@ -262,6 +290,14 @@ class _ImageClipExampleHomeState extends State<ImageClipExampleHome> {
   }
 
   Future<ImageClipResult?> _pushFullscreenEditor() {
+    final imagePath = _pickedImagePath;
+    if (imagePath != null) {
+      return showImageClipEditor(
+        context,
+        imagePath: imagePath,
+        imageLabel: _pickedImageLabel,
+      );
+    }
     final imageBytes = _pickedImageBytes;
     if (imageBytes == null) {
       return showImageClipEditor(context);
@@ -566,7 +602,9 @@ class _ExampleSummary extends StatelessWidget {
     required this.settings,
     required this.inputInfo,
     required this.result,
+    required this.previewImage,
     required this.progress,
+    required this.pickElapsedMs,
     required this.status,
     required this.canCancel,
     required this.onSettingsChanged,
@@ -579,7 +617,9 @@ class _ExampleSummary extends StatelessWidget {
   final _DemoSettings settings;
   final ImageClipImageInfo? inputInfo;
   final ImageClipResult? result;
+  final EditedImage? previewImage;
   final ImageClipTaskProgress? progress;
+  final int? pickElapsedMs;
   final String status;
   final bool canCancel;
   final ValueChanged<_DemoSettings> onSettingsChanged;
@@ -654,6 +694,18 @@ class _ExampleSummary extends StatelessWidget {
                     : '${cropped.fileExtension} ${cropped.dimensionsLabel}',
               ),
               _MetricChip(label: 'Bytes', value: cropped?.bytesLabel ?? '-'),
+              _MetricChip(
+                label: 'Pick/probe',
+                value: _millisecondsLabel(pickElapsedMs),
+              ),
+              _MetricChip(
+                label: 'Preview task',
+                value: _millisecondsLabel(previewImage?.elapsedMs),
+              ),
+              _MetricChip(
+                label: 'Save task',
+                value: _millisecondsLabel(cropped?.elapsedMs),
+              ),
             ],
           ),
           if (cropped != null) ...[
@@ -1187,4 +1239,11 @@ String _pixelsLabel(int? pixels) {
       ? megapixels.toStringAsFixed(0)
       : megapixels.toStringAsFixed(1);
   return '$text MP';
+}
+
+String _millisecondsLabel(int? milliseconds) {
+  if (milliseconds == null) {
+    return '-';
+  }
+  return '${milliseconds}ms';
 }

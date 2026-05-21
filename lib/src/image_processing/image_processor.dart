@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
 
+import 'crop_transform.dart';
 import 'decode_adapter.dart';
 import 'exceptions.dart';
 import 'models.dart';
@@ -123,7 +124,7 @@ class ImageProcessor {
 
   /// Reads lightweight format and dimension metadata from an image file.
   Future<ImageClipImageInfo> probeFile(String path) async {
-    return probeBytes(await File(path).readAsBytes());
+    return probeBytes(await _readFileHeader(path));
   }
 
   /// Decodes an image file in a background isolate.
@@ -173,10 +174,17 @@ class ImageProcessor {
     ImageClipPipeline pipeline, {
     ImageClipTaskOptions? options,
   }) {
-    if (pipeline.bytes != null &&
+    final fileAdapterTask = _processFileAdapterPipelineTask(
+      pipeline,
+      options: options,
+    );
+    if (fileAdapterTask != null) {
+      return fileAdapterTask;
+    }
+    if ((pipeline.bytes != null || pipeline.inputPath != null) &&
         decodeAdapter != null &&
         pipeline.decodeSettings.usePlatformAdapter) {
-      return _processBytesPipelineTask(pipeline, options: options);
+      return _processAdapterPipelineTask(pipeline, options: options);
     }
     return _runPipelineTask(pipeline, options: options);
   }
@@ -281,12 +289,11 @@ class ImageProcessor {
     return file.writeAsBytes(image.bytes, flush: true);
   }
 
-  ImageClipTask<EditedImage> _processBytesPipelineTask(
+  ImageClipTask<EditedImage> _processAdapterPipelineTask(
     ImageClipPipeline pipeline, {
     ImageClipTaskOptions? options,
   }) {
-    final bytes = pipeline.bytes;
-    if (bytes == null ||
+    if ((pipeline.bytes == null && pipeline.inputPath == null) ||
         decodeAdapter == null ||
         !pipeline.decodeSettings.usePlatformAdapter) {
       return processPipelineTask(pipeline, options: options);
@@ -348,20 +355,137 @@ class ImageProcessor {
     }, options: options);
   }
 
+  ImageClipTask<EditedImage>? _processFileAdapterPipelineTask(
+    ImageClipPipeline pipeline, {
+    ImageClipTaskOptions? options,
+  }) {
+    final adapter = decodeAdapter;
+    if (adapter is! ImageClipFileProcessingAdapter ||
+        !pipeline.decodeSettings.usePlatformAdapter) {
+      return null;
+    }
+    final fileAdapter = adapter as ImageClipFileProcessingAdapter;
+    final request = _fileCropAdapterRequestFor(pipeline);
+    if (request == null) {
+      return null;
+    }
+
+    final effectiveOptions = options ?? const ImageClipTaskOptions();
+    late final ImageClipTask<EditedImage> task;
+    ImageClipTask<EditedImage>? fallbackTask;
+    StreamSubscription<ImageClipTaskProgress>? progressSubscription;
+
+    Future<EditedImage> run() async {
+      final stopwatch = Stopwatch()..start();
+      task._emitProgress(
+        const ImageClipTaskProgress(
+          stage: ImageClipTaskProgressStage.processing,
+          completedSteps: 0,
+          totalSteps: 1,
+          message: 'Processing image',
+        ),
+      );
+      final result = await fileAdapter.cropFile(
+        request.path,
+        region: request.region,
+        transform: request.transform,
+        outputSettings: pipeline.outputSettings,
+        processingSettings: processingSettings,
+        label: pipeline.label,
+      );
+      if (task.isCanceled) {
+        throw const ImageClipTaskCanceledException();
+      }
+      if (result == null) {
+        fallbackTask = _runPipelineTask(pipeline);
+        progressSubscription = fallbackTask!.progress.listen(
+          task._emitProgress,
+        );
+        return fallbackTask!.result;
+      }
+      stopwatch.stop();
+      return EditedImage(
+        bytes: result.bytes,
+        width: result.width,
+        height: result.height,
+        label: pipeline.label,
+        operation:
+            pipeline.operationLabel ??
+            _operationLabelForFileAdapterPipeline(pipeline),
+        elapsedMs: stopwatch.elapsedMilliseconds,
+        format: result.format,
+        sourceWidth: result.sourceWidth,
+        sourceHeight: result.sourceHeight,
+      );
+    }
+
+    task = ImageClipTask<EditedImage>._manual(
+      effectiveOptions,
+      onCancel: () {
+        fallbackTask?.cancel();
+        unawaited(progressSubscription?.cancel());
+      },
+    );
+    task._emitProgress(
+      const ImageClipTaskProgress(
+        stage: ImageClipTaskProgressStage.queued,
+        completedSteps: 0,
+        totalSteps: 0,
+        message: 'Queued',
+      ),
+    );
+    task._bindFuture(
+      Future<EditedImage>(
+        run,
+      ).whenComplete(() => progressSubscription?.cancel()),
+    );
+    return task;
+  }
+
   Future<ImageClipPipeline> _normalizedPipeline(
     ImageClipPipeline pipeline,
   ) async {
     final adapter = decodeAdapter;
     final bytes = pipeline.bytes;
-    if (adapter == null || bytes == null) {
+    final path = pipeline.inputPath;
+    if (adapter == null) {
       return pipeline;
     }
-    final info = probeBytes(bytes);
+    if (bytes != null) {
+      final info = probeBytes(bytes);
+      if (!adapter.supportsDecode(info, pipeline.decodeSettings)) {
+        return pipeline;
+      }
+      final result = await adapter.decode(
+        bytes,
+        info: info,
+        label: pipeline.label,
+        settings: pipeline.decodeSettings,
+      );
+      if (result == null) {
+        return pipeline;
+      }
+      return ImageClipPipeline.decode(
+        bytes: result.bytes,
+        label: pipeline.label,
+        steps: pipeline.steps,
+        outputSettings: pipeline.outputSettings,
+        decodeSettings: pipeline.decodeSettings,
+        sourceWidth: result.sourceWidth,
+        sourceHeight: result.sourceHeight,
+        operationLabel: pipeline.operationLabel,
+      );
+    }
+
+    if (path == null) {
+      return pipeline;
+    }
+    final info = await probeFile(path);
     if (!adapter.supportsDecode(info, pipeline.decodeSettings)) {
       return pipeline;
     }
-    final result = await adapter.decode(
-      bytes,
+    final result = await adapter.decodeFile(
+      path,
       info: info,
       label: pipeline.label,
       settings: pipeline.decodeSettings,
@@ -654,6 +778,109 @@ String _fileLabel(String path) {
   final normalized = path.replaceAll('\\', '/');
   final index = normalized.lastIndexOf('/');
   return index < 0 ? normalized : normalized.substring(index + 1);
+}
+
+Future<Uint8List> _readFileHeader(String path) async {
+  const maxHeaderBytes = 256 * 1024;
+  final file = File(path);
+  final length = await file.length();
+  if (length <= maxHeaderBytes) {
+    return file.readAsBytes();
+  }
+
+  final builder = BytesBuilder(copy: false);
+  await for (final chunk in file.openRead(0, maxHeaderBytes)) {
+    builder.add(chunk);
+  }
+  return builder.takeBytes();
+}
+
+_FileCropAdapterRequest? _fileCropAdapterRequestFor(
+  ImageClipPipeline pipeline,
+) {
+  final path = pipeline.inputPath;
+  if (path == null ||
+      pipeline.bytes != null ||
+      pipeline.source != null ||
+      pipeline.decodeSettings.hasTargetSize ||
+      pipeline.outputSettings.format != ImageClipOutputFormat.jpeg) {
+    return null;
+  }
+
+  final steps = <Map<String, Object?>>[
+    for (final step in pipeline.steps) step.toMap(),
+  ];
+  if (steps.isEmpty || steps.first['kind'] != 'cropRegion') {
+    return null;
+  }
+  final region = CropRegion.fromMap(steps.first);
+  if (!region.hasPositiveSize || region.cornerRadius != 0) {
+    return null;
+  }
+
+  var rotationDegrees = 0;
+  var flipHorizontal = false;
+  var flipVertical = false;
+  var sawFlip = false;
+  for (final step in steps.skip(1)) {
+    switch (step['kind']) {
+      case 'rotate':
+        if (sawFlip) {
+          return null;
+        }
+        final degrees = _intOf(step['angle'], fallback: 90);
+        if (!ImageClipCropTransform.isQuarterTurnRotation(degrees)) {
+          return null;
+        }
+        rotationDegrees = ImageClipCropTransform(
+          rotationDegrees: rotationDegrees + degrees,
+        ).normalizedRotation;
+        break;
+      case 'flipHorizontal':
+        sawFlip = true;
+        flipHorizontal = !flipHorizontal;
+        break;
+      case 'flipVertical':
+        sawFlip = true;
+        flipVertical = !flipVertical;
+        break;
+      default:
+        return null;
+    }
+  }
+
+  return _FileCropAdapterRequest(
+    path: path,
+    region: region,
+    transform: ImageClipCropTransform(
+      rotationDegrees: rotationDegrees,
+      flipHorizontal: flipHorizontal,
+      flipVertical: flipVertical,
+    ),
+  );
+}
+
+String _operationLabelForFileAdapterPipeline(ImageClipPipeline pipeline) {
+  final steps = <Map<Object?, Object?>>[
+    for (final step in pipeline.steps) step.toMap(),
+  ];
+  return _defaultPipelineOperationLabel(
+    steps: steps,
+    startsFromEditedImage: false,
+    outputSettings: pipeline.outputSettings,
+  );
+}
+
+class _FileCropAdapterRequest {
+  const _FileCropAdapterRequest({
+    required this.path,
+    required this.region,
+    required this.transform,
+  });
+
+  final String path;
+  final CropRegion region;
+  final ImageClipCropTransform transform;
 }
 
 ImageClipImageInfo _probeEncodedImage(Uint8List bytes) {

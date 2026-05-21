@@ -185,7 +185,7 @@ class _CropBottomBar extends StatelessWidget {
                           _CropToolButton(
                             icon: scaleMode == ImageClipScaleMode.fill
                                 ? _CropToolIcon.fit
-                                : Icons.fullscreen_outlined,
+                                : _CropToolIcon.fill,
                             label: scaleMode == ImageClipScaleMode.fill
                                 ? labels.fitButton
                                 : labels.fillButton,
@@ -299,7 +299,7 @@ class _CropBottomBar extends StatelessWidget {
   }
 }
 
-enum _CropToolIcon { fit, rotate }
+enum _CropToolIcon { fit, fill, rotate }
 
 class _CropToolButton extends StatelessWidget {
   const _CropToolButton({
@@ -340,6 +340,9 @@ class _CropToolButton extends StatelessWidget {
                 child: switch (icon) {
                   _CropToolIcon.fit => CustomPaint(
                     painter: _FitGlyphPainter(color: color),
+                  ),
+                  _CropToolIcon.fill => CustomPaint(
+                    painter: _FillGlyphPainter(color: color),
                   ),
                   _CropToolIcon.rotate => CustomPaint(
                     painter: _RotateGlyphPainter(color: color),
@@ -392,32 +395,81 @@ class _FitGlyphPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     final path = Path()
-      ..moveTo(3, 7.4)
-      ..lineTo(3, 3)
-      ..lineTo(7.4, 3)
-      ..moveTo(3, 3)
-      ..lineTo(8.5, 8.5)
-      ..moveTo(14.6, 3)
-      ..lineTo(19, 3)
-      ..lineTo(19, 7.4)
-      ..moveTo(19, 3)
-      ..lineTo(13.5, 8.5)
-      ..moveTo(3, 14.6)
-      ..lineTo(3, 19)
-      ..lineTo(7.4, 19)
-      ..moveTo(3, 19)
-      ..lineTo(8.5, 13.5)
-      ..moveTo(14.6, 19)
-      ..lineTo(19, 19)
-      ..lineTo(19, 14.6)
-      ..moveTo(19, 19)
-      ..lineTo(13.5, 13.5);
+      ..moveTo(3.5, 3.5)
+      ..lineTo(8.25, 8.25)
+      ..moveTo(3.5, 8.25)
+      ..lineTo(8.25, 8.25)
+      ..lineTo(8.25, 3.5)
+      ..moveTo(18.5, 3.5)
+      ..lineTo(13.75, 8.25)
+      ..moveTo(18.5, 8.25)
+      ..lineTo(13.75, 8.25)
+      ..lineTo(13.75, 3.5)
+      ..moveTo(3.5, 18.5)
+      ..lineTo(8.25, 13.75)
+      ..moveTo(3.5, 13.75)
+      ..lineTo(8.25, 13.75)
+      ..lineTo(8.25, 18.5)
+      ..moveTo(18.5, 18.5)
+      ..lineTo(13.75, 13.75)
+      ..moveTo(18.5, 13.75)
+      ..lineTo(13.75, 13.75)
+      ..lineTo(13.75, 18.5);
     canvas.drawPath(path, paint);
     canvas.restore();
   }
 
   @override
   bool shouldRepaint(covariant _FitGlyphPainter oldDelegate) {
+    return oldDelegate.color != color;
+  }
+}
+
+class _FillGlyphPainter extends CustomPainter {
+  const _FillGlyphPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final sx = size.width / 22;
+    final sy = size.height / 22;
+    canvas.save();
+    canvas.scale(sx, sy);
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.83333
+      ..strokeCap = StrokeCap.square
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    final path = Path()
+      ..moveTo(13.75, 13.75)
+      ..lineTo(18.5, 18.5)
+      ..moveTo(13.75, 8.25)
+      ..lineTo(18.5, 3.5)
+      ..moveTo(19.25, 14.85)
+      ..lineTo(19.25, 19.25)
+      ..lineTo(14.85, 19.25)
+      ..moveTo(19.25, 7.15)
+      ..lineTo(19.25, 2.75)
+      ..lineTo(14.85, 2.75)
+      ..moveTo(2.75, 14.85)
+      ..lineTo(2.75, 19.25)
+      ..lineTo(7.15, 19.25)
+      ..moveTo(3.5, 18.5)
+      ..lineTo(8.25, 13.75)
+      ..moveTo(2.75, 7.15)
+      ..lineTo(2.75, 2.75)
+      ..lineTo(7.15, 2.75)
+      ..moveTo(8.25, 8.25)
+      ..lineTo(3.5, 3.5);
+    canvas.drawPath(path, paint);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _FillGlyphPainter oldDelegate) {
     return oldDelegate.color != color;
   }
 }
@@ -429,6 +481,8 @@ class _RotateGlyphPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final sx = size.width / 22;
+    final sy = size.height / 22;
     final paint = Paint()
       ..color = color
       ..strokeWidth = 1.83333
@@ -437,11 +491,9 @@ class _RotateGlyphPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     canvas.save();
-    canvas.translate(size.width * 0.125, size.height * 0.125);
-    canvas.scale(
-      (size.width * 0.7386) / 18.0833,
-      (size.height * 0.75) / 18.3333,
-    );
+    canvas.scale(sx, sy);
+    canvas.translate(2.75, 2.75);
+    canvas.scale(16.25 / 18.0833, 16.5 / 18.3333);
     final arc = Path()
       ..moveTo(17.1667, 9.66667)
       ..cubicTo(17.1667, 11.2984, 16.9328, 12.3934, 16.0263, 13.7501)
@@ -458,11 +510,9 @@ class _RotateGlyphPainter extends CustomPainter {
     canvas.restore();
 
     canvas.save();
-    canvas.translate(size.width * 0.6667, size.height * 0.125);
-    canvas.scale(
-      (size.width * 0.2083) / 6.41667,
-      (size.height * 0.2083) / 6.41667,
-    );
+    canvas.scale(sx, sy);
+    canvas.translate(14.6667, 2.75);
+    canvas.scale(4.5833 / 6.41667, 4.5833 / 6.41667);
     final arrow = Path()
       ..moveTo(5.5, 0.916667)
       ..lineTo(5.5, 5.5)

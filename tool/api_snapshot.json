@@ -36,14 +36,25 @@
       "declarations": [
         "  constructor ImageClipDecodeAdapter()",
         "  constructor ImageClipDecodeAdapterResult(required this.bytes, this.sourceWidth, this.sourceHeight)",
+        "  constructor ImageClipFileProcessingAdapterResult(required this.bytes, required this.width, required this.height, required this.format, this.sourceWidth, this.sourceHeight)",
         "  field ImageClipDecodeAdapterResult.bytes",
         "  field ImageClipDecodeAdapterResult.sourceHeight",
         "  field ImageClipDecodeAdapterResult.sourceWidth",
+        "  field ImageClipFileProcessingAdapterResult.bytes",
+        "  field ImageClipFileProcessingAdapterResult.format",
+        "  field ImageClipFileProcessingAdapterResult.height",
+        "  field ImageClipFileProcessingAdapterResult.sourceHeight",
+        "  field ImageClipFileProcessingAdapterResult.sourceWidth",
+        "  field ImageClipFileProcessingAdapterResult.width",
         "  method ImageClipDecodeAdapter.decode(Uint8List bytes, required ImageClipImageInfo info, required String label, required ImageClipDecodeSettings settings)",
+        "  method ImageClipDecodeAdapter.decodeFile(String path, required ImageClipImageInfo info, required String label, required ImageClipDecodeSettings settings)",
         "  method ImageClipDecodeAdapter.supports(ImageClipImageInfo info)",
         "  method ImageClipDecodeAdapter.supportsDecode(ImageClipImageInfo info, ImageClipDecodeSettings settings)",
+        "  method ImageClipFileProcessingAdapter.cropFile(String path, required CropRegion region, required ImageClipCropTransform transform, required ImageClipOutputSettings outputSettings, required ImageClipProcessingSettings processingSettings, required String label)",
         "abstract class ImageClipDecodeAdapter",
-        "class ImageClipDecodeAdapterResult"
+        "abstract class ImageClipFileProcessingAdapter",
+        "class ImageClipDecodeAdapterResult",
+        "class ImageClipFileProcessingAdapterResult"
       ]
     },
     {
@@ -345,7 +356,9 @@
       "declarations": [
         "  constructor ImageClipPlatformDecodeAdapter(this.channel)",
         "  field ImageClipPlatformDecodeAdapter.channel",
+        "  method ImageClipPlatformDecodeAdapter.cropFile(String path, required CropRegion region, required ImageClipCropTransform transform, required ImageClipOutputSettings outputSettings, required ImageClipProcessingSettings processingSettings, required String label)",
         "  method ImageClipPlatformDecodeAdapter.decode(Uint8List bytes, required ImageClipImageInfo info, required String label, required ImageClipDecodeSettings settings)",
+        "  method ImageClipPlatformDecodeAdapter.decodeFile(String path, required ImageClipImageInfo info, required String label, required ImageClipDecodeSettings settings)",
         "  method ImageClipPlatformDecodeAdapter.supportsDecode(ImageClipImageInfo info, ImageClipDecodeSettings settings)",
         "class ImageClipPlatformDecodeAdapter"
       ]
@@ -364,6 +377,7 @@
         "  method ImageClipEditorController.flipHorizontal()",
         "  method ImageClipEditorController.flipVertical()",
         "  method ImageClipEditorController.loadImage(Uint8List bytes, String label)",
+        "  method ImageClipEditorController.loadImageFile(String path, String label)",
         "  method ImageClipEditorController.loadSample()",
         "  method ImageClipEditorController.resetView()",
         "  method ImageClipEditorController.rotateRight()",
@@ -374,7 +388,7 @@
       "file": "lib/src/widgets/image_clip_editor/editor.dart",
       "declarations": [
         "  constructor ImageClipAspectRatio(required this.label, required this.width, required this.height)",
-        "  constructor ImageClipEditor(super.key, this.controller, this.processor, this.initialImageBytes, this.initialImageLabel, this.initialOrientation, this.initialAspectRatio, this.initialRotationDegrees, this.initialCropRegion, this.aspectRatios, this.initialScaleMode, this.outputSettings, this.previewDecodeSettings, this.processingSettings, this.labels, this.theme, this.cropAreaHeight, this.loadSampleOnStart, this.closeOnCancel, this.closeOnSave, this.showResultPage, this.onCancel, this.onProgress, this.onResult)",
+        "  constructor ImageClipEditor(super.key, this.controller, this.processor, this.initialImageBytes, this.initialImagePath, this.initialImageLabel, this.initialOrientation, this.initialAspectRatio, this.initialRotationDegrees, this.initialCropRegion, this.aspectRatios, this.initialScaleMode, this.outputSettings, this.previewDecodeSettings, this.processingSettings, this.labels, this.theme, this.cropAreaHeight, this.loadSampleOnStart, this.closeOnCancel, this.closeOnSave, this.showResultPage, this.onCancel, this.onProgress, this.onResult)",
         "  enumValue ImageClipCropOrientation.landscape",
         "  enumValue ImageClipCropOrientation.portrait",
         "  enumValue ImageClipScaleMode.fill",
@@ -398,6 +412,7 @@
         "  field ImageClipEditor.initialCropRegion",
         "  field ImageClipEditor.initialImageBytes",
         "  field ImageClipEditor.initialImageLabel",
+        "  field ImageClipEditor.initialImagePath",
         "  field ImageClipEditor.initialOrientation",
         "  field ImageClipEditor.initialRotationDegrees",
         "  field ImageClipEditor.initialScaleMode",
@@ -423,7 +438,7 @@
         "class ImageClipEditor",
         "enum ImageClipCropOrientation",
         "enum ImageClipScaleMode",
-        "function showImageClipEditor(BuildContext context, Uint8List? imageBytes, String imageLabel, ImageProcessor? processor, ImageClipCropOrientation initialOrientation, ImageClipAspectRatio? initialAspectRatio, int initialRotationDegrees, CropRegion? initialCropRegion, List<ImageClipAspectRatio> aspectRatios, ImageClipScaleMode initialScaleMode, ImageClipOutputSettings outputSettings, ImageClipDecodeSettings previewDecodeSettings, ImageClipProcessingSettings processingSettings, ImageClipEditorLabels labels, ImageClipEditorTheme theme, double? cropAreaHeight, bool loadSampleOnStart, bool useRootNavigator, RouteSettings? routeSettings, ValueChanged<ImageClipTaskProgress>? onProgress)"
+        "function showImageClipEditor(BuildContext context, Uint8List? imageBytes, String? imagePath, String imageLabel, ImageProcessor? processor, ImageClipCropOrientation initialOrientation, ImageClipAspectRatio? initialAspectRatio, int initialRotationDegrees, CropRegion? initialCropRegion, List<ImageClipAspectRatio> aspectRatios, ImageClipScaleMode initialScaleMode, ImageClipOutputSettings outputSettings, ImageClipDecodeSettings previewDecodeSettings, ImageClipProcessingSettings processingSettings, ImageClipEditorLabels labels, ImageClipEditorTheme theme, double? cropAreaHeight, bool loadSampleOnStart, bool useRootNavigator, RouteSettings? routeSettings, ValueChanged<ImageClipTaskProgress>? onProgress)"
       ]
     },
     {

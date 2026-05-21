@@ -157,6 +157,56 @@ void main() {
     expect(decoded.sourceHeight, 120);
   });
 
+  test('normalizes image files through the platform decode adapter', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'flutter_image_clip_platform_file_test_',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final input = File('${tempDir.path}/platform-source.png');
+    await input.writeAsBytes(
+      img.encodePng(img.Image(width: 240, height: 120)),
+      flush: true,
+    );
+
+    const channel = MethodChannel('flutter_image_clip/decode_file_test');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          final arguments = Map<Object?, Object?>.from(call.arguments! as Map);
+          expect(call.method, 'decode');
+          expect(arguments['path'], input.path);
+          expect(arguments.containsKey('bytes'), isFalse);
+          return <String, Object?>{
+            'bytes': Uint8List.fromList(
+              img.encodePng(img.Image(width: 24, height: 12)),
+            ),
+            'sourceWidth': 240,
+            'sourceHeight': 120,
+          };
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    final processor = ImageProcessor(
+      decodeAdapter: const ImageClipPlatformDecodeAdapter(channel: channel),
+    );
+    final decoded = await processor.decodeFile(
+      input.path,
+      label: 'platform-source.png',
+      decodeSettings: const ImageClipDecodeSettings.preview(targetLongSide: 24),
+    );
+
+    expect(decoded.width, 24);
+    expect(decoded.height, 12);
+    expect(decoded.sourceWidth, 240);
+    expect(decoded.sourceHeight, 120);
+  });
+
   test('maps platform unsupported format errors to typed exceptions', () async {
     const channel = MethodChannel('flutter_image_clip/decode_unsupported_test');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -420,6 +470,183 @@ void main() {
     expect(result.height, 60);
     expect(result.format, ImageClipOutputFormat.jpeg);
     expect(await output.length(), result.bytes.length);
+  });
+
+  test('crops image files through the platform file adapter', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'flutter_image_clip_platform_crop_test_',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final input = File('${tempDir.path}/source.png');
+    await input.writeAsBytes(
+      img.encodePng(img.Image(width: 160, height: 120)),
+      flush: true,
+    );
+
+    const channel = MethodChannel('flutter_image_clip/crop_file_test');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          final arguments = Map<Object?, Object?>.from(call.arguments! as Map);
+          final region = Map<Object?, Object?>.from(
+            arguments['region']! as Map,
+          );
+          final transform = Map<Object?, Object?>.from(
+            arguments['transform']! as Map,
+          );
+          final output = Map<Object?, Object?>.from(
+            arguments['output']! as Map,
+          );
+
+          expect(call.method, 'cropFile');
+          expect(arguments['path'], input.path);
+          expect(region['x'], 10);
+          expect(region['y'], 12);
+          expect(region['width'], 80);
+          expect(region['height'], 60);
+          expect(transform['rotationDegrees'], 90);
+          expect(transform['flipHorizontal'], isTrue);
+          expect(output['format'], 'jpeg');
+          return <String, Object?>{
+            'bytes': Uint8List.fromList(
+              img.encodeJpg(img.Image(width: 60, height: 80), quality: 82),
+            ),
+            'width': 60,
+            'height': 80,
+            'format': 'jpeg',
+            'sourceWidth': 160,
+            'sourceHeight': 120,
+          };
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    final processor = ImageProcessor(
+      decodeAdapter: const ImageClipPlatformDecodeAdapter(channel: channel),
+    );
+    final result = await processor.processFile(
+      input.path,
+      steps: const <ImageClipPipelineStep>[
+        ImageClipPipelineStep.cropRegion(
+          CropRegion(x: 10, y: 12, width: 80, height: 60, cornerRadius: 0),
+        ),
+        ImageClipPipelineStep.rotate(),
+        ImageClipPipelineStep.flipHorizontal(),
+      ],
+      outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 82),
+      operationLabel: 'Crop',
+    );
+
+    expect(result.label, 'source.png');
+    expect(result.operation, 'Crop');
+    expect(result.width, 60);
+    expect(result.height, 80);
+    expect(result.sourceWidth, 160);
+    expect(result.sourceHeight, 120);
+    expect(result.format, ImageClipOutputFormat.jpeg);
+  });
+
+  test('uses fallback operation labels for platform file crops', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'flutter_image_clip_platform_crop_label_test_',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final input = File('${tempDir.path}/source.png');
+    await input.writeAsBytes(
+      img.encodePng(img.Image(width: 160, height: 120)),
+      flush: true,
+    );
+
+    const channel = MethodChannel('flutter_image_clip/crop_file_label_test');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          expect(call.method, 'cropFile');
+          return <String, Object?>{
+            'bytes': Uint8List.fromList(
+              img.encodeJpg(img.Image(width: 80, height: 60), quality: 90),
+            ),
+            'width': 80,
+            'height': 60,
+            'format': 'jpeg',
+            'sourceWidth': 160,
+            'sourceHeight': 120,
+          };
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    final processor = ImageProcessor(
+      decodeAdapter: const ImageClipPlatformDecodeAdapter(channel: channel),
+    );
+    final result = await processor.processFile(
+      input.path,
+      steps: const <ImageClipPipelineStep>[
+        ImageClipPipelineStep.cropRegion(
+          CropRegion(x: 10, y: 12, width: 80, height: 60, cornerRadius: 0),
+        ),
+      ],
+      outputSettings: const ImageClipOutputSettings.jpeg(),
+    );
+
+    expect(result.operation, 'Crop region');
+  });
+
+  test('keeps PNG file crops on the Dart pipeline to honor pngLevel', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'flutter_image_clip_png_crop_fallback_test_',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final input = File('${tempDir.path}/source.png');
+    await input.writeAsBytes(
+      img.encodePng(img.Image(width: 160, height: 120)),
+      flush: true,
+    );
+
+    var platformCalled = false;
+    const channel = MethodChannel('flutter_image_clip/png_crop_fallback_test');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          platformCalled = true;
+          return null;
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    final processor = ImageProcessor(
+      decodeAdapter: const ImageClipPlatformDecodeAdapter(channel: channel),
+    );
+    final result = await processor.processFile(
+      input.path,
+      steps: const <ImageClipPipelineStep>[
+        ImageClipPipelineStep.cropRegion(
+          CropRegion(x: 10, y: 12, width: 80, height: 60, cornerRadius: 0),
+        ),
+      ],
+      outputSettings: const ImageClipOutputSettings.png(pngLevel: 1),
+    );
+
+    expect(platformCalled, isFalse);
+    expect(result.operation, 'Crop region');
+    expect(result.format, ImageClipOutputFormat.png);
+    expect(result.width, 80);
+    expect(result.height, 60);
   });
 
   test('processes existing EditedImage values through a pipeline', () async {

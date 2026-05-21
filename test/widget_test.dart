@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -936,6 +937,177 @@ void main() {
     expect(result.region.height, greaterThan(result.previewRegion.height));
     expect(result.cropped.width, result.region.width);
     expect(result.cropped.height, result.region.height);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('source save region preserves selected 10:16 ratio', (
+    tester,
+  ) async {
+    final controller = ImageClipEditorController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: controller,
+          initialImageBytes: _pngBytes(1001, 777),
+          initialImageLabel: 'ratio-source.png',
+          initialAspectRatio: ImageClipAspectRatio.ratio10x16,
+          aspectRatios: const <ImageClipAspectRatio>[
+            ImageClipAspectRatio.ratio10x16,
+          ],
+          outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 82),
+          previewDecodeSettings: const ImageClipDecodeSettings.preview(
+            targetLongSide: 333,
+          ),
+          loadSampleOnStart: false,
+          showResultPage: false,
+        ),
+      ),
+    );
+    await pumpUntilIdle(tester);
+
+    final result = await tester.runAsync(controller.crop);
+    await tester.pump();
+
+    expect(result, isNotNull);
+    expect(result!.source.isPreviewSized, isTrue);
+    expect(result.region.width * 16, result.region.height * 10);
+    expect(result.cropped.width * 16, result.cropped.height * 10);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('rotated source save region preserves visual 10:16 ratio', (
+    tester,
+  ) async {
+    final controller = ImageClipEditorController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: controller,
+          initialImageBytes: _pngBytes(1001, 777),
+          initialImageLabel: 'rotated-ratio-source.png',
+          initialAspectRatio: ImageClipAspectRatio.ratio10x16,
+          initialRotationDegrees: 90,
+          aspectRatios: const <ImageClipAspectRatio>[
+            ImageClipAspectRatio.ratio10x16,
+          ],
+          outputSettings: const ImageClipOutputSettings.jpeg(jpegQuality: 82),
+          previewDecodeSettings: const ImageClipDecodeSettings.preview(
+            targetLongSide: 333,
+          ),
+          loadSampleOnStart: false,
+          showResultPage: false,
+        ),
+      ),
+    );
+    await pumpUntilIdle(tester);
+
+    final result = await tester.runAsync(controller.crop);
+    await tester.pump();
+
+    expect(result, isNotNull);
+    expect(result!.source.isPreviewSized, isTrue);
+    expect(result.region.width * 10, result.region.height * 16);
+    expect(result.cropped.width * 16, result.cropped.height * 10);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('initialImagePath preview decode saves from source file', (
+    tester,
+  ) async {
+    late final Directory tempDir;
+    late final File input;
+    await tester.runAsync(() async {
+      tempDir = await Directory.systemTemp.createTemp(
+        'flutter_image_clip_widget_path_test_',
+      );
+      input = File('${tempDir.path}/preview-source.png');
+      await input.writeAsBytes(_pngBytes(400, 200), flush: true);
+    });
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final controller = ImageClipEditorController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: controller,
+          initialImagePath: input.path,
+          initialImageLabel: 'preview-source.png',
+          previewDecodeSettings: const ImageClipDecodeSettings.preview(
+            targetLongSide: 100,
+          ),
+          loadSampleOnStart: false,
+          showResultPage: false,
+        ),
+      ),
+    );
+    await pumpUntilIdle(tester);
+
+    expect(controller.image?.width, 100);
+    expect(controller.image?.height, 50);
+    expect(controller.image?.sourceWidth, 400);
+    expect(controller.image?.sourceHeight, 200);
+
+    final result = await tester.runAsync(controller.crop);
+    await tester.pump();
+
+    expect(result, isNotNull);
+    expect(result!.source.isPreviewSized, isTrue);
+    expect(result.region.width, greaterThan(result.previewRegion.width));
+    expect(result.region.height, greaterThan(result.previewRegion.height));
+    expect(result.cropped.width, result.region.width);
+    expect(result.cropped.height, result.region.height);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('controller can load an image file', (tester) async {
+    late final Directory tempDir;
+    late final File input;
+    await tester.runAsync(() async {
+      tempDir = await Directory.systemTemp.createTemp(
+        'flutter_image_clip_controller_path_test_',
+      );
+      input = File('${tempDir.path}/controller.png');
+      await input.writeAsBytes(_pngBytes(160, 80), flush: true);
+    });
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final controller = ImageClipEditorController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: controller,
+          loadSampleOnStart: false,
+          showResultPage: false,
+        ),
+      ),
+    );
+
+    await tester.runAsync(() {
+      return controller.loadImageFile(input.path, label: 'controller.png');
+    });
+    await tester.pump();
+
+    expect(controller.image, isNotNull);
+    expect(controller.image?.label, 'controller.png');
+    expect(controller.image?.width, 160);
+    expect(controller.image?.height, 80);
+
+    final result = await tester.runAsync(controller.crop);
+    await tester.pump();
+
+    expect(result, isNotNull);
+    expect(result!.source.label, 'controller.png');
+    expect(result.cropped.bytes, isNotEmpty);
     expect(tester.takeException(), isNull);
   });
 
