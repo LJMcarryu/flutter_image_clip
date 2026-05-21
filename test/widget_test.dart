@@ -960,6 +960,10 @@ void main() {
           initialImageLabel: 'restore-source.png',
           initialRotationDegrees: 90,
           initialCropRegion: initialRegion,
+          aspectRatios: const <ImageClipAspectRatio>[
+            ImageClipAspectRatio.portrait,
+            ImageClipAspectRatio(label: '1:2', width: 1, height: 2),
+          ],
           loadSampleOnStart: false,
           showResultPage: false,
         ),
@@ -990,6 +994,46 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('initial crop region chooses closest supported ratio', (
+    tester,
+  ) async {
+    final controller = ImageClipEditorController();
+    const initialRegion = CropRegion(
+      x: 200,
+      y: 180,
+      width: 500,
+      height: 300,
+      cornerRadius: 0,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: controller,
+          initialImageBytes: _pngBytes(1000, 800),
+          initialImageLabel: 'closest-ratio-source.png',
+          initialCropRegion: initialRegion,
+          aspectRatios: const <ImageClipAspectRatio>[
+            ImageClipAspectRatio.square,
+            ImageClipAspectRatio.widescreen,
+          ],
+          loadSampleOnStart: false,
+          showResultPage: false,
+        ),
+      ),
+    );
+    await pumpUntilIdle(tester);
+    await tester.pump();
+
+    expect(find.text('5:3'), findsNothing);
+    expect(find.text('16:9'), findsOneWidget);
+
+    final restored = controller.currentCropRegion();
+    expect(restored, isNotNull);
+    expect(restored!.width / restored.height, closeTo(16 / 9, 0.02));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('initial crop position does not override editor controls', (
     tester,
   ) async {
@@ -1010,6 +1054,10 @@ void main() {
           initialImageBytes: imageBytes,
           initialImageLabel: 'restore-source.png',
           initialCropRegion: initialRegion,
+          aspectRatios: const <ImageClipAspectRatio>[
+            ImageClipAspectRatio(label: '3:2', width: 3, height: 2),
+            ImageClipAspectRatio.landscape,
+          ],
           loadSampleOnStart: false,
           showResultPage: false,
         ),
@@ -1108,6 +1156,10 @@ void main() {
           initialImageBytes: imageBytes,
           initialImageLabel: 'restore-source.png',
           initialCropRegion: region,
+          aspectRatios: const <ImageClipAspectRatio>[
+            ImageClipAspectRatio.landscape,
+            ImageClipAspectRatio(label: '2:1', width: 2, height: 1),
+          ],
           loadSampleOnStart: false,
           showResultPage: false,
         ),

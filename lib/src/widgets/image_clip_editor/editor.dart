@@ -310,8 +310,10 @@ class ImageClipEditor extends StatefulWidget {
   /// Initial crop position in source-image pixel coordinates.
   ///
   /// When provided, the editor restores the preview scale and offset so this
-  /// source region is shown inside the crop frame. The initial crop aspect
-  /// ratio is derived from this region and [initialRotationDegrees].
+  /// source region is shown inside the crop frame. The initial crop aspect ratio
+  /// is selected from [aspectRatios] using this region and
+  /// [initialRotationDegrees]. If no supported ratio matches exactly, the
+  /// closest supported ratio is used.
   ///
   /// Coordinates outside the source image are clamped after the image loads.
   /// Regions with non-positive [CropRegion.width] or [CropRegion.height] are
@@ -421,13 +423,17 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   }
 
   List<ImageClipAspectRatio> get _aspectRatioChoices {
-    final presets = widget.aspectRatios.isEmpty
-        ? ImageClipAspectRatio.defaults
-        : widget.aspectRatios;
+    final presets = _supportedAspectRatios;
     if (presets.contains(_cropAspectRatio)) {
       return presets;
     }
     return <ImageClipAspectRatio>[_cropAspectRatio, ...presets];
+  }
+
+  List<ImageClipAspectRatio> get _supportedAspectRatios {
+    return widget.aspectRatios.isEmpty
+        ? ImageClipAspectRatio.defaults
+        : widget.aspectRatios;
   }
 
   ImageClipCropTransform get _initialCropTransform {
@@ -1009,13 +1015,23 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   }
 
   ImageClipAspectRatio _aspectRatioForInitialRegion(CropRegion region) {
-    return ImageClipAspectRatio.fromCropRegion(
-      region,
-      rotationDegrees: widget.initialRotationDegrees,
-      presets: widget.aspectRatios.isEmpty
-          ? ImageClipAspectRatio.defaults
-          : widget.aspectRatios,
-    );
+    final rotated = _initialCropTransform.quarterTurns.isOdd;
+    final target =
+        (rotated ? region.height : region.width) /
+        (rotated ? region.width : region.height);
+    final presets = _supportedAspectRatios;
+    var closest = presets.first;
+    var closestDistance = (closest.value - target).abs();
+
+    for (final preset in presets.skip(1)) {
+      final distance = (preset.value - target).abs();
+      if (distance < closestDistance) {
+        closest = preset;
+        closestDistance = distance;
+      }
+    }
+
+    return closest;
   }
 }
 
