@@ -595,12 +595,16 @@ void main() {
             sourceHeight: 80,
             previewRegion: result.previewRegion,
           );
-      expect(result.region.x, expectedRegion.x);
-      expect(result.region.y, expectedRegion.y);
-      expect(result.region.width, expectedRegion.width);
-      expect(result.region.height, expectedRegion.height);
-      expect(result.cropped.width, result.previewRegion.width);
-      expect(result.cropped.height, result.previewRegion.height);
+      final boundedRegion = result.region.clampToBounds(
+        sourceWidth: 120,
+        sourceHeight: 80,
+      );
+      expect(boundedRegion.x, expectedRegion.x);
+      expect(boundedRegion.y, expectedRegion.y);
+      expect(boundedRegion.width, expectedRegion.width);
+      expect(boundedRegion.height, expectedRegion.height);
+      expect(result.cropped.width, greaterThan(0));
+      expect(result.cropped.height, greaterThan(0));
       expect(tester.takeException(), isNull);
     },
   );
@@ -935,8 +939,8 @@ void main() {
     expect(result!.source.isPreviewSized, isTrue);
     expect(result.region.width, greaterThan(result.previewRegion.width));
     expect(result.region.height, greaterThan(result.previewRegion.height));
-    expect(result.cropped.width, result.region.width);
-    expect(result.cropped.height, result.region.height);
+    expect(result.cropped.width, greaterThan(result.previewRegion.width));
+    expect(result.cropped.height, greaterThan(result.previewRegion.height));
     expect(tester.takeException(), isNull);
   });
 
@@ -976,86 +980,88 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('fit-mode visible region restores letterbox spacing', (
-    tester,
-  ) async {
-    final firstController = ImageClipEditorController();
-    final imageBytes = _pngBytes(100, 200);
+  testWidgets(
+    'fit-mode region restores letterbox spacing without extra state',
+    (tester) async {
+      final firstController = ImageClipEditorController();
+      final imageBytes = _pngBytes(100, 200);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: ImageClipEditor(
-          controller: firstController,
-          initialImageBytes: imageBytes,
-          initialImageLabel: 'letterbox-source.png',
-          initialAspectRatio: ImageClipAspectRatio.square,
-          aspectRatios: const <ImageClipAspectRatio>[
-            ImageClipAspectRatio.portrait,
-            ImageClipAspectRatio.square,
-          ],
-          previewDecodeSettings: const ImageClipDecodeSettings.preview(
-            targetLongSide: 100,
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ImageClipEditor(
+            controller: firstController,
+            initialImageBytes: imageBytes,
+            initialImageLabel: 'letterbox-source.png',
+            initialAspectRatio: ImageClipAspectRatio.square,
+            aspectRatios: const <ImageClipAspectRatio>[
+              ImageClipAspectRatio.portrait,
+              ImageClipAspectRatio.square,
+            ],
+            previewDecodeSettings: const ImageClipDecodeSettings.preview(
+              targetLongSide: 100,
+            ),
+            loadSampleOnStart: false,
+            showResultPage: false,
           ),
-          loadSampleOnStart: false,
-          showResultPage: false,
         ),
-      ),
-    );
-    await pumpUntilIdle(tester);
+      );
+      await pumpUntilIdle(tester);
 
-    final saved = await tester.runAsync(firstController.crop);
-    await tester.pump();
+      final saved = await tester.runAsync(firstController.crop);
+      await tester.pump();
 
-    expect(saved, isNotNull);
-    expect(saved!.source.isPreviewSized, isTrue);
-    expect(saved.aspectRatio, ImageClipAspectRatio.square);
-    expect(saved.visibleRegion.x, 0);
-    expect(saved.visibleRegion.y, 0);
-    expect(saved.visibleRegion.width, 100);
-    expect(saved.visibleRegion.height, 200);
-    expect(saved.region.width, saved.region.height);
+      expect(saved, isNotNull);
+      expect(saved!.source.isPreviewSized, isTrue);
+      expect(saved.region.x, -50);
+      expect(saved.region.y, 0);
+      expect(saved.region.width, 200);
+      expect(saved.region.height, 200);
+      expect(saved.visibleRegion, saved.region);
+      expect(saved.region.width, saved.region.height);
+      expect(saved.cropped.width, 100);
+      expect(saved.cropped.height, 100);
 
-    final secondController = ImageClipEditorController();
-    await tester.pumpWidget(
-      MaterialApp(
-        home: ImageClipEditor(
-          controller: secondController,
-          initialImageBytes: imageBytes,
-          initialImageLabel: 'letterbox-source.png',
-          initialAspectRatio: saved.aspectRatio,
-          initialCropRegion: saved.visibleRegion,
-          aspectRatios: const <ImageClipAspectRatio>[
-            ImageClipAspectRatio.portrait,
-            ImageClipAspectRatio.square,
-          ],
-          previewDecodeSettings: const ImageClipDecodeSettings.preview(
-            targetLongSide: 100,
+      final secondController = ImageClipEditorController();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ImageClipEditor(
+            controller: secondController,
+            initialImageBytes: imageBytes,
+            initialImageLabel: 'letterbox-source.png',
+            initialCropRegion: saved.region,
+            aspectRatios: const <ImageClipAspectRatio>[
+              ImageClipAspectRatio.portrait,
+              ImageClipAspectRatio.square,
+            ],
+            previewDecodeSettings: const ImageClipDecodeSettings.preview(
+              targetLongSide: 100,
+            ),
+            loadSampleOnStart: false,
+            showResultPage: false,
           ),
-          loadSampleOnStart: false,
-          showResultPage: false,
         ),
-      ),
-    );
-    await pumpUntilIdle(tester);
+      );
+      await pumpUntilIdle(tester);
 
-    expect(find.text('1:1'), findsOneWidget);
-    final restored = secondController.currentCropRegion();
-    expect(restored, isNotNull);
-    expect(restored!.x, closeTo(saved.previewRegion.x, 1));
-    expect(restored.y, closeTo(saved.previewRegion.y, 1));
-    expect(restored.width, closeTo(saved.previewRegion.width, 1));
-    expect(restored.height, closeTo(saved.previewRegion.height, 1));
+      expect(find.text('1:1'), findsOneWidget);
+      final restored = secondController.currentCropRegion();
+      expect(restored, isNotNull);
+      expect(restored!.x, closeTo(saved.previewRegion.x, 1));
+      expect(restored.y, closeTo(saved.previewRegion.y, 1));
+      expect(restored.width, closeTo(saved.previewRegion.width, 1));
+      expect(restored.height, closeTo(saved.previewRegion.height, 1));
 
-    final restoredResult = await tester.runAsync(secondController.crop);
-    await tester.pump();
+      final restoredResult = await tester.runAsync(secondController.crop);
+      await tester.pump();
 
-    expect(restoredResult, isNotNull);
-    expect(restoredResult!.visibleRegion.x, saved.visibleRegion.x);
-    expect(restoredResult.visibleRegion.y, saved.visibleRegion.y);
-    expect(restoredResult.visibleRegion.width, saved.visibleRegion.width);
-    expect(restoredResult.visibleRegion.height, saved.visibleRegion.height);
-    expect(tester.takeException(), isNull);
-  });
+      expect(restoredResult, isNotNull);
+      expect(restoredResult!.region.x, saved.region.x);
+      expect(restoredResult.region.y, saved.region.y);
+      expect(restoredResult.region.width, saved.region.width);
+      expect(restoredResult.region.height, saved.region.height);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('rotated source save region preserves visual 10:16 ratio', (
     tester,
@@ -1141,8 +1147,8 @@ void main() {
     expect(result!.source.isPreviewSized, isTrue);
     expect(result.region.width, greaterThan(result.previewRegion.width));
     expect(result.region.height, greaterThan(result.previewRegion.height));
-    expect(result.cropped.width, result.region.width);
-    expect(result.cropped.height, result.region.height);
+    expect(result.cropped.width, greaterThan(result.previewRegion.width));
+    expect(result.cropped.height, greaterThan(result.previewRegion.height));
     expect(tester.takeException(), isNull);
   });
 

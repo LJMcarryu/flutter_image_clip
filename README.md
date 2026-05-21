@@ -45,7 +45,7 @@ After the package is published to pub.dev, add it to your app:
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.9.1
+  flutter_image_clip: ^0.9.2
 ```
 
 Then run:
@@ -82,7 +82,7 @@ Use `imagePath` / `initialImagePath` for local gallery images whenever possible.
 
 `showImageClipEditor` enables `ImageClipPlatformDecodeAdapter` by default. Fullscreen usage usually only needs the image path and business-level settings; pass a custom `processor` or `previewDecodeSettings` only when you need stricter limits or custom platform behavior.
 
-If your app persists crop metadata, pass `initialRotationDegrees`, `initialAspectRatio`, and `initialCropRegion` to restore the previous visible position. Use `result.visibleRegion` for `initialCropRegion` and `result.aspectRatio` for `initialAspectRatio`; this preserves Fit-mode crops where the image had left/right or top/bottom blank space. If `initialAspectRatio` is not provided, the editor maps `initialCropRegion` into the rotated preview and selects the nearest supported aspect ratio from `aspectRatios`. `initialRotationDegrees` supports 90-degree increments; invalid or out-of-bounds crop regions are clamped or ignored after image load.
+If your app persists crop metadata, pass `initialRotationDegrees` and `initialCropRegion` to restore the previous visible position. Use `result.region` for `initialCropRegion`. The region may use negative `x` / `y` or a width / height larger than the source image to encode Fit-mode left/right or top/bottom blank space. If `initialAspectRatio` is not provided, the editor maps `initialCropRegion` into the rotated preview and selects the nearest supported aspect ratio from `aspectRatios`. `initialRotationDegrees` supports 90-degree increments; non-positive crop sizes are ignored.
 
 ```dart
 import 'package:flutter_image_clip/flutter_image_clip.dart';
@@ -129,8 +129,6 @@ final result = await showImageClipEditor(
 if (result != null) {
   final croppedBytes = result.cropped.bytes;
   final sourceRegion = result.region;
-  final visibleRegion = result.visibleRegion;
-  final aspectRatio = result.aspectRatio;
   final previewRegion = result.previewRegion;
   final rotationDegrees = result.rotationDegrees;
   final flippedHorizontally = result.flippedHorizontally;
@@ -164,14 +162,6 @@ final result = await showImageClipEditor(
     height: 640,
     cornerRadius: 0,
   ),
-  visibleRegion: CropRegion(
-    x: 120,
-    y: 0,
-    width: 480,
-    height: 640,
-    cornerRadius: 0,
-  ),
-  aspectRatio: ImageClipAspectRatio.portrait,
   previewRegion: CropRegion(
     x: 0,
     y: 120,
@@ -395,7 +385,7 @@ final safeRegion = savedRegion.clampToBounds(
 );
 ```
 
-`ImageClipResult.region` / `sourceRegion` represent the source pixels used by the exported image. To restore the editor UI, persist `visibleRegion`, `aspectRatio`, `rotationDegrees`, `flippedHorizontally`, and `flippedVertically`; pass `visibleRegion` back as `initialCropRegion` and `aspectRatio` back as `initialAspectRatio`. `previewRegion` represents the current preview size and should usually stay internal to the UI.
+`ImageClipResult.region` / `sourceRegion` represent the crop frame mapped into source-image coordinates and can extend outside the source bounds to preserve Fit-mode blank space. Persist `region`, `rotationDegrees`, `flippedHorizontally`, and `flippedVertically`; pass `region` back as `initialCropRegion`. `previewRegion` represents the current preview size and should usually stay internal to the UI.
 
 Reuse the editor's aspect-ratio inference outside the editor:
 
@@ -623,7 +613,7 @@ MIT License. See `LICENSE`.
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.9.1
+  flutter_image_clip: ^0.9.2
 ```
 
 执行：
@@ -656,7 +646,7 @@ dependencies:
 
 全屏裁剪建议优先传 `imagePath`，这样相册本地文件可以走 file-backed preview/save 链路，避免业务页提前持有完整原图 bytes。只有网络图、内存图或没有稳定本地路径时再传 `imageBytes`。
 
-如果需要保存后下次恢复编辑器位置，建议持久化 `result.visibleRegion`、`result.aspectRatio`、`result.rotationDegrees`、`result.flippedHorizontally` 和 `result.flippedVertically`。恢复时把 `visibleRegion` 传给 `initialCropRegion`，把 `aspectRatio` 传给 `initialAspectRatio`，这样 Fit 模式下左右或上下留白的位置也能按原样恢复。
+如果需要保存后下次恢复编辑器位置，持久化 `result.region`、`result.rotationDegrees`、`result.flippedHorizontally` 和 `result.flippedVertically`。恢复时把 `region` 传给 `initialCropRegion`。`region` 可能包含负数 `x` / `y`，或者超出原图边界的 `width` / `height`，用于表达 Fit 模式下左右或上下留白。
 
 ```dart
 final result = await showImageClipEditor(
@@ -672,8 +662,7 @@ final result = await showImageClipEditor(
 
 if (result != null) {
   final croppedBytes = result.cropped.bytes;
-  final visibleRegion = result.visibleRegion;
-  final aspectRatio = result.aspectRatio;
+  final sourceRegion = result.region;
   final previewRegion = result.previewRegion;
 }
 ```

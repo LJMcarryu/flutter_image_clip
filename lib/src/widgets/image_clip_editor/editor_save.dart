@@ -24,8 +24,12 @@ extension _ImageClipEditorSave on _ImageClipEditorState {
     });
 
     try {
-      final visibleRegion = _sourceVisibleRegionForResult(source, sourceRegion);
       final saveRegion = _sourceRegionForSave(source, sourceRegion, transform);
+      final resultRegion = _sourceRegionForResult(
+        source,
+        sourceRegion,
+        transform,
+      );
       final steps = <ImageClipPipelineStep>[
         ImageClipPipelineStep.cropRegion(saveRegion),
         if (transform.normalizedRotation != 0)
@@ -71,9 +75,9 @@ extension _ImageClipEditorSave on _ImageClipEditorState {
       final result = ImageClipResult(
         source: source,
         cropped: cropped,
-        region: saveRegion,
+        region: resultRegion,
         previewRegion: previewRegion,
-        visibleRegion: visibleRegion,
+        visibleRegion: resultRegion,
         aspectRatio: _cropAspectRatio,
         rotationDegrees: transform.normalizedRotation,
         flippedHorizontally: transform.flipHorizontal,
@@ -122,32 +126,32 @@ extension _ImageClipEditorSave on _ImageClipEditorState {
     }
   }
 
-  CropRegion _sourceVisibleRegionForResult(
+  CropRegion _sourceRegionForResult(
     EditedImage source,
     CropRegion region,
+    ImageClipCropTransform transform,
   ) {
+    final sourceRatio = _sourceSaveAspectRatioFor(transform);
+    final sourceRatioUnits = _sourceSaveAspectRatioUnitsFor(transform);
+    return _aspectLockedVirtualRegion(
+      _sourceRegionForOriginal(source, region),
+      targetRatio: sourceRatio,
+      ratioUnits: sourceRatioUnits,
+    );
+  }
+
+  CropRegion _sourceRegionForOriginal(EditedImage source, CropRegion region) {
     if (!source.isPreviewSized) {
-      return region.clampToBounds(
-        sourceWidth: source.sourceWidth,
-        sourceHeight: source.sourceHeight,
-      );
+      return region;
     }
 
     final scaleX = source.sourceWidth / source.width;
     final scaleY = source.sourceHeight / source.height;
-    final x = (region.x * scaleX).round().clamp(0, source.sourceWidth - 1);
-    final y = (region.y * scaleY).round().clamp(0, source.sourceHeight - 1);
     return CropRegion(
-      x: x.toInt(),
-      y: y.toInt(),
-      width: (region.width * scaleX)
-          .round()
-          .clamp(1, source.sourceWidth - x)
-          .toInt(),
-      height: (region.height * scaleY)
-          .round()
-          .clamp(1, source.sourceHeight - y)
-          .toInt(),
+      x: (region.x * scaleX).round(),
+      y: (region.y * scaleY).round(),
+      width: math.max(1, (region.width * scaleX).round()),
+      height: math.max(1, (region.height * scaleY).round()),
       cornerRadius: region.cornerRadius * ((scaleX + scaleY) / 2),
     );
   }
@@ -159,36 +163,49 @@ extension _ImageClipEditorSave on _ImageClipEditorState {
   ) {
     final sourceRatio = _sourceSaveAspectRatioFor(transform);
     final sourceRatioUnits = _sourceSaveAspectRatioUnitsFor(transform);
-    if (!source.isPreviewSized) {
-      return region.clampToBounds(
-        sourceWidth: source.sourceWidth,
-        sourceHeight: source.sourceHeight,
-      );
-    }
-
-    final scaleX = source.sourceWidth / source.width;
-    final scaleY = source.sourceHeight / source.height;
-    final x = (region.x * scaleX).round().clamp(0, source.sourceWidth - 1);
-    final y = (region.y * scaleY).round().clamp(0, source.sourceHeight - 1);
-    final mapped = CropRegion(
-      x: x.toInt(),
-      y: y.toInt(),
-      width: (region.width * scaleX)
-          .round()
-          .clamp(1, source.sourceWidth - x)
-          .toInt(),
-      height: (region.height * scaleY)
-          .round()
-          .clamp(1, source.sourceHeight - y)
-          .toInt(),
-      cornerRadius: region.cornerRadius * ((scaleX + scaleY) / 2),
-    );
+    final mapped = _sourceRegionForOriginal(source, region);
     return _aspectLockedRegion(
       mapped,
       sourceWidth: source.sourceWidth,
       sourceHeight: source.sourceHeight,
       targetRatio: sourceRatio,
       ratioUnits: sourceRatioUnits,
+    );
+  }
+
+  CropRegion _aspectLockedVirtualRegion(
+    CropRegion region, {
+    required double targetRatio,
+    required _AspectRatioUnits? ratioUnits,
+  }) {
+    var width = region.width;
+    var height = region.height;
+
+    if (ratioUnits != null) {
+      final units = math.min(
+        width ~/ ratioUnits.width,
+        height ~/ ratioUnits.height,
+      );
+      if (units > 0) {
+        width = units * ratioUnits.width;
+        height = units * ratioUnits.height;
+      } else {
+        final fitted = _fitRegionSize(width, height, targetRatio);
+        width = fitted.width;
+        height = fitted.height;
+      }
+    } else {
+      final fitted = _fitRegionSize(width, height, targetRatio);
+      width = fitted.width;
+      height = fitted.height;
+    }
+
+    return CropRegion(
+      x: (region.x + (region.width - width) / 2).round(),
+      y: (region.y + (region.height - height) / 2).round(),
+      width: width,
+      height: height,
+      cornerRadius: region.cornerRadius.clamp(0, math.min(width, height) / 2),
     );
   }
 

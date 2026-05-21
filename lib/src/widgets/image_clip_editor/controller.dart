@@ -20,7 +20,10 @@ class ImageClipEditorController {
   /// The image currently loaded in the attached editor.
   EditedImage? get image => _state?._image;
 
-  /// The current visible crop region in source-image pixel coordinates.
+  /// The current crop frame in source-image pixel coordinates.
+  ///
+  /// The returned region may extend outside the source image when the crop
+  /// frame contains Fit-mode letterbox or pillarbox space.
   CropRegion? currentCropRegion({double cornerRadius = 0}) {
     return _requireState()._currentCropRegion(cornerRadius: cornerRadius);
   }

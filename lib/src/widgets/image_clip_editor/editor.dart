@@ -330,12 +330,14 @@ class ImageClipEditor extends StatefulWidget {
   /// Initial crop position in source-image pixel coordinates.
   ///
   /// When provided, the editor restores the preview scale and offset so this
-  /// source region is shown inside the crop frame. When [initialAspectRatio] is
-  /// not provided, the initial crop aspect ratio is selected from
-  /// [aspectRatios] using this region and [initialRotationDegrees]. If no
-  /// supported ratio matches exactly, the closest supported ratio is used.
+  /// source region is shown inside the crop frame. The region may extend
+  /// outside the source image bounds; negative coordinates or oversized width
+  /// and height are used to restore Fit-mode letterbox or pillarbox spacing.
+  /// When [initialAspectRatio] is not provided, the initial crop aspect ratio
+  /// is selected from [aspectRatios] using this region and
+  /// [initialRotationDegrees]. If no supported ratio matches exactly, the
+  /// closest supported ratio is used.
   ///
-  /// Coordinates outside the source image are clamped after the image loads.
   /// Regions with non-positive [CropRegion.width] or [CropRegion.height] are
   /// ignored and the editor falls back to [initialAspectRatio] or
   /// [initialOrientation].
@@ -715,15 +717,12 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     if (image == null || initialRegion == null) {
       return null;
     }
-    final sourceRegion = initialRegion.clampToBounds(
-      sourceWidth: image.sourceWidth,
-      sourceHeight: image.sourceHeight,
-    );
     final previewSourceRegion = _previewSourceRegionForInitial(
       image,
-      sourceRegion,
+      initialRegion,
     );
-    return _cropTransform.previewRegionForSource(
+    return _virtualPreviewRegionForSource(
+      transform: _cropTransform,
       sourceWidth: image.width,
       sourceHeight: image.height,
       sourceRegion: previewSourceRegion,
@@ -739,16 +738,11 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     }
     final scaleX = image.width / image.sourceWidth;
     final scaleY = image.height / image.sourceHeight;
-    final x = (region.x * scaleX).round().clamp(0, image.width - 1);
-    final y = (region.y * scaleY).round().clamp(0, image.height - 1);
     return CropRegion(
-      x: x.toInt(),
-      y: y.toInt(),
-      width: (region.width * scaleX).round().clamp(1, image.width - x).toInt(),
-      height: (region.height * scaleY)
-          .round()
-          .clamp(1, image.height - y)
-          .toInt(),
+      x: (region.x * scaleX).round(),
+      y: (region.y * scaleY).round(),
+      width: math.max(1, (region.width * scaleX).round()),
+      height: math.max(1, (region.height * scaleY).round()),
       cornerRadius: region.cornerRadius * ((scaleX + scaleY) / 2),
     );
   }
@@ -842,7 +836,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     if (source == null || previewRegion == null) {
       return null;
     }
-    return _cropTransform.sourceRegionForPreview(
+    return _virtualSourceRegionForPreview(
+      transform: _cropTransform,
       sourceWidth: source.width,
       sourceHeight: source.height,
       previewRegion: previewRegion,
@@ -894,7 +889,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
           height: visualSize.height,
           cornerRadius: 0,
         );
-    final sourceRegion = transform.sourceRegionForPreview(
+    final sourceRegion = _virtualSourceRegionForPreview(
+      transform: transform,
       sourceWidth: source.width,
       sourceHeight: source.height,
       previewRegion: previewRegion,
@@ -1109,6 +1105,109 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
 }
 
 const _aspectRatioTolerance = 0.001;
+
+CropRegion _virtualSourceRegionForPreview({
+  required ImageClipCropTransform transform,
+  required int sourceWidth,
+  required int sourceHeight,
+  required CropRegion previewRegion,
+}) {
+  final visual = transform.visualSize(
+    sourceWidth: sourceWidth,
+    sourceHeight: sourceHeight,
+  );
+  var x = previewRegion.x;
+  var y = previewRegion.y;
+  var width = previewRegion.width;
+  var height = previewRegion.height;
+
+  if (transform.flipHorizontal) {
+    x = visual.width - x - width;
+  }
+  if (transform.flipVertical) {
+    y = visual.height - y - height;
+  }
+
+  return switch (transform.normalizedRotation) {
+    90 => CropRegion(
+      x: y,
+      y: sourceHeight - x - width,
+      width: height,
+      height: width,
+      cornerRadius: previewRegion.cornerRadius,
+    ),
+    180 => CropRegion(
+      x: sourceWidth - x - width,
+      y: sourceHeight - y - height,
+      width: width,
+      height: height,
+      cornerRadius: previewRegion.cornerRadius,
+    ),
+    270 => CropRegion(
+      x: sourceWidth - y - height,
+      y: x,
+      width: height,
+      height: width,
+      cornerRadius: previewRegion.cornerRadius,
+    ),
+    _ => CropRegion(
+      x: x,
+      y: y,
+      width: width,
+      height: height,
+      cornerRadius: previewRegion.cornerRadius,
+    ),
+  };
+}
+
+CropRegion _virtualPreviewRegionForSource({
+  required ImageClipCropTransform transform,
+  required int sourceWidth,
+  required int sourceHeight,
+  required CropRegion sourceRegion,
+}) {
+  final visual = transform.visualSize(
+    sourceWidth: sourceWidth,
+    sourceHeight: sourceHeight,
+  );
+  var x = sourceRegion.x;
+  var y = sourceRegion.y;
+  var width = sourceRegion.width;
+  var height = sourceRegion.height;
+
+  switch (transform.normalizedRotation) {
+    case 90:
+      final nextWidth = height;
+      x = sourceHeight - sourceRegion.y - sourceRegion.height;
+      y = sourceRegion.x;
+      width = nextWidth;
+      height = sourceRegion.width;
+    case 180:
+      x = sourceWidth - sourceRegion.x - sourceRegion.width;
+      y = sourceHeight - sourceRegion.y - sourceRegion.height;
+    case 270:
+      final nextWidth = height;
+      x = sourceRegion.y;
+      y = sourceWidth - sourceRegion.x - sourceRegion.width;
+      width = nextWidth;
+      height = sourceRegion.width;
+  }
+
+  if (transform.flipHorizontal) {
+    x = visual.width - x - width;
+  }
+  if (transform.flipVertical) {
+    y = visual.height - y - height;
+  }
+
+  return CropRegion(
+    x: x,
+    y: y,
+    width: width,
+    height: height,
+    cornerRadius: sourceRegion.cornerRadius,
+  );
+}
 
 int _greatestCommonDivisor(int a, int b) {
   var x = a.abs();

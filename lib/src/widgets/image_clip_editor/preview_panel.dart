@@ -75,24 +75,17 @@ class _PreviewPanelState extends State<_PreviewPanel> {
     final pixelsPerLogicalPixel =
         visualSize.width / (layout.baseRect.width * _scale);
     final cropLeft =
-        ((layout.cropRect.left - imageLeft) * pixelsPerLogicalPixel)
-            .round()
-            .clamp(0, visualSize.width - 1)
-            .toInt();
+        ((layout.cropRect.left - imageLeft) * pixelsPerLogicalPixel).round();
     final cropTop = ((layout.cropRect.top - imageTop) * pixelsPerLogicalPixel)
-        .round()
-        .clamp(0, visualSize.height - 1)
-        .toInt();
-    final cropRight =
-        ((layout.cropRect.right - imageLeft) * pixelsPerLogicalPixel)
-            .round()
-            .clamp(cropLeft + 1, visualSize.width)
-            .toInt();
-    final cropBottom =
-        ((layout.cropRect.bottom - imageTop) * pixelsPerLogicalPixel)
-            .round()
-            .clamp(cropTop + 1, visualSize.height)
-            .toInt();
+        .round();
+    final cropRight = math.max(
+      cropLeft + 1,
+      ((layout.cropRect.right - imageLeft) * pixelsPerLogicalPixel).round(),
+    );
+    final cropBottom = math.max(
+      cropTop + 1,
+      ((layout.cropRect.bottom - imageTop) * pixelsPerLogicalPixel).round(),
+    );
 
     return CropRegion(
       x: cropLeft,
@@ -383,11 +376,7 @@ class _PreviewPanelState extends State<_PreviewPanel> {
       sourceWidth: image.width,
       sourceHeight: image.height,
     );
-    final bounded = _boundedPreviewRegion(
-      region,
-      width: visualSize.width,
-      height: visualSize.height,
-    );
+    final bounded = region;
     final scaleForWidth =
         layout.cropRect.width *
         visualSize.width /
@@ -494,14 +483,6 @@ class _PreviewPanelState extends State<_PreviewPanel> {
       _offset = _clampOffset(nextOffset, layout, nextScale, widget.scaleMode);
     });
   }
-}
-
-CropRegion _boundedPreviewRegion(
-  CropRegion region, {
-  required int width,
-  required int height,
-}) {
-  return region.clampToBounds(sourceWidth: width, sourceHeight: height);
 }
 
 Size _cropSizeFor(Size size, double aspectRatio) {

@@ -27,9 +27,10 @@ class ImageClipResult {
 
   /// Crop rectangle in original source-image pixel coordinates.
   ///
-  /// This is the source region used for the exported image. For restoring the
-  /// editor UI, especially Fit-mode crops that include letterbox or pillarbox
-  /// space, persist [visibleRegion] and [aspectRatio] instead.
+  /// This is the crop frame mapped into source-image coordinates. It may extend
+  /// outside the source image bounds when the saved Fit-mode crop included
+  /// letterbox or pillarbox space. Persist this value and pass it back as
+  /// [ImageClipEditor.initialCropRegion] to restore the same editor position.
   final CropRegion region;
 
   /// Alias for [region] that makes the coordinate space explicit.
@@ -41,18 +42,15 @@ class ImageClipResult {
   /// not stable across different preview decode sizes.
   final CropRegion previewRegion;
 
-  /// Source-image pixels that were visible inside the crop frame before save.
+  /// Source-image crop frame that was visible inside the crop frame before save.
   ///
-  /// This is the preferred region to persist and later pass back as
-  /// [ImageClipEditor.initialCropRegion]. Persist [aspectRatio] with it and
-  /// pass that value back as [ImageClipEditor.initialAspectRatio] so Fit-mode
-  /// crops with blank space can restore the same visual placement.
+  /// Kept for compatibility with `0.9.1`; it now matches [region].
   final CropRegion visibleRegion;
 
   /// Crop aspect ratio selected when this result was saved.
   ///
-  /// Persist this with [visibleRegion] and pass it back as
-  /// [ImageClipEditor.initialAspectRatio] when restoring an editor session.
+  /// Kept for compatibility with `0.9.1`. Restoring Fit-mode blank space no
+  /// longer requires passing this value back when [region] is persisted.
   final ImageClipAspectRatio? aspectRatio;
 
   /// Clockwise preview rotation applied to the saved crop, in degrees.
