@@ -361,10 +361,8 @@ class _CropToolButton extends StatelessWidget {
                   _CropToolIcon.rotate => CustomPaint(
                     painter: _RotateGlyphPainter(color: color),
                   ),
-                  _CropToolIcon.revert => Icon(
-                    Icons.restore_rounded,
-                    color: color,
-                    size: 22,
+                  _CropToolIcon.revert => CustomPaint(
+                    painter: _RevertGlyphPainter(color: color),
                   ),
                   _ => Icon(icon as IconData, color: color, size: 22),
                 },
@@ -504,6 +502,74 @@ class _RotateGlyphPainter extends CustomPainter {
     final sy = size.height / 22;
     final paint = Paint()
       ..color = color
+      ..style = PaintingStyle.fill;
+
+    canvas.save();
+    canvas.scale(sx, sy);
+    canvas.translate(0.5, 1);
+    canvas.translate(20, 0);
+    canvas.scale(-1, 1);
+
+    final frame = Path()
+      ..fillType = PathFillType.evenOdd
+      ..moveTo(14.1363, 7.95139)
+      ..lineTo(0.807789, 7.95139)
+      ..cubicTo(0.360981, 7.95139, 0, 8.31184, 0, 8.75799)
+      ..lineTo(0, 19.1934)
+      ..cubicTo(0, 19.6395, 0.360981, 20, 0.807789, 20)
+      ..lineTo(14.1363, 20)
+      ..cubicTo(14.5831, 20, 14.9441, 19.6395, 14.9441, 19.1934)
+      ..lineTo(14.9441, 8.75799)
+      ..cubicTo(14.9441, 8.31184, 14.5831, 7.95139, 14.1363, 7.95139)
+      ..close()
+      ..moveTo(13.0256, 18.0843)
+      ..lineTo(1.9185, 18.0843)
+      ..lineTo(1.9185, 9.86706)
+      ..lineTo(13.0256, 9.86706)
+      ..lineTo(13.0256, 18.0843)
+      ..close();
+    canvas.drawPath(frame, paint);
+
+    final arrow = Path()
+      ..moveTo(17.8543, 5.69604)
+      ..cubicTo(15.8651, 3.15777, 12.9066, 1.82436, 9.91269, 1.80923)
+      ..lineTo(9.90764, 0.196033)
+      ..cubicTo(9.90764, 0.0321927, 9.71579, -0.0585499, 9.58958, 0.0422751)
+      ..lineTo(6.35842, 2.58811)
+      ..cubicTo(6.25745, 2.66625, 6.25997, 2.81748, 6.35842, 2.89814)
+      ..lineTo(9.5921, 5.44649)
+      ..cubicTo(9.72084, 5.54732, 9.91269, 5.45658, 9.91017, 5.29274)
+      ..lineTo(9.91017, 3.68206)
+      ..cubicTo(10.2358, 3.68458, 10.564, 3.70474, 10.8896, 3.74507)
+      ..cubicTo(11.9524, 3.87615, 12.9621, 4.20383, 13.8936, 4.72055)
+      ..cubicTo(14.8553, 5.25493, 15.6909, 5.97331, 16.3775, 6.84544)
+      ..cubicTo(17.0616, 7.7201, 17.5564, 8.70314, 17.8442, 9.76432)
+      ..cubicTo(18.1218, 10.7902, 18.1976, 11.8489, 18.0688, 12.9101)
+      ..cubicTo(18.0512, 13.0462, 18.0335, 13.1823, 18.0082, 13.3159)
+      ..lineTo(19.899, 13.3159)
+      ..cubicTo(20.2726, 10.7045, 19.6137, 7.94695, 17.8543, 5.69604)
+      ..close();
+    canvas.drawPath(arrow, paint);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _RotateGlyphPainter oldDelegate) {
+    return oldDelegate.color != color;
+  }
+}
+
+class _RevertGlyphPainter extends CustomPainter {
+  const _RevertGlyphPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final sx = size.width / 22;
+    final sy = size.height / 22;
+    final paint = Paint()
+      ..color = color
       ..strokeWidth = 1.83333
       ..strokeCap = StrokeCap.square
       ..strokeJoin = StrokeJoin.round
@@ -511,8 +577,9 @@ class _RotateGlyphPainter extends CustomPainter {
 
     canvas.save();
     canvas.scale(sx, sy);
-    canvas.translate(2.75, 2.75);
-    canvas.scale(16.25 / 18.0833, 16.5 / 18.3333);
+    canvas.translate(3, 2.75);
+    canvas.translate(16.25, 0);
+    canvas.scale(-16.25 / 18.0833, 16.5 / 18.3333);
     final arc = Path()
       ..moveTo(17.1667, 9.66667)
       ..cubicTo(17.1667, 11.2984, 16.9328, 12.3934, 16.0263, 13.7501)
@@ -530,8 +597,9 @@ class _RotateGlyphPainter extends CustomPainter {
 
     canvas.save();
     canvas.scale(sx, sy);
-    canvas.translate(14.6667, 2.75);
-    canvas.scale(4.5833 / 6.41667, 4.5833 / 6.41667);
+    canvas.translate(2.75, 2.75);
+    canvas.translate(4.5833, 0);
+    canvas.scale(-4.5833 / 6.41667, 4.5833 / 6.41667);
     final arrow = Path()
       ..moveTo(5.5, 0.916667)
       ..lineTo(5.5, 5.5)
@@ -541,7 +609,7 @@ class _RotateGlyphPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _RotateGlyphPainter oldDelegate) {
+  bool shouldRepaint(covariant _RevertGlyphPainter oldDelegate) {
     return oldDelegate.color != color;
   }
 }
