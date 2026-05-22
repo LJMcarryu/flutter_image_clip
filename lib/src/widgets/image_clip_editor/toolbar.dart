@@ -112,8 +112,10 @@ class _CropBottomBar extends StatelessWidget {
     required this.theme,
     required this.canRun,
     required this.canSave,
+    required this.showRevert,
     required this.onScaleModeToggle,
     required this.onRotate,
+    required this.onRevert,
     required this.onAspectRatioChanged,
     required this.onSave,
   });
@@ -126,8 +128,10 @@ class _CropBottomBar extends StatelessWidget {
   final ImageClipEditorTheme theme;
   final bool canRun;
   final bool canSave;
+  final bool showRevert;
   final VoidCallback onScaleModeToggle;
   final VoidCallback onRotate;
+  final VoidCallback onRevert;
   final ValueChanged<ImageClipAspectRatio> onAspectRatioChanged;
   final VoidCallback onSave;
 
@@ -201,6 +205,16 @@ class _CropBottomBar extends StatelessWidget {
                             enabled: canRun,
                             onPressed: onRotate,
                           ),
+                          if (showRevert) ...[
+                            SizedBox(width: theme.toolButtonGap),
+                            _CropToolButton(
+                              icon: _CropToolIcon.revert,
+                              label: labels.revertButton,
+                              theme: theme,
+                              enabled: canRun,
+                              onPressed: onRevert,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -299,7 +313,7 @@ class _CropBottomBar extends StatelessWidget {
   }
 }
 
-enum _CropToolIcon { fit, fill, rotate }
+enum _CropToolIcon { fit, fill, rotate, revert }
 
 class _CropToolButton extends StatelessWidget {
   const _CropToolButton({
@@ -346,6 +360,11 @@ class _CropToolButton extends StatelessWidget {
                   ),
                   _CropToolIcon.rotate => CustomPaint(
                     painter: _RotateGlyphPainter(color: color),
+                  ),
+                  _CropToolIcon.revert => Icon(
+                    Icons.restore_rounded,
+                    color: color,
+                    size: 22,
                   ),
                   _ => Icon(icon as IconData, color: color, size: 22),
                 },

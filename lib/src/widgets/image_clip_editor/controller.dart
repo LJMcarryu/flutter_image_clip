@@ -57,7 +57,7 @@ class ImageClipEditorController {
 
   /// Resets the crop viewport to the editor's current scale mode.
   void resetView() {
-    _requireState()._resetCropView();
+    _requireState()._resetCropView(markUnsaved: true);
   }
 
   /// Rotates the editor preview clockwise by 90 degrees.

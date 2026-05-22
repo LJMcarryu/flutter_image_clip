@@ -14,6 +14,7 @@ class ImageClipEditorLabels {
     this.flipHorizontalButton = 'Flip H',
     this.flipVerticalButton = 'Flip V',
     this.rotateButton = 'Rotate',
+    this.revertButton = 'Revert',
     this.previewSemanticsLabel = 'Image crop preview',
     this.cropFrameSemanticsLabel = 'Crop frame',
     this.resultTitle = 'Crop result',
@@ -57,6 +58,7 @@ class ImageClipEditorLabels {
     flipHorizontalButton: '水平翻转',
     flipVerticalButton: '垂直翻转',
     rotateButton: '旋转',
+    revertButton: '还原',
     previewSemanticsLabel: '图片裁剪预览',
     cropFrameSemanticsLabel: '裁剪框',
     resultTitle: '裁剪结果',
@@ -111,6 +113,9 @@ class ImageClipEditorLabels {
 
   /// Rotate button label.
   final String rotateButton;
+
+  /// Revert-to-original button label.
+  final String revertButton;
 
   /// Semantics label for the interactive crop preview.
   final String previewSemanticsLabel;

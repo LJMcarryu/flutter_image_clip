@@ -540,6 +540,163 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('save stays disabled until the position changes', (tester) async {
+    ImageClipResult? result;
+
+    await pumpClippingApp(
+      tester,
+      editor: ImageClipEditor(
+        showResultPage: false,
+        onResult: (value) {
+          result = value;
+        },
+      ),
+    );
+
+    await tester.tap(find.text('Save'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(result, isNull);
+
+    await tester.tap(find.text('Fill'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Save'));
+    await pumpUntilIdle(tester);
+
+    expect(result, isNotNull);
+    expect(result!.revertedToOriginal, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('save result callback can keep the editor open', (tester) async {
+    var attempts = 0;
+    ImageClipResult? completedResult;
+
+    await pumpClippingApp(
+      tester,
+      editor: ImageClipEditor(
+        showResultPage: false,
+        onSaveResult: (result) {
+          attempts++;
+          return attempts > 1;
+        },
+        onResult: (value) {
+          completedResult = value;
+        },
+      ),
+    );
+
+    await tester.tap(find.text('Fill'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Save'));
+    await pumpUntilIdle(tester);
+
+    expect(attempts, 1);
+    expect(completedResult, isNull);
+    expect(find.byType(ImageClipEditor), findsOneWidget);
+
+    await tester.tap(find.text('Save'));
+    await pumpUntilIdle(tester);
+
+    expect(attempts, 2);
+    expect(completedResult, isNotNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('cancel attempt reports whether discard confirmation is needed', (
+    tester,
+  ) async {
+    final cancelAttempts = <bool>[];
+
+    await pumpClippingApp(
+      tester,
+      editor: ImageClipEditor(
+        onCancelAttempt: cancelAttempts.add,
+        initialImageBytes: _pngBytes(160, 120),
+        initialImageLabel: 'discard-callback.png',
+        loadSampleOnStart: false,
+      ),
+    );
+    await pumpUntilIdle(tester);
+
+    await tester.tap(
+      find.byKey(const ValueKey('image_clip_editor_close_hit_area')),
+      warnIfMissed: false,
+    );
+    await tester.pump();
+
+    expect(cancelAttempts, <bool>[false]);
+
+    await tester.tap(find.text('Fill'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(
+      find.byKey(const ValueKey('image_clip_editor_close_hit_area')),
+      warnIfMissed: false,
+    );
+    await tester.pump();
+
+    expect(cancelAttempts, <bool>[false, true]);
+    expect(find.text('Fit'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('revert restores the original view and marks the save result', (
+    tester,
+  ) async {
+    final controller = ImageClipEditorController();
+    ImageClipResult? result;
+    const initialRegion = CropRegion(
+      x: 60,
+      y: 30,
+      width: 120,
+      height: 90,
+      cornerRadius: 0,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          controller: controller,
+          initialImageBytes: _pngBytes(400, 300),
+          initialImageLabel: 'revert-source.png',
+          initialCropRegion: initialRegion,
+          hasCustomPosition: true,
+          loadSampleOnStart: false,
+          showResultPage: false,
+          onResult: (value) {
+            result = value;
+          },
+        ),
+      ),
+    );
+    await pumpUntilIdle(tester);
+    await tester.pump();
+
+    expect(find.text('Revert'), findsOneWidget);
+    expect(
+      _isCloseToRegion(controller.currentCropRegion(), initialRegion),
+      isTrue,
+    );
+
+    await tester.tap(find.text('Save'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(result, isNull);
+
+    await tester.tap(find.text('Revert'));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(
+      _isCloseToRegion(controller.currentCropRegion(), initialRegion),
+      isFalse,
+    );
+
+    await tester.tap(find.text('Save'));
+    await pumpUntilIdle(tester);
+
+    expect(result, isNotNull);
+    expect(result!.revertedToOriginal, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('save opens result page with crop metadata', (tester) async {
     final controller = ImageClipEditorController();
 
@@ -776,6 +933,8 @@ void main() {
       ),
     );
 
+    await tester.tap(find.text('Fill'));
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.text('Save'));
     await pumpUntilIdle(tester);
 
@@ -822,6 +981,8 @@ void main() {
     expect(find.text('Cover'), findsOneWidget);
     expect(find.text('Turn'), findsOneWidget);
     expect(find.text('Use photo'), findsOneWidget);
+    await tester.tap(find.text('Cover'));
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.text('Use photo'));
     await pumpUntilIdle(tester);
     await tester.pumpAndSettle();

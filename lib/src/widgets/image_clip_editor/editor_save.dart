@@ -82,9 +82,9 @@ extension _ImageClipEditorSave on _ImageClipEditorState {
         rotationDegrees: transform.normalizedRotation,
         flippedHorizontally: transform.flipHorizontal,
         flippedVertically: transform.flipVertical,
+        revertedToOriginal: _revertedToOriginal,
       );
       setState(() {
-        _isBusy = false;
         _activeTask = null;
         _activeProgressSubscription = null;
         _progressValue = null;
@@ -92,6 +92,20 @@ extension _ImageClipEditorSave on _ImageClipEditorState {
           widget.labels.cropCompleteStatus,
           cropped,
         );
+      });
+      final shouldComplete = await _shouldCompleteSave(result);
+      if (!mounted || taskId != _taskSerial) {
+        return null;
+      }
+      if (!shouldComplete) {
+        setState(() {
+          _isBusy = false;
+        });
+        return result;
+      }
+      setState(() {
+        _isBusy = false;
+        _resetUnsavedState();
       });
       widget.onResult?.call(result);
       if (widget.closeOnSave) {
@@ -124,6 +138,14 @@ extension _ImageClipEditorSave on _ImageClipEditorState {
       _showMessage(widget.labels.errorMessage(error));
       return null;
     }
+  }
+
+  Future<bool> _shouldCompleteSave(ImageClipResult result) async {
+    final onSaveResult = widget.onSaveResult;
+    if (onSaveResult == null) {
+      return true;
+    }
+    return onSaveResult(result);
   }
 
   CropRegion _sourceRegionForResult(

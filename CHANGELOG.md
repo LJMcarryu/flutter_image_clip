@@ -1,3 +1,10 @@
+# 0.10.0
+
+- 新增编辑器保存脏状态控制：内置 Save 按钮会在用户调整 Position 后才可点击。
+- 新增 `ImageClipEditor.onCancelAttempt` / `showImageClipEditor(onCancelAttempt:)`，业务侧可在返回时根据是否存在未保存修改决定是否弹出 Discard 确认框。
+- 新增 `ImageClipEditor.hasCustomPosition`、Revert 工具按钮和 `ImageClipResult.revertedToOriginal`，支持业务在 Save 成功后清空已保存的 Position。
+- 新增 `ImageClipEditor.onSaveResult` / `showImageClipEditor(onSaveResult:)`，业务侧可在接口保存成功后再允许编辑器关闭，接口失败时保留编辑页供用户重试。
+
 # 0.9.5
 
 - 将 pub.dev README 调整为纯英文正文，并把语言切换链接改为 GitHub 上的英文与简体中文 README，避免 pub.dev 内部锚点跳转异常。

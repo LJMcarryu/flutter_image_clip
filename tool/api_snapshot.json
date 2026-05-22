@@ -388,7 +388,7 @@
       "file": "lib/src/widgets/image_clip_editor/editor.dart",
       "declarations": [
         "  constructor ImageClipAspectRatio(required this.label, required this.width, required this.height)",
-        "  constructor ImageClipEditor(super.key, this.controller, this.processor, this.initialImageBytes, this.initialImagePath, this.initialImageLabel, this.initialOrientation, this.initialAspectRatio, this.initialRotationDegrees, this.initialCropRegion, this.aspectRatios, this.initialScaleMode, this.outputSettings, this.previewDecodeSettings, this.processingSettings, this.labels, this.theme, this.cropAreaHeight, this.loadSampleOnStart, this.closeOnCancel, this.closeOnSave, this.showResultPage, this.onCancel, this.onProgress, this.onResult)",
+        "  constructor ImageClipEditor(super.key, this.controller, this.processor, this.initialImageBytes, this.initialImagePath, this.initialImageLabel, this.initialOrientation, this.initialAspectRatio, this.initialRotationDegrees, this.initialCropRegion, this.aspectRatios, this.initialScaleMode, this.hasCustomPosition, this.outputSettings, this.previewDecodeSettings, this.processingSettings, this.labels, this.theme, this.cropAreaHeight, this.loadSampleOnStart, this.closeOnCancel, this.closeOnSave, this.showResultPage, this.onCancelAttempt, this.onSaveResult, this.onCancel, this.onProgress, this.onResult)",
         "  enumValue ImageClipCropOrientation.landscape",
         "  enumValue ImageClipCropOrientation.portrait",
         "  enumValue ImageClipScaleMode.fill",
@@ -408,6 +408,7 @@
         "  field ImageClipEditor.closeOnSave",
         "  field ImageClipEditor.controller",
         "  field ImageClipEditor.cropAreaHeight",
+        "  field ImageClipEditor.hasCustomPosition",
         "  field ImageClipEditor.initialAspectRatio",
         "  field ImageClipEditor.initialCropRegion",
         "  field ImageClipEditor.initialImageBytes",
@@ -419,8 +420,10 @@
         "  field ImageClipEditor.labels",
         "  field ImageClipEditor.loadSampleOnStart",
         "  field ImageClipEditor.onCancel",
+        "  field ImageClipEditor.onCancelAttempt",
         "  field ImageClipEditor.onProgress",
         "  field ImageClipEditor.onResult",
+        "  field ImageClipEditor.onSaveResult",
         "  field ImageClipEditor.outputSettings",
         "  field ImageClipEditor.previewDecodeSettings",
         "  field ImageClipEditor.processingSettings",
@@ -438,13 +441,13 @@
         "class ImageClipEditor",
         "enum ImageClipCropOrientation",
         "enum ImageClipScaleMode",
-        "function showImageClipEditor(BuildContext context, Uint8List? imageBytes, String? imagePath, String imageLabel, ImageProcessor? processor, ImageClipCropOrientation initialOrientation, ImageClipAspectRatio? initialAspectRatio, int initialRotationDegrees, CropRegion? initialCropRegion, List<ImageClipAspectRatio> aspectRatios, ImageClipScaleMode initialScaleMode, ImageClipOutputSettings outputSettings, ImageClipDecodeSettings previewDecodeSettings, ImageClipProcessingSettings processingSettings, ImageClipEditorLabels labels, ImageClipEditorTheme theme, double? cropAreaHeight, bool loadSampleOnStart, bool useRootNavigator, RouteSettings? routeSettings, ValueChanged<ImageClipTaskProgress>? onProgress)"
+        "function showImageClipEditor(BuildContext context, Uint8List? imageBytes, String? imagePath, String imageLabel, ImageProcessor? processor, ImageClipCropOrientation initialOrientation, ImageClipAspectRatio? initialAspectRatio, int initialRotationDegrees, CropRegion? initialCropRegion, List<ImageClipAspectRatio> aspectRatios, ImageClipScaleMode initialScaleMode, bool hasCustomPosition, ImageClipOutputSettings outputSettings, ImageClipDecodeSettings previewDecodeSettings, ImageClipProcessingSettings processingSettings, ImageClipEditorLabels labels, ImageClipEditorTheme theme, double? cropAreaHeight, bool loadSampleOnStart, bool useRootNavigator, RouteSettings? routeSettings, ImageClipCancelAttemptCallback? onCancelAttempt, ImageClipSaveResultCallback? onSaveResult, ValueChanged<ImageClipTaskProgress>? onProgress)"
       ]
     },
     {
       "file": "lib/src/widgets/image_clip_editor/labels.dart",
       "declarations": [
-        "  constructor ImageClipEditorLabels(this.editorTitle, this.positionHint, this.defaultImageLabel, this.cancelButton, this.saveButton, this.fitButton, this.fillButton, this.flipHorizontalButton, this.flipVerticalButton, this.rotateButton, this.previewSemanticsLabel, this.cropFrameSemanticsLabel, this.resultTitle, this.cropDetailsTitle, this.rotationDegreesLabel, this.sourceSizeLabel, this.resultDataTitle, this.backTooltip, this.initialStatus, this.loadingImageStatus, this.imageLoadedStatus, this.waitingForImageStatus, this.generatingSampleStatus, this.sampleGeneratedStatus, this.imageRequiredMessage, this.rotatingStatus, this.rotationCompleteStatus, this.flipPreviewStatus, this.croppingStatus, this.cropCompleteStatus, this.cropResetMessage, this.taskCanceledStatus, this.processingFailedPrefix)",
+        "  constructor ImageClipEditorLabels(this.editorTitle, this.positionHint, this.defaultImageLabel, this.cancelButton, this.saveButton, this.fitButton, this.fillButton, this.flipHorizontalButton, this.flipVerticalButton, this.rotateButton, this.revertButton, this.previewSemanticsLabel, this.cropFrameSemanticsLabel, this.resultTitle, this.cropDetailsTitle, this.rotationDegreesLabel, this.sourceSizeLabel, this.resultDataTitle, this.backTooltip, this.initialStatus, this.loadingImageStatus, this.imageLoadedStatus, this.waitingForImageStatus, this.generatingSampleStatus, this.sampleGeneratedStatus, this.imageRequiredMessage, this.rotatingStatus, this.rotationCompleteStatus, this.flipPreviewStatus, this.croppingStatus, this.cropCompleteStatus, this.cropResetMessage, this.taskCanceledStatus, this.processingFailedPrefix)",
         "  field ImageClipEditorLabels.backTooltip",
         "  field ImageClipEditorLabels.cancelButton",
         "  field ImageClipEditorLabels.cropCompleteStatus",
@@ -471,6 +474,7 @@
         "  field ImageClipEditorLabels.processingFailedPrefix",
         "  field ImageClipEditorLabels.resultDataTitle",
         "  field ImageClipEditorLabels.resultTitle",
+        "  field ImageClipEditorLabels.revertButton",
         "  field ImageClipEditorLabels.rotateButton",
         "  field ImageClipEditorLabels.rotatingStatus",
         "  field ImageClipEditorLabels.rotationCompleteStatus",
@@ -489,7 +493,7 @@
     {
       "file": "lib/src/widgets/image_clip_editor/result_page.dart",
       "declarations": [
-        "  constructor ImageClipResult(required this.source, required this.cropped, required this.region, required this.rotationDegrees, CropRegion? previewRegion, CropRegion? visibleRegion, this.aspectRatio, this.flippedHorizontally, this.flippedVertically)",
+        "  constructor ImageClipResult(required this.source, required this.cropped, required this.region, required this.rotationDegrees, CropRegion? previewRegion, CropRegion? visibleRegion, this.aspectRatio, this.flippedHorizontally, this.flippedVertically, this.revertedToOriginal)",
         "  constructor ImageClipResultPage(super.key, required this.result, this.labels, this.theme)",
         "  field ImageClipResult.aspectRatio",
         "  field ImageClipResult.cropped",
@@ -497,6 +501,7 @@
         "  field ImageClipResult.flippedVertically",
         "  field ImageClipResult.previewRegion",
         "  field ImageClipResult.region",
+        "  field ImageClipResult.revertedToOriginal",
         "  field ImageClipResult.rotationDegrees",
         "  field ImageClipResult.source",
         "  field ImageClipResult.visibleRegion",

@@ -1,5 +1,22 @@
 part of '../image_clip_editor.dart';
 
+/// Called when the editor close/back control is tapped.
+///
+/// [needsDiscardConfirmation] is true when the current editor state contains
+/// unsaved user adjustments. In that case the editor leaves navigation to the
+/// host app so it can show a discard confirmation.
+typedef ImageClipCancelAttemptCallback =
+    void Function(bool needsDiscardConfirmation);
+
+/// Called after the editor has produced a save result.
+///
+/// Return true to let the editor continue its normal completion flow, including
+/// [ImageClipEditor.onResult], closing the route, or opening the result page.
+/// Return false to keep the editor open so the host app can report a failure or
+/// let the user retry.
+typedef ImageClipSaveResultCallback =
+    FutureOr<bool> Function(ImageClipResult result);
+
 /// Opens a full-screen image crop editor and returns an [ImageClipResult].
 ///
 /// [initialRotationDegrees] must be a quarter-turn rotation. When
@@ -22,6 +39,7 @@ Future<ImageClipResult?> showImageClipEditor(
   CropRegion? initialCropRegion,
   List<ImageClipAspectRatio> aspectRatios = ImageClipAspectRatio.defaults,
   ImageClipScaleMode initialScaleMode = ImageClipScaleMode.fit,
+  bool hasCustomPosition = false,
   ImageClipOutputSettings outputSettings = const ImageClipOutputSettings.png(),
   ImageClipDecodeSettings previewDecodeSettings =
       const ImageClipDecodeSettings(),
@@ -33,6 +51,8 @@ Future<ImageClipResult?> showImageClipEditor(
   bool loadSampleOnStart = true,
   bool useRootNavigator = false,
   RouteSettings? routeSettings,
+  ImageClipCancelAttemptCallback? onCancelAttempt,
+  ImageClipSaveResultCallback? onSaveResult,
   ValueChanged<ImageClipTaskProgress>? onProgress,
 }) {
   return Navigator.of(context, rootNavigator: useRootNavigator).push(
@@ -55,6 +75,7 @@ Future<ImageClipResult?> showImageClipEditor(
           initialCropRegion: initialCropRegion,
           aspectRatios: aspectRatios,
           initialScaleMode: initialScaleMode,
+          hasCustomPosition: hasCustomPosition,
           outputSettings: outputSettings,
           previewDecodeSettings: previewDecodeSettings,
           processingSettings: processingSettings,
@@ -65,6 +86,8 @@ Future<ImageClipResult?> showImageClipEditor(
           closeOnCancel: true,
           closeOnSave: true,
           showResultPage: false,
+          onCancelAttempt: onCancelAttempt,
+          onSaveResult: onSaveResult,
           onProgress: onProgress,
         );
       },
@@ -270,6 +293,7 @@ class ImageClipEditor extends StatefulWidget {
     this.initialCropRegion,
     this.aspectRatios = ImageClipAspectRatio.defaults,
     this.initialScaleMode = ImageClipScaleMode.fit,
+    this.hasCustomPosition = false,
     this.outputSettings = const ImageClipOutputSettings.png(),
     this.previewDecodeSettings = const ImageClipDecodeSettings(),
     this.processingSettings = const ImageClipProcessingSettings(),
@@ -280,6 +304,8 @@ class ImageClipEditor extends StatefulWidget {
     this.closeOnCancel = false,
     this.closeOnSave = false,
     this.showResultPage = true,
+    this.onCancelAttempt,
+    this.onSaveResult,
     this.onCancel,
     this.onProgress,
     this.onResult,
@@ -351,6 +377,13 @@ class ImageClipEditor extends StatefulWidget {
   /// Initial image scaling mode.
   final ImageClipScaleMode initialScaleMode;
 
+  /// Whether the loaded image already has a persisted custom position.
+  ///
+  /// When true, the editor shows a Revert control. Saving after Revert returns
+  /// [ImageClipResult.revertedToOriginal] as true so the host app can clear its
+  /// persisted position metadata.
+  final bool hasCustomPosition;
+
   /// Output encoding settings used for the saved crop result.
   final ImageClipOutputSettings outputSettings;
 
@@ -389,6 +422,19 @@ class ImageClipEditor extends StatefulWidget {
   /// Whether to navigate to [ImageClipResultPage] after saving.
   final bool showResultPage;
 
+  /// Called when the user taps the close/back control.
+  ///
+  /// If [ImageClipCancelAttemptCallback] receives true, the editor does not run
+  /// its default cancel behavior so the host app can show a discard dialog and
+  /// decide whether to close or stay in the editor.
+  final ImageClipCancelAttemptCallback? onCancelAttempt;
+
+  /// Called after the user taps Save and the editor has produced a result.
+  ///
+  /// This callback runs before [onResult], [closeOnSave], and [showResultPage].
+  /// Return false to keep the editor open and preserve its unsaved state.
+  final ImageClipSaveResultCallback? onSaveResult;
+
   /// Called when the user cancels the crop operation.
   final VoidCallback? onCancel;
 
@@ -422,6 +468,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   int _initialCropRegionRevision = 0;
   bool _flipHorizontal = false;
   bool _flipVertical = false;
+  bool _hasUnsavedChanges = false;
+  bool _revertedToOriginal = false;
 
   double get _cropAspectRatioValue => _cropAspectRatio.value;
 
@@ -441,6 +489,17 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     final region = _validInitialCropRegion;
     if (region != null) {
       return _aspectRatioForInitialRegion(region);
+    }
+    final orientationRatio = ImageClipAspectRatio.fromOrientation(
+      widget.initialOrientation,
+    );
+    return _closestAspectRatioForValue(orientationRatio.value);
+  }
+
+  ImageClipAspectRatio get _originalAspectRatio {
+    final explicit = widget.initialAspectRatio;
+    if (explicit != null) {
+      return _closestAspectRatioForValue(explicit.value);
     }
     final orientationRatio = ImageClipAspectRatio.fromOrientation(
       widget.initialOrientation,
@@ -511,13 +570,16 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     if (initialCropRegionChanged ||
         oldWidget.initialAspectRatio != widget.initialAspectRatio ||
         oldWidget.initialOrientation != widget.initialOrientation ||
+        oldWidget.initialScaleMode != widget.initialScaleMode ||
         aspectRatiosChanged) {
       setState(() {
         if (initialCropRegionChanged) {
           _initialCropRegionRevision++;
         }
         _cropAspectRatio = _initialAspectRatio;
+        _cropScaleMode = widget.initialScaleMode;
         _resetPreviewTransform();
+        _resetUnsavedState();
       });
     }
   }
@@ -562,6 +624,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
                 initialCropRegionRevision: _initialCropRegionRevision,
                 labels: widget.labels,
                 theme: widget.theme,
+                onChanged: _markPositionAdjusted,
               ),
             );
 
@@ -592,9 +655,11 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
                   labels: widget.labels,
                   theme: widget.theme,
                   canRun: _image != null && !_isBusy,
-                  canSave: _image != null && !_isBusy,
+                  canSave: _image != null && !_isBusy && _hasUnsavedChanges,
+                  showRevert: widget.hasCustomPosition && _image != null,
                   onScaleModeToggle: _toggleScaleMode,
                   onRotate: _rotateRight,
+                  onRevert: _revertToOriginal,
                   onAspectRatioChanged: _setCropAspectRatio,
                   onSave: _applyCrop,
                 ),
@@ -675,6 +740,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
           _sourceImagePath = null;
           _sourceImageLabel = _initialImageLabel;
           _resetPreviewTransform();
+          _resetUnsavedState();
         },
       );
     }
@@ -695,6 +761,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
           _sourceImagePath = path;
           _sourceImageLabel = _initialImageLabel;
           _resetPreviewTransform();
+          _resetUnsavedState();
         },
       );
     }
@@ -711,6 +778,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       _sourceImageLabel = null;
       _status = widget.labels.waitingForImageStatus;
       _resetPreviewTransform();
+      _resetUnsavedState();
     });
     return Future<void>.value();
   }
@@ -768,6 +836,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
         _sourceImagePath = null;
         _sourceImageLabel = effectiveLabel;
         _resetPreviewTransform();
+        _resetUnsavedState();
       },
     );
   }
@@ -790,6 +859,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
         _sourceImagePath = path;
         _sourceImageLabel = effectiveLabel;
         _resetPreviewTransform();
+        _resetUnsavedState();
       },
     );
   }
@@ -805,6 +875,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
         _sourceImagePath = null;
         _sourceImageLabel = null;
         _resetPreviewTransform();
+        _resetUnsavedState();
       },
     );
   }
@@ -823,6 +894,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       _isBusy = false;
       _progressValue = null;
       _resetPreviewTransform();
+      _resetUnsavedState();
       _status = widget.labels.waitingForImageStatus;
     });
   }
@@ -921,6 +993,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
           .copyWith(rotationDegrees: _rotationDegrees + 90)
           .normalizedRotation;
       _status = widget.labels.rotationCompleteStatus;
+      _markPositionAdjustedInsideSetState();
     });
     return Future<void>.value();
   }
@@ -949,6 +1022,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
         _flipVertical = !_flipVertical;
       }
       _status = widget.labels.flipPreviewStatus;
+      _markPositionAdjustedInsideSetState();
     });
     return Future<void>.value();
   }
@@ -1031,8 +1105,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     });
   }
 
-  void _resetCropView() {
-    _previewKey.currentState?.resetCropView();
+  void _resetCropView({bool markUnsaved = false}) {
+    _previewKey.currentState?.resetCropView(notify: markUnsaved);
   }
 
   void _toggleScaleMode() {
@@ -1044,6 +1118,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
         ImageClipScaleMode.fill => ImageClipScaleMode.fit,
         ImageClipScaleMode.fit => ImageClipScaleMode.fill,
       };
+      _markPositionAdjustedInsideSetState();
     });
   }
 
@@ -1053,7 +1128,40 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     _flipVertical = false;
   }
 
+  void _resetPreviewTransformToOriginal() {
+    _rotationDegrees = 0;
+    _flipHorizontal = false;
+    _flipVertical = false;
+  }
+
+  void _resetUnsavedState() {
+    _hasUnsavedChanges = false;
+    _revertedToOriginal = false;
+  }
+
+  void _markPositionAdjusted() {
+    if (_hasUnsavedChanges && !_revertedToOriginal) {
+      return;
+    }
+    setState(_markPositionAdjustedInsideSetState);
+  }
+
+  void _markPositionAdjustedInsideSetState() {
+    _hasUnsavedChanges = true;
+    _revertedToOriginal = false;
+  }
+
+  void _markRevertedInsideSetState() {
+    _hasUnsavedChanges = true;
+    _revertedToOriginal = true;
+  }
+
   void _cancelCrop() {
+    final needsDiscardConfirmation = _hasUnsavedChanges;
+    widget.onCancelAttempt?.call(needsDiscardConfirmation);
+    if (needsDiscardConfirmation && widget.onCancelAttempt != null) {
+      return;
+    }
     widget.onCancel?.call();
     if (widget.closeOnCancel) {
       Navigator.of(context).maybePop();
@@ -1063,6 +1171,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       _cropAspectRatio = _initialAspectRatio;
       _cropScaleMode = widget.initialScaleMode;
       _resetPreviewTransform();
+      _resetUnsavedState();
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -1079,6 +1188,24 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     }
     setState(() {
       _cropAspectRatio = supportedAspectRatio;
+      _markPositionAdjustedInsideSetState();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _resetCropView();
+      }
+    });
+  }
+
+  void _revertToOriginal() {
+    if (_isBusy || _image == null) {
+      return;
+    }
+    setState(() {
+      _cropAspectRatio = _originalAspectRatio;
+      _cropScaleMode = ImageClipScaleMode.fit;
+      _resetPreviewTransformToOriginal();
+      _markRevertedInsideSetState();
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {

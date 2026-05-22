@@ -13,6 +13,7 @@ class _PreviewPanel extends StatefulWidget {
     required this.initialCropRegionRevision,
     required this.labels,
     required this.theme,
+    required this.onChanged,
   });
 
   final EditedImage? image;
@@ -25,6 +26,7 @@ class _PreviewPanel extends StatefulWidget {
   final int initialCropRegionRevision;
   final ImageClipEditorLabels labels;
   final ImageClipEditorTheme theme;
+  final VoidCallback onChanged;
 
   @override
   State<_PreviewPanel> createState() => _PreviewPanelState();
@@ -137,17 +139,22 @@ class _PreviewPanelState extends State<_PreviewPanel> {
                       layout.baseRect.topLeft -
                       focalImagePoint * nextScale;
 
+                  final clampedOffset = _clampOffset(
+                    nextOffset,
+                    layout,
+                    nextScale,
+                    widget.scaleMode,
+                  );
+                  if (nextScale == _scale && clampedOffset == _offset) {
+                    return;
+                  }
                   setState(() {
                     _scale = nextScale;
-                    _offset = _clampOffset(
-                      nextOffset,
-                      layout,
-                      nextScale,
-                      widget.scaleMode,
-                    );
+                    _offset = clampedOffset;
                   });
+                  widget.onChanged();
                 },
-                onDoubleTap: _resetGestureCrop,
+                onDoubleTap: () => _resetGestureCrop(notify: true),
                 child: ClipRect(
                   child: Stack(
                     fit: StackFit.expand,
@@ -424,18 +431,23 @@ class _PreviewPanelState extends State<_PreviewPanel> {
     return spansFullWidth || spansFullHeight;
   }
 
-  void _resetGestureCrop() {
+  void _resetGestureCrop({required bool notify}) {
     final layout = _layout;
     if (layout == null) {
       return;
     }
+    final previousScale = _scale;
+    final previousOffset = _offset;
     setState(() {
       _resetToLayout(layout);
     });
+    if (notify && (previousScale != _scale || previousOffset != _offset)) {
+      widget.onChanged();
+    }
   }
 
-  void resetCropView() {
-    _resetGestureCrop();
+  void resetCropView({bool notify = false}) {
+    _resetGestureCrop(notify: notify);
   }
 
   void _handlePointerSignal(PointerSignalEvent event) {
@@ -482,6 +494,7 @@ class _PreviewPanelState extends State<_PreviewPanel> {
       _scale = nextScale;
       _offset = _clampOffset(nextOffset, layout, nextScale, widget.scaleMode);
     });
+    widget.onChanged();
   }
 }
 

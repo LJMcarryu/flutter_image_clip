@@ -44,7 +44,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.9.5
+  flutter_image_clip: ^0.10.0
 ```
 
 执行：

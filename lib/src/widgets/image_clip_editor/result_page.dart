@@ -13,6 +13,7 @@ class ImageClipResult {
     this.aspectRatio,
     this.flippedHorizontally = false,
     this.flippedVertically = false,
+    this.revertedToOriginal = false,
   }) : previewRegion = previewRegion ?? region,
        visibleRegion = visibleRegion ?? region;
 
@@ -62,6 +63,12 @@ class ImageClipResult {
   /// Whether the saved crop was mirrored around its horizontal axis.
   final bool flippedVertically;
 
+  /// Whether this save represents a Revert-to-original action.
+  ///
+  /// Host apps can use this flag to clear persisted custom position metadata
+  /// instead of saving the returned crop region as a new custom position.
+  final bool revertedToOriginal;
+
   /// Transform metadata represented by this result.
   ImageClipCropTransform get transform {
     return ImageClipCropTransform(
@@ -82,6 +89,7 @@ class ImageClipResult {
     'rotationDegrees': rotationDegrees,
     'flippedHorizontally': flippedHorizontally,
     'flippedVertically': flippedVertically,
+    'revertedToOriginal': revertedToOriginal,
   };
 
   /// Creates a result from [toMap] output.
@@ -111,6 +119,7 @@ class ImageClipResult {
       rotationDegrees: _intOf(map['rotationDegrees'], fallback: 0),
       flippedHorizontally: _boolOf(map['flippedHorizontally'], fallback: false),
       flippedVertically: _boolOf(map['flippedVertically'], fallback: false),
+      revertedToOriginal: _boolOf(map['revertedToOriginal'], fallback: false),
     );
   }
 }
