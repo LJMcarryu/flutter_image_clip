@@ -1,3 +1,7 @@
+# 0.10.2
+
+- 修正 Position 工具栏 Revert 图标的尺寸和位置，使其与 Figma 设计稿的 22px 图标边界一致。
+
 # 0.10.1
 
 - 按 Figma 设计稿替换 Position 工具栏里的 Rotate 和 Revert 图标，保持原有尺寸、颜色状态和交互逻辑不变。

@@ -577,9 +577,8 @@ class _RevertGlyphPainter extends CustomPainter {
 
     canvas.save();
     canvas.scale(sx, sy);
-    canvas.translate(3, 2.75);
-    canvas.translate(16.25, 0);
-    canvas.scale(-16.25 / 18.0833, 16.5 / 18.3333);
+    canvas.translate(20.1667, 1.8333);
+    canvas.scale(-1, 1);
     final arc = Path()
       ..moveTo(17.1667, 9.66667)
       ..cubicTo(17.1667, 11.2984, 16.9328, 12.3934, 16.0263, 13.7501)
@@ -597,9 +596,8 @@ class _RevertGlyphPainter extends CustomPainter {
 
     canvas.save();
     canvas.scale(sx, sy);
-    canvas.translate(2.75, 2.75);
-    canvas.translate(4.5833, 0);
-    canvas.scale(-4.5833 / 6.41667, 4.5833 / 6.41667);
+    canvas.translate(8.25, 1.8333);
+    canvas.scale(-1, 1);
     final arrow = Path()
       ..moveTo(5.5, 0.916667)
       ..lineTo(5.5, 5.5)
