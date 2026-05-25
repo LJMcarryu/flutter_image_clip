@@ -44,7 +44,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.10.2
+  flutter_image_clip: ^0.10.3
 ```
 
 执行：
@@ -136,6 +136,16 @@ await controller.loadImageFile(picked.path, label: picked.name);
 await controller.rotateRight();
 final result = await controller.crop();
 controller.cancelTask();
+```
+
+主题色可以通过 `ImageClipEditorTheme` 覆盖。`progressColor` 会同时控制顶部进度条，以及图片预览解码期间显示的圆形 loading：
+
+```dart
+ImageClipEditor(
+  theme: const ImageClipEditorTheme(
+    progressColor: Color(0xFF10B062),
+  ),
+)
 ```
 
 ## 图像处理

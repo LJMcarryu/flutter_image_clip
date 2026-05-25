@@ -64,7 +64,7 @@ After the package is published to pub.dev, add it to your app:
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.10.2
+  flutter_image_clip: ^0.10.3
 ```
 
 Then run:
@@ -292,11 +292,14 @@ ImageClipEditor(
     accentColor: Color(0xFF10B062),
     accentSurfaceColor: Color(0xFFD6F1E1),
     onAccentColor: Color(0xFFFFFFFF),
+    progressColor: Color(0xFF10B062),
     cropShadeColor: Color(0x80000000),
     cropBorderColor: Color(0xFFFFFFFF),
   ),
 )
 ```
+
+`progressColor` controls both the top progress bar and the circular loading indicator shown while the editor is decoding the image preview.
 
 For the older dark look, start from `const ImageClipEditorTheme.dark()` and override individual tokens. You can also derive a theme from the host app:
 

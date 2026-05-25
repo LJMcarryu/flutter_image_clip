@@ -24,20 +24,6 @@ class _CropTopBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          Expanded(
-            child: Text(
-              labels.editorTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: theme.primaryTextColor,
-                fontSize: 20,
-                height: 1.4,
-                letterSpacing: 0,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
           Semantics(
             button: true,
             enabled: !isBusy,
@@ -48,36 +34,56 @@ class _CropTopBar extends StatelessWidget {
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: isBusy ? null : onCancel,
-                  child: SizedBox.square(
+                  child: SizedBox(
                     key: const ValueKey('image_clip_editor_close_hit_area'),
-                    dimension: 44,
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: SizedBox.square(
-                        key: const ValueKey('image_clip_editor_close_icon'),
-                        dimension: 20,
-                        child: CustomPaint(
-                          painter: _CloseGlyphPainter(
-                            color: isBusy
-                                ? theme.disabledTextColor
-                                : theme.closeIconColor,
+                    width: 176,
+                    height: 44,
+                    child: Row(
+                      children: [
+                        SizedBox.square(
+                          key: const ValueKey('image_clip_editor_back_icon'),
+                          dimension: 20,
+                          child: CustomPaint(
+                            painter: _BackGlyphPainter(
+                              color: isBusy
+                                  ? theme.disabledTextColor
+                                  : theme.controlTextColor,
+                            ),
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            labels.editorTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: isBusy
+                                  ? theme.disabledTextColor
+                                  : theme.primaryTextColor,
+                              fontSize: 18,
+                              height: 1.35,
+                              letterSpacing: -0.18,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
             ),
           ),
+          const Spacer(),
         ],
       ),
     );
   }
 }
 
-class _CloseGlyphPainter extends CustomPainter {
-  const _CloseGlyphPainter({required this.color});
+class _BackGlyphPainter extends CustomPainter {
+  const _BackGlyphPainter({required this.color});
 
   final Color color;
 
@@ -85,19 +91,36 @@ class _CloseGlyphPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
-      ..strokeWidth = 1.8
-      ..strokeCap = StrokeCap.square
-      ..style = PaintingStyle.stroke;
-    final left = size.width * 0.2;
-    final right = size.width * 0.8;
-    final top = size.height * 0.2;
-    final bottom = size.height * 0.8;
-    canvas.drawLine(Offset(left, top), Offset(right, bottom), paint);
-    canvas.drawLine(Offset(right, top), Offset(left, bottom), paint);
+      ..style = PaintingStyle.fill;
+
+    final sx = size.width / 20;
+    final sy = size.height / 20;
+    canvas.save();
+    canvas.scale(sx, sy);
+    canvas.translate(5.45, 2.08335);
+    final path = Path()
+      ..moveTo(7.75967, 0.0467469)
+      ..lineTo(0.183859, 7.35886)
+      ..cubicTo(-0.046866, 7.58858, -0.0604382, 7.95263, 0.143143, 8.19816)
+      ..lineTo(0.183859, 8.24274)
+      ..lineTo(7.75933, 15.7848)
+      ..cubicTo(7.79057, 15.8159, 7.83285, 15.8333, 7.87692, 15.8333)
+      ..lineTo(9.17972, 15.8333)
+      ..cubicTo(9.27177, 15.8333, 9.34639, 15.7587, 9.34639, 15.6667)
+      ..cubicTo(9.34639, 15.6223, 9.32873, 15.5798, 9.29732, 15.5486)
+      ..lineTo(1.54075, 7.82571)
+      ..lineTo(9.28929, 0.286117)
+      ..cubicTo(9.35526, 0.221926, 9.3567, 0.116408, 9.29251, 0.0504371)
+      ..cubicTo(9.26113, 0.0181907, 9.21805, 0, 9.17306, 0)
+      ..lineTo(7.87541, 0)
+      ..cubicTo(7.83223, 0, 7.79074, 0.016759, 7.75967, 0.0467469)
+      ..close();
+    canvas.drawPath(path, paint);
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant _CloseGlyphPainter oldDelegate) {
+  bool shouldRepaint(covariant _BackGlyphPainter oldDelegate) {
     return oldDelegate.color != color;
   }
 }

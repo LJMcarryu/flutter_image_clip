@@ -102,7 +102,11 @@ class _PreviewPanelState extends State<_PreviewPanel> {
   Widget build(BuildContext context) {
     final image = widget.image;
     if (image == null) {
-      return _EmptyPreview(status: widget.status, theme: widget.theme);
+      return _EmptyPreview(
+        isBusy: widget.isBusy,
+        status: widget.status,
+        theme: widget.theme,
+      );
     }
 
     return LayoutBuilder(
@@ -531,8 +535,13 @@ class _CropPreviewLayout {
 }
 
 class _EmptyPreview extends StatelessWidget {
-  const _EmptyPreview({required this.status, required this.theme});
+  const _EmptyPreview({
+    required this.isBusy,
+    required this.status,
+    required this.theme,
+  });
 
+  final bool isBusy;
   final String status;
   final ImageClipEditorTheme theme;
 
@@ -543,14 +552,25 @@ class _EmptyPreview extends StatelessWidget {
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text(
-            status,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: theme.primaryTextColor,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          child: isBusy
+              ? Semantics(
+                  label: status,
+                  child: SizedBox.square(
+                    dimension: 32,
+                    child: CircularProgressIndicator(
+                      color: theme.progressColor,
+                      strokeWidth: 3,
+                    ),
+                  ),
+                )
+              : Text(
+                  status,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: theme.primaryTextColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
         ),
       ),
     );

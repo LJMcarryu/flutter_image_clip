@@ -337,8 +337,8 @@ void main() {
     final closeHitRect = tester.getRect(
       find.byKey(const ValueKey('image_clip_editor_close_hit_area')),
     );
-    final closeIconRect = tester.getRect(
-      find.byKey(const ValueKey('image_clip_editor_close_icon')),
+    final backIconRect = tester.getRect(
+      find.byKey(const ValueKey('image_clip_editor_back_icon')),
     );
     final saveRect = tester.getRect(
       find.byKey(const ValueKey('image_clip_editor_save_action')),
@@ -346,14 +346,14 @@ void main() {
     final fillRect = tester.getRect(find.text('Fill'));
     final rotateRect = tester.getRect(find.text('Rotate'));
 
-    expect(titleRect.left, 16);
-    expect(titleRect.top, closeTo(14, 1));
-    expect(closeHitRect.left, 315);
+    expect(titleRect.left, 44);
+    expect(titleRect.top, closeTo(16, 1));
+    expect(closeHitRect.left, 16);
     expect(closeHitRect.top, closeTo(6, 0.5));
-    expect(closeHitRect.size, const Size(44, 44));
-    expect(closeIconRect.left, 339);
-    expect(closeIconRect.top, closeTo(18, 0.5));
-    expect(closeIconRect.size, const Size(20, 20));
+    expect(closeHitRect.size, const Size(176, 44));
+    expect(backIconRect.left, 16);
+    expect(backIconRect.top, closeTo(18, 0.5));
+    expect(backIconRect.size, const Size(20, 20));
     expect(saveRect, const Rect.fromLTWH(16, 724, 343, 48));
     expect(fillRect.center.dx, closeTo(131, 1));
     expect(rotateRect.center.dx, closeTo(243, 1));
@@ -844,6 +844,38 @@ void main() {
 
     expect(scaffold.backgroundColor, background);
     expect(title.style?.color, primaryText);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('loading preview uses a themed circular indicator', (
+    tester,
+  ) async {
+    const progressColor = Color(0xFFE11D48);
+    final processor = _DelayedDecodeProcessor();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageClipEditor(
+          processor: processor,
+          initialImageBytes: _pngBytes(64, 64),
+          initialImageLabel: 'loading.png',
+          loadSampleOnStart: false,
+          theme: const ImageClipEditorTheme(progressColor: progressColor),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final indicator = tester.widget<CircularProgressIndicator>(
+      find.byType(CircularProgressIndicator),
+    );
+    expect(indicator.color, progressColor);
+    expect(find.text('Loading image'), findsNothing);
+
+    processor.complete('loading.png', width: 64, height: 64);
+    await tester.pump();
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

@@ -1,3 +1,8 @@
+# 0.10.3
+
+- 将图片预览加载态从文本改为圆形 loading，并复用 `ImageClipEditorTheme.progressColor` 支持业务自定义颜色。
+- 按 Figma 设计稿调整顶部栏布局：左侧返回箭头与标题作为取消入口，移除右侧关闭图标，并更新标题字号与间距。
+
 # 0.10.2
 
 - 修正 Position 工具栏 Revert 图标的尺寸和位置，使其与 Figma 设计稿的 22px 图标边界一致。
