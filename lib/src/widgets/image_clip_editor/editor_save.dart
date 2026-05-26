@@ -19,7 +19,6 @@ extension _ImageClipEditorSave on _ImageClipEditorState {
 
     setState(() {
       _isBusy = true;
-      _progressValue = 0;
       _status = widget.labels.croppingStatus;
     });
 
@@ -87,7 +86,6 @@ extension _ImageClipEditorSave on _ImageClipEditorState {
       setState(() {
         _activeTask = null;
         _activeProgressSubscription = null;
-        _progressValue = null;
         _status = widget.labels.completedStatus(
           widget.labels.cropCompleteStatus,
           cropped,
@@ -132,7 +130,6 @@ extension _ImageClipEditorSave on _ImageClipEditorState {
         _isBusy = false;
         _activeTask = null;
         _activeProgressSubscription = null;
-        _progressValue = null;
         _status = widget.labels.errorMessage(error);
       });
       _showMessage(widget.labels.errorMessage(error));

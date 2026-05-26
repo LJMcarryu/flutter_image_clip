@@ -1,3 +1,7 @@
+# 0.10.4
+
+- 移除图片任务运行时的顶部进度条，加载图片时仅保留预览区中央的圆形 loading。
+
 # 0.10.3
 
 - 将图片预览加载态从文本改为圆形 loading，并复用 `ImageClipEditorTheme.progressColor` 支持业务自定义颜色。

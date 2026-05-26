@@ -198,7 +198,10 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       });
       await tester.pump(const Duration(milliseconds: 100));
-      if (find.byType(LinearProgressIndicator).evaluate().isEmpty) {
+      if (find
+          .byKey(const ValueKey('image_clip_editor_busy_state'))
+          .evaluate()
+          .isEmpty) {
         return;
       }
     }
@@ -870,12 +873,21 @@ void main() {
       find.byType(CircularProgressIndicator),
     );
     expect(indicator.color, progressColor);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(
+      find.byKey(const ValueKey('image_clip_editor_busy_state')),
+      findsOneWidget,
+    );
     expect(find.text('Loading image'), findsNothing);
 
     processor.complete('loading.png', width: 64, height: 64);
     await tester.pump();
 
     expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(
+      find.byKey(const ValueKey('image_clip_editor_busy_state')),
+      findsNothing,
+    );
     expect(tester.takeException(), isNull);
   });
 

@@ -460,7 +460,6 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
   String? _sourceImageLabel;
   ImageClipTask<EditedImage>? _activeTask;
   StreamSubscription<ImageClipTaskProgress>? _activeProgressSubscription;
-  double? _progressValue;
   late String _status;
   late ImageClipAspectRatio _cropAspectRatio;
   late ImageClipScaleMode _cropScaleMode;
@@ -600,14 +599,9 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final busyHeight = _isBusy ? 2.0 : 0.0;
-            final cropAreaHeight = _cropAreaHeightFor(
-              constraints.maxHeight,
-              busyHeight: busyHeight,
-            );
+            final cropAreaHeight = _cropAreaHeightFor(constraints.maxHeight);
             final bottomBarHeight = _bottomBarHeightFor(
               constraints.maxHeight,
-              busyHeight: busyHeight,
               cropAreaHeight: cropAreaHeight,
             );
             final preview = KeyedSubtree(
@@ -637,11 +631,8 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
                   onCancel: _cancelCrop,
                 ),
                 if (_isBusy)
-                  LinearProgressIndicator(
-                    value: _progressValue,
-                    minHeight: busyHeight,
-                    color: widget.theme.progressColor,
-                    backgroundColor: widget.theme.borderColor,
+                  const SizedBox.shrink(
+                    key: ValueKey('image_clip_editor_busy_state'),
                   ),
                 if (cropAreaHeight == null)
                   Expanded(child: preview)
@@ -671,10 +662,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     );
   }
 
-  double? _cropAreaHeightFor(
-    double availableHeight, {
-    required double busyHeight,
-  }) {
+  double? _cropAreaHeightFor(double availableHeight) {
     final requestedHeight = widget.cropAreaHeight;
     if (requestedHeight == null || !availableHeight.isFinite) {
       return requestedHeight;
@@ -682,26 +670,20 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
 
     final topBarHeight = widget.theme.topBarHeight;
     final compactBottomBarHeight = widget.theme.compactBottomBarHeight;
-    final maxHeight =
-        availableHeight - topBarHeight - busyHeight - compactBottomBarHeight;
+    final maxHeight = availableHeight - topBarHeight - compactBottomBarHeight;
     if (maxHeight <= 0) {
       return 0;
     }
     return requestedHeight.clamp(0, maxHeight).toDouble();
   }
 
-  double _bottomBarHeightFor(
-    double availableHeight, {
-    required double busyHeight,
-    double? cropAreaHeight,
-  }) {
+  double _bottomBarHeightFor(double availableHeight, {double? cropAreaHeight}) {
     final topBarHeight = widget.theme.topBarHeight;
     final targetBottomBarHeight = widget.theme.bottomBarHeight;
     final compactBottomBarHeight = widget.theme.compactBottomBarHeight;
 
     if (cropAreaHeight != null && availableHeight.isFinite) {
-      final height =
-          availableHeight - topBarHeight - busyHeight - cropAreaHeight;
+      final height = availableHeight - topBarHeight - cropAreaHeight;
       return height.clamp(0, double.infinity).toDouble();
     }
 
@@ -709,7 +691,7 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       return targetBottomBarHeight;
     }
 
-    final usableHeight = availableHeight - topBarHeight - busyHeight;
+    final usableHeight = availableHeight - topBarHeight;
     if (usableHeight <= compactBottomBarHeight) {
       return usableHeight.clamp(0, targetBottomBarHeight).toDouble();
     }
@@ -892,7 +874,6 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       _sourceImagePath = null;
       _sourceImageLabel = null;
       _isBusy = false;
-      _progressValue = null;
       _resetPreviewTransform();
       _resetUnsavedState();
       _status = widget.labels.waitingForImageStatus;
@@ -932,7 +913,6 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
     if (mounted) {
       setState(() {
         _isBusy = false;
-        _progressValue = null;
         _status = widget.labels.taskCanceledStatus;
       });
     }
@@ -1046,7 +1026,6 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
 
     setState(() {
       _isBusy = true;
-      _progressValue = 0;
       _status = busyLabel;
     });
 
@@ -1064,7 +1043,6 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
         _isBusy = false;
         _activeTask = null;
         _activeProgressSubscription = null;
-        _progressValue = null;
         onDone?.call(result);
         _status = widget.labels.completedStatus(doneLabel, result);
       });
@@ -1076,7 +1054,6 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
         _isBusy = false;
         _activeTask = null;
         _activeProgressSubscription = null;
-        _progressValue = null;
         _status = widget.labels.errorMessage(error);
       });
       _showMessage(widget.labels.errorMessage(error));
@@ -1098,9 +1075,6 @@ class _ImageClipEditorState extends State<ImageClipEditor> {
       if (!mounted || taskId != _taskSerial) {
         return;
       }
-      setState(() {
-        _progressValue = progress.fraction.clamp(0, 1).toDouble();
-      });
       widget.onProgress?.call(progress);
     });
   }

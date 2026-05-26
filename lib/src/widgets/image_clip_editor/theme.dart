@@ -174,7 +174,7 @@ class ImageClipEditorTheme {
   /// Text color shown on [accentColor].
   final Color onAccentColor;
 
-  /// Progress indicator color.
+  /// Loading indicator color.
   final Color progressColor;
 
   /// Overlay color outside the crop frame.
