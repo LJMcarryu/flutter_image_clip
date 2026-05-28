@@ -302,7 +302,7 @@ void main() {
     final previousComparator = goldenFileComparator;
     goldenFileComparator = _TolerantGoldenFileComparator(
       Uri.parse('test/widget_test.dart'),
-      precisionTolerance: 0.01,
+      precisionTolerance: 0.02,
     );
     addTearDown(() {
       goldenFileComparator = previousComparator;

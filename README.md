@@ -64,7 +64,7 @@ After the package is published to pub.dev, add it to your app:
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.11.0
+  flutter_image_clip: ^0.11.1
 ```
 
 Then run:
