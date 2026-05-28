@@ -9,26 +9,68 @@ class _CropShade extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      child: CustomPaint(painter: _CropShadePainter(rect, theme)),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipPath(
+            clipper: _CropShadeClipper(rect),
+            child: _BlurredCropShade(theme: theme),
+          ),
+          CustomPaint(painter: _CropGridPainter(rect, theme)),
+        ],
+      ),
     );
   }
 }
 
-class _CropShadePainter extends CustomPainter {
-  const _CropShadePainter(this.rect, this.theme);
+class _BlurredCropShade extends StatelessWidget {
+  const _BlurredCropShade({required this.theme});
+
+  final ImageClipEditorTheme theme;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = ColoredBox(color: theme.cropShadeColor);
+    if (theme.cropShadeBlurSigma == 0) {
+      return child;
+    }
+    return BackdropFilter(
+      filter: ui.ImageFilter.blur(
+        sigmaX: theme.cropShadeBlurSigma,
+        sigmaY: theme.cropShadeBlurSigma,
+      ),
+      child: child,
+    );
+  }
+}
+
+class _CropShadeClipper extends CustomClipper<Path> {
+  const _CropShadeClipper(this.rect);
+
+  final Rect rect;
+
+  @override
+  Path getClip(Size size) {
+    return Path()
+      ..fillType = PathFillType.evenOdd
+      ..addRect(Offset.zero & size)
+      ..addRect(rect);
+  }
+
+  @override
+  bool shouldReclip(covariant _CropShadeClipper oldClipper) {
+    return oldClipper.rect != rect;
+  }
+}
+
+class _CropGridPainter extends CustomPainter {
+  const _CropGridPainter(this.rect, this.theme);
 
   final Rect rect;
   final ImageClipEditorTheme theme;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final shade = Paint()..color = theme.cropShadeColor;
-    final path = Path()
-      ..fillType = PathFillType.evenOdd
-      ..addRect(Offset.zero & size)
-      ..addRect(rect);
-    canvas.drawPath(path, shade);
-
     final grid = Paint()
       ..color = theme.cropGridColor
       ..strokeWidth = 1;
@@ -41,7 +83,7 @@ class _CropShadePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _CropShadePainter oldDelegate) {
+  bool shouldRepaint(covariant _CropGridPainter oldDelegate) {
     return oldDelegate.rect != rect || oldDelegate.theme != theme;
   }
 }

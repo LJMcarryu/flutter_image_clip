@@ -64,7 +64,7 @@ After the package is published to pub.dev, add it to your app:
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.10.4
+  flutter_image_clip: ^0.11.0
 ```
 
 Then run:
@@ -293,7 +293,8 @@ ImageClipEditor(
     accentSurfaceColor: Color(0xFFD6F1E1),
     onAccentColor: Color(0xFFFFFFFF),
     progressColor: Color(0xFF10B062),
-    cropShadeColor: Color(0x80000000),
+    cropShadeColor: Color(0x99FFFFFF),
+    cropShadeBlurSigma: 20,
     cropBorderColor: Color(0xFFFFFFFF),
   ),
 )

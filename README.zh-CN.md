@@ -44,7 +44,7 @@
 
 ```yaml
 dependencies:
-  flutter_image_clip: ^0.10.4
+  flutter_image_clip: ^0.11.0
 ```
 
 执行：
@@ -144,6 +144,8 @@ controller.cancelTask();
 ImageClipEditor(
   theme: const ImageClipEditorTheme(
     progressColor: Color(0xFF10B062),
+    cropShadeColor: Color(0x99FFFFFF),
+    cropShadeBlurSigma: 20,
   ),
 )
 ```
