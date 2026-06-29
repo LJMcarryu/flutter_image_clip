@@ -910,8 +910,8 @@ void main() {
     const theme = ImageClipEditorTheme();
 
     expect(theme.cropBorderColor, const Color(0xFFFFFFFF));
-    expect(theme.cropShadeColor, const Color(0x99FFFFFF));
-    expect(theme.cropShadeBlurSigma, 20);
+    expect(theme.cropShadeColor, const Color(0x4D000000));
+    expect(theme.cropShadeBlurSigma, 15);
     expect(theme.previewBackgroundColor, const Color(0xFFF8F9FA));
     expect(theme.imageBackgroundColor, const Color(0xFFF8F9FA));
     expect(theme.surfaceColor, const Color(0xFFFFFFFF));
@@ -975,8 +975,8 @@ void main() {
       );
 
       expect(theme.cropBorderColor, const Color(0xFFFFFFFF));
-      expect(theme.cropShadeColor, const Color(0x99FFFFFF));
-      expect(theme.cropShadeBlurSigma, 20);
+      expect(theme.cropShadeColor, const Color(0x4D000000));
+      expect(theme.cropShadeBlurSigma, 15);
       expect(theme.previewBackgroundColor, const Color(0xFFF8F9FA));
       expect(theme.imageBackgroundColor, const Color(0xFFF8F9FA));
       expect(theme.surfaceColor, const Color(0xFFFFFFFF));

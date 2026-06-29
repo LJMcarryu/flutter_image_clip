@@ -21,8 +21,8 @@ class ImageClipEditorTheme {
     this.accentSurfaceColor = const Color(0xFFD6F1E1),
     this.onAccentColor = const Color(0xFFFFFFFF),
     this.progressColor = const Color(0xFF10B062),
-    this.cropShadeColor = const Color(0x99FFFFFF),
-    this.cropShadeBlurSigma = 20,
+    this.cropShadeColor = const Color(0x4D000000),
+    this.cropShadeBlurSigma = 15,
     this.cropBorderColor = const Color(0xFFFFFFFF),
     this.cropGridColor = const Color(0x99FFFFFF),
     this.borderRadius = 8,
@@ -81,7 +81,7 @@ class ImageClipEditorTheme {
         accentSurfaceColor: const Color(0xFF173927),
         onAccentColor: const Color(0xFFFFFFFF),
         progressColor: const Color(0xFF10B062),
-        cropShadeColor: const Color(0x99FFFFFF),
+        cropShadeColor: const Color(0x4D000000),
       );
 
   /// Creates a theme from a Flutter [ColorScheme].
@@ -120,7 +120,7 @@ class ImageClipEditorTheme {
       accentSurfaceColor: colorScheme.primaryContainer,
       onAccentColor: colorScheme.onPrimary,
       progressColor: colorScheme.primary,
-      cropShadeColor: const Color(0x99FFFFFF),
+      cropShadeColor: const Color(0x4D000000),
       cropBorderColor: dark ? colorScheme.primary : const Color(0xFFFFFFFF),
       cropGridColor: dark
           ? _imageClipColorWithOpacity(colorScheme.primary, 0.62)
