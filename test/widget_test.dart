@@ -324,9 +324,7 @@ void main() {
     );
   });
 
-  testWidgets('renders the crop shade without a Gaussian blur', (
-    tester,
-  ) async {
+  testWidgets('renders the crop shade without a Gaussian blur', (tester) async {
     await pumpClippingApp(
       tester,
       editor: ImageClipEditor(
