@@ -22,7 +22,6 @@ class ImageClipEditorTheme {
     this.onAccentColor = const Color(0xFFFFFFFF),
     this.progressColor = const Color(0xFF10B062),
     this.cropShadeColor = const Color(0x4D000000),
-    this.cropShadeBlurSigma = 15,
     this.cropBorderColor = const Color(0xFFFFFFFF),
     this.cropGridColor = const Color(0x99FFFFFF),
     this.borderRadius = 8,
@@ -42,8 +41,7 @@ class ImageClipEditorTheme {
     this.aspectRatioRowTop = 112,
     this.aspectRatioGap = 24,
     this.aspectRatioGlyphBorderRadius = 2,
-  }) : assert(cropShadeBlurSigma >= 0),
-       assert(borderRadius >= 0),
+  }) : assert(borderRadius >= 0),
        assert(cropBorderWidth >= 0),
        assert(aspectRatioBorderWidth >= 0),
        assert(topBarHeight > 0),
@@ -182,9 +180,6 @@ class ImageClipEditorTheme {
   /// Overlay color outside the crop frame.
   final Color cropShadeColor;
 
-  /// Gaussian blur sigma applied behind the overlay outside the crop frame.
-  final double cropShadeBlurSigma;
-
   /// Crop frame border color.
   final Color cropBorderColor;
 
@@ -262,7 +257,6 @@ class ImageClipEditorTheme {
     Color? onAccentColor,
     Color? progressColor,
     Color? cropShadeColor,
-    double? cropShadeBlurSigma,
     Color? cropBorderColor,
     Color? cropGridColor,
     double? borderRadius,
@@ -303,7 +297,6 @@ class ImageClipEditorTheme {
       onAccentColor: onAccentColor ?? this.onAccentColor,
       progressColor: progressColor ?? this.progressColor,
       cropShadeColor: cropShadeColor ?? this.cropShadeColor,
-      cropShadeBlurSigma: cropShadeBlurSigma ?? this.cropShadeBlurSigma,
       cropBorderColor: cropBorderColor ?? this.cropBorderColor,
       cropGridColor: cropGridColor ?? this.cropGridColor,
       borderRadius: borderRadius ?? this.borderRadius,

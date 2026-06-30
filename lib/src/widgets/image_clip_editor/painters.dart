@@ -14,32 +14,11 @@ class _CropShade extends StatelessWidget {
         children: [
           ClipPath(
             clipper: _CropShadeClipper(rect),
-            child: _BlurredCropShade(theme: theme),
+            child: ColoredBox(color: theme.cropShadeColor),
           ),
           CustomPaint(painter: _CropGridPainter(rect, theme)),
         ],
       ),
-    );
-  }
-}
-
-class _BlurredCropShade extends StatelessWidget {
-  const _BlurredCropShade({required this.theme});
-
-  final ImageClipEditorTheme theme;
-
-  @override
-  Widget build(BuildContext context) {
-    final child = ColoredBox(color: theme.cropShadeColor);
-    if (theme.cropShadeBlurSigma == 0) {
-      return child;
-    }
-    return BackdropFilter(
-      filter: ui.ImageFilter.blur(
-        sigmaX: theme.cropShadeBlurSigma,
-        sigmaY: theme.cropShadeBlurSigma,
-      ),
-      child: child,
     );
   }
 }

@@ -294,7 +294,6 @@ ImageClipEditor(
     onAccentColor: Color(0xFFFFFFFF),
     progressColor: Color(0xFF10B062),
     cropShadeColor: Color(0x4D000000),
-    cropShadeBlurSigma: 15,
     cropBorderColor: Color(0xFFFFFFFF),
   ),
 )

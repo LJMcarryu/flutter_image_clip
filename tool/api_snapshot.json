@@ -520,7 +520,7 @@
     {
       "file": "lib/src/widgets/image_clip_editor/theme.dart",
       "declarations": [
-        "  constructor ImageClipEditorTheme(this.backgroundColor, this.previewBackgroundColor, this.surfaceColor, this.imageBackgroundColor, this.tileColor, this.borderColor, this.strongBorderColor, this.primaryTextColor, this.controlTextColor, this.secondaryTextColor, this.disabledTextColor, this.inactiveTextColor, this.closeIconColor, this.accentColor, this.accentSurfaceColor, this.onAccentColor, this.progressColor, this.cropShadeColor, this.cropShadeBlurSigma, this.cropBorderColor, this.cropGridColor, this.borderRadius, this.cropBorderWidth, this.aspectRatioBorderWidth, this.topBarHeight, this.bottomBarHeight, this.compactBottomBarHeight, this.bottomBarContentHeight, this.bottomBarHorizontalPadding, this.maxSaveButtonWidth, this.saveButtonHeight, this.saveButtonTop, this.positionHintTop, this.toolRowTop, this.toolButtonGap, this.aspectRatioRowTop, this.aspectRatioGap, this.aspectRatioGlyphBorderRadius)",
+        "  constructor ImageClipEditorTheme(this.backgroundColor, this.previewBackgroundColor, this.surfaceColor, this.imageBackgroundColor, this.tileColor, this.borderColor, this.strongBorderColor, this.primaryTextColor, this.controlTextColor, this.secondaryTextColor, this.disabledTextColor, this.inactiveTextColor, this.closeIconColor, this.accentColor, this.accentSurfaceColor, this.onAccentColor, this.progressColor, this.cropShadeColor, this.cropBorderColor, this.cropGridColor, this.borderRadius, this.cropBorderWidth, this.aspectRatioBorderWidth, this.topBarHeight, this.bottomBarHeight, this.compactBottomBarHeight, this.bottomBarContentHeight, this.bottomBarHorizontalPadding, this.maxSaveButtonWidth, this.saveButtonHeight, this.saveButtonTop, this.positionHintTop, this.toolRowTop, this.toolButtonGap, this.aspectRatioRowTop, this.aspectRatioGap, this.aspectRatioGlyphBorderRadius)",
         "  constructor ImageClipEditorTheme.dark()",
         "  constructor ImageClipEditorTheme.fromColorScheme(ColorScheme colorScheme)",
         "  field ImageClipEditorTheme.accentColor",
@@ -541,7 +541,6 @@
         "  field ImageClipEditorTheme.cropBorderColor",
         "  field ImageClipEditorTheme.cropBorderWidth",
         "  field ImageClipEditorTheme.cropGridColor",
-        "  field ImageClipEditorTheme.cropShadeBlurSigma",
         "  field ImageClipEditorTheme.cropShadeColor",
         "  field ImageClipEditorTheme.disabledTextColor",
         "  field ImageClipEditorTheme.imageBackgroundColor",
@@ -561,7 +560,7 @@
         "  field ImageClipEditorTheme.toolButtonGap",
         "  field ImageClipEditorTheme.toolRowTop",
         "  field ImageClipEditorTheme.topBarHeight",
-        "  method ImageClipEditorTheme.copyWith(Color? backgroundColor, Color? previewBackgroundColor, Color? surfaceColor, Color? imageBackgroundColor, Color? tileColor, Color? borderColor, Color? strongBorderColor, Color? primaryTextColor, Color? controlTextColor, Color? secondaryTextColor, Color? disabledTextColor, Color? inactiveTextColor, Color? closeIconColor, Color? accentColor, Color? accentSurfaceColor, Color? onAccentColor, Color? progressColor, Color? cropShadeColor, double? cropShadeBlurSigma, Color? cropBorderColor, Color? cropGridColor, double? borderRadius, double? cropBorderWidth, double? aspectRatioBorderWidth, double? topBarHeight, double? bottomBarHeight, double? compactBottomBarHeight, double? bottomBarContentHeight, double? bottomBarHorizontalPadding, double? maxSaveButtonWidth, double? saveButtonHeight, double? saveButtonTop, double? positionHintTop, double? toolRowTop, double? toolButtonGap, double? aspectRatioRowTop, double? aspectRatioGap, double? aspectRatioGlyphBorderRadius)",
+        "  method ImageClipEditorTheme.copyWith(Color? backgroundColor, Color? previewBackgroundColor, Color? surfaceColor, Color? imageBackgroundColor, Color? tileColor, Color? borderColor, Color? strongBorderColor, Color? primaryTextColor, Color? controlTextColor, Color? secondaryTextColor, Color? disabledTextColor, Color? inactiveTextColor, Color? closeIconColor, Color? accentColor, Color? accentSurfaceColor, Color? onAccentColor, Color? progressColor, Color? cropShadeColor, Color? cropBorderColor, Color? cropGridColor, double? borderRadius, double? cropBorderWidth, double? aspectRatioBorderWidth, double? topBarHeight, double? bottomBarHeight, double? compactBottomBarHeight, double? bottomBarContentHeight, double? bottomBarHorizontalPadding, double? maxSaveButtonWidth, double? saveButtonHeight, double? saveButtonTop, double? positionHintTop, double? toolRowTop, double? toolButtonGap, double? aspectRatioRowTop, double? aspectRatioGap, double? aspectRatioGlyphBorderRadius)",
         "class ImageClipEditorTheme"
       ]
     }

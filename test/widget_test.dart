@@ -324,19 +324,19 @@ void main() {
     );
   });
 
-  testWidgets('applies Gaussian blur to the default crop shade', (
+  testWidgets('renders the crop shade without a Gaussian blur', (
     tester,
   ) async {
     await pumpClippingApp(
       tester,
       editor: ImageClipEditor(
         initialImageBytes: _pngBytes(160, 120),
-        initialImageLabel: 'blurred-shade.png',
+        initialImageLabel: 'crop-shade.png',
         loadSampleOnStart: false,
       ),
     );
 
-    expect(find.byType(BackdropFilter), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsNothing);
   });
 
   testWidgets('matches Figma default mobile chrome metrics', (tester) async {
@@ -911,7 +911,6 @@ void main() {
 
     expect(theme.cropBorderColor, const Color(0xFFFFFFFF));
     expect(theme.cropShadeColor, const Color(0x4D000000));
-    expect(theme.cropShadeBlurSigma, 15);
     expect(theme.previewBackgroundColor, const Color(0xFFF8F9FA));
     expect(theme.imageBackgroundColor, const Color(0xFFF8F9FA));
     expect(theme.surfaceColor, const Color(0xFFFFFFFF));
@@ -931,7 +930,6 @@ void main() {
       maxSaveButtonWidth: 300,
       saveButtonHeight: 52,
       saveButtonTop: 224,
-      cropShadeBlurSigma: 16,
       positionHintTop: 18,
       toolRowTop: 56,
       toolButtonGap: 36,
@@ -943,7 +941,6 @@ void main() {
     final copied = theme.copyWith(
       topBarHeight: 60,
       saveButtonHeight: 44,
-      cropShadeBlurSigma: 8,
       aspectRatioGap: 20,
     );
 
@@ -955,7 +952,6 @@ void main() {
     expect(copied.maxSaveButtonWidth, 300);
     expect(copied.saveButtonHeight, 44);
     expect(copied.saveButtonTop, 224);
-    expect(copied.cropShadeBlurSigma, 8);
     expect(copied.positionHintTop, 18);
     expect(copied.toolRowTop, 56);
     expect(copied.toolButtonGap, 36);
@@ -976,7 +972,6 @@ void main() {
 
       expect(theme.cropBorderColor, const Color(0xFFFFFFFF));
       expect(theme.cropShadeColor, const Color(0x4D000000));
-      expect(theme.cropShadeBlurSigma, 15);
       expect(theme.previewBackgroundColor, const Color(0xFFF8F9FA));
       expect(theme.imageBackgroundColor, const Color(0xFFF8F9FA));
       expect(theme.surfaceColor, const Color(0xFFFFFFFF));
